@@ -1,0 +1,99 @@
+# ---- Local-only agent/working files (never commit) ----
+CLAUDE.md
+CODEX_CHANGELOG.md
+.claude/
+.codex/
+
+# ---- .NET / Visual Studio ----
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userprefs
+*.pidb
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.publishsettings
+*.opendb
+*.VC.db
+*.VC.VC.opendb
+.vs/
+.vshistory/
+
+# MSBuild
+*.binlog
+*.tlog
+msbuild.log
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!packages/build/
+*.nuget.props
+*.nuget.targets
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+publish/
+
+# Rider / VS Code
+.idea/
+.vscode/
+*.iml
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+
+# Coverlet / code coverage
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# ---- OS junk ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# ---- User data / secrets ----
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+secrets/
+*.pfx
+*.snk
+appsettings.Local.json
+appsettings.*.Local.json
+
+# ---- TeamStation local dev artifacts ----
+TeamStation.db
+teamstation-*.log
+*.backup
