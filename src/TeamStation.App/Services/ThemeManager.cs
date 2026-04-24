@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using Microsoft.Win32;
 using System.Runtime.InteropServices;
 
 namespace TeamStation.App.Services;
@@ -12,10 +13,14 @@ public static class ThemeManager
 {
     private const int DwmAttributeUseImmersiveDarkMode = 20;
     private const int DwmAttributeUseImmersiveDarkModeBefore20H1 = 19;
+    private const string SystemThemeId = "System";
+    private const string DefaultThemeId = "Dark";
+    private const string PersonalizeRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
     private static string _currentThemeId = "Dark";
 
     public static IReadOnlyList<AppTheme> Themes { get; } =
     [
+        new(SystemThemeId, "System"),
         new("Dark", "Dark"),
         new("Graphite", "Graphite"),
         new("Light", "Light"),
@@ -45,7 +50,8 @@ public static class ThemeManager
             RedSoft: Color.FromArgb(0x24, 0xF8, 0x71, 0x71),
             YellowSoft: Color.FromArgb(0x24, 0xF5, 0xC5, 0x42),
             PanelBorder: Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF),
-            InputBorder: Color.FromArgb(0x55, 0x8A, 0x8A, 0x8A)),
+            InputBorder: Color.FromArgb(0x55, 0x8A, 0x8A, 0x8A),
+            DangerBorder: Color.FromArgb(0x66, 0xF8, 0x71, 0x71)),
         ["Graphite"] = new(
             Base: Color.FromRgb(0x18, 0x18, 0x18),
             Mantle: Color.FromRgb(0x20, 0x20, 0x20),
@@ -67,7 +73,8 @@ public static class ThemeManager
             RedSoft: Color.FromArgb(0x24, 0xFF, 0x8A, 0x8A),
             YellowSoft: Color.FromArgb(0x24, 0xE6, 0xC2, 0x66),
             PanelBorder: Color.FromArgb(0x3A, 0xFF, 0xFF, 0xFF),
-            InputBorder: Color.FromArgb(0x55, 0x99, 0x99, 0x99)),
+            InputBorder: Color.FromArgb(0x55, 0x99, 0x99, 0x99),
+            DangerBorder: Color.FromArgb(0x66, 0xFF, 0x8A, 0x8A)),
         ["Light"] = new(
             Base: Color.FromRgb(0xF4, 0xF5, 0xF7),
             Mantle: Color.FromRgb(0xFF, 0xFF, 0xFF),
@@ -89,7 +96,8 @@ public static class ThemeManager
             RedSoft: Color.FromArgb(0x18, 0xB9, 0x1C, 0x1C),
             YellowSoft: Color.FromArgb(0x18, 0x9A, 0x67, 0x13),
             PanelBorder: Color.FromArgb(0x30, 0x1F, 0x29, 0x37),
-            InputBorder: Color.FromArgb(0x55, 0x6B, 0x72, 0x80)),
+            InputBorder: Color.FromArgb(0x55, 0x6B, 0x72, 0x80),
+            DangerBorder: Color.FromArgb(0x55, 0xB9, 0x1C, 0x1C)),
         ["HighContrast"] = new(
             Base: Colors.Black,
             Mantle: Color.FromRgb(0x08, 0x08, 0x08),
@@ -111,18 +119,34 @@ public static class ThemeManager
             RedSoft: Color.FromArgb(0x32, 0xFF, 0x5C, 0x7A),
             YellowSoft: Color.FromArgb(0x32, 0xFF, 0xD7, 0x52),
             PanelBorder: Color.FromArgb(0x75, 0xFF, 0xFF, 0xFF),
-            InputBorder: Color.FromArgb(0xAA, 0xFF, 0xFF, 0xFF)),
+            InputBorder: Color.FromArgb(0xAA, 0xFF, 0xFF, 0xFF),
+            DangerBorder: Color.FromArgb(0xAA, 0xFF, 0x5C, 0x7A)),
     };
 
-    public static string Normalize(string? themeId) =>
-        themeId is not null && Palettes.ContainsKey(themeId) ? themeId : "Dark";
+    public static string Normalize(string? themeId)
+    {
+        if (string.IsNullOrWhiteSpace(themeId))
+            return DefaultThemeId;
+
+        if (IsSystemTheme(themeId))
+            return SystemThemeId;
+
+        foreach (var id in Palettes.Keys)
+        {
+            if (string.Equals(id, themeId, StringComparison.OrdinalIgnoreCase))
+                return id;
+        }
+
+        return DefaultThemeId;
+    }
 
     public static void Apply(string? themeId)
     {
         if (Application.Current is not { } app)
             return;
 
-        _currentThemeId = Normalize(themeId);
+        var normalizedThemeId = Normalize(themeId);
+        _currentThemeId = ResolveThemeId(normalizedThemeId);
         var palette = Palettes[_currentThemeId];
         Set(app, nameof(Palette.Base), palette.Base);
         Set(app, nameof(Palette.Mantle), palette.Mantle);
@@ -145,6 +169,7 @@ public static class ThemeManager
         Set(app, nameof(Palette.YellowSoft), palette.YellowSoft);
         Set(app, nameof(Palette.PanelBorder), palette.PanelBorder);
         Set(app, nameof(Palette.InputBorder), palette.InputBorder);
+        Set(app, nameof(Palette.DangerBorder), palette.DangerBorder);
 
         foreach (Window window in app.Windows)
             ApplyWindowChrome(window);
@@ -178,6 +203,30 @@ public static class ThemeManager
         // old frozen brush will not re-theme until the view is re-created,
         // which is acceptable for the rare freeze path.
         app.Resources[brushKey] = new SolidColorBrush(color);
+    }
+
+    private static string ResolveThemeId(string normalizedThemeId)
+    {
+        if (!IsSystemTheme(normalizedThemeId))
+            return normalizedThemeId;
+
+        return IsSystemLightTheme() ? "Light" : DefaultThemeId;
+    }
+
+    private static bool IsSystemTheme(string themeId) =>
+        string.Equals(themeId, SystemThemeId, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsSystemLightTheme()
+    {
+        try
+        {
+            using var personalize = Registry.CurrentUser.OpenSubKey(PersonalizeRegistryPath);
+            return personalize?.GetValue("AppsUseLightTheme") is int value && value > 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void ApplyWindowChrome(Window window)
@@ -224,5 +273,6 @@ public static class ThemeManager
         Color RedSoft,
         Color YellowSoft,
         Color PanelBorder,
-        Color InputBorder);
+        Color InputBorder,
+        Color DangerBorder);
 }

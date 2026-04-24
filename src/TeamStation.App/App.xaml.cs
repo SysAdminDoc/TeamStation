@@ -50,7 +50,7 @@ public partial class App : Application
             _ownsSingleInstanceMutex = createdNew;
             if (!createdNew)
             {
-                ThemeManager.Apply("Dark");
+                ThemeManager.Apply("System");
                 ThemedMessageDialog.Show(
                     null,
                     "TeamStation",

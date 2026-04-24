@@ -32,6 +32,7 @@
             <Color x:Key="YellowSoft">#24F5C542</Color>
             <Color x:Key="PanelBorder">#38FFFFFF</Color>
             <Color x:Key="InputBorder">#558A8A8A</Color>
+            <Color x:Key="DangerBorder">#66F87171</Color>
 
             <SolidColorBrush x:Key="BaseBrush" Color="{StaticResource Base}" />
             <SolidColorBrush x:Key="MantleBrush" Color="{StaticResource Mantle}" />
@@ -54,6 +55,7 @@
             <SolidColorBrush x:Key="YellowSoftBrush" Color="{StaticResource YellowSoft}" />
             <SolidColorBrush x:Key="PanelBorderBrush" Color="{StaticResource PanelBorder}" />
             <SolidColorBrush x:Key="InputBorderBrush" Color="{StaticResource InputBorder}" />
+            <SolidColorBrush x:Key="DangerBorderBrush" Color="{StaticResource DangerBorder}" />
 
             <!--  Elevation: subtle, never aggressive. Two layers below top-level cards
                   so the inspector reads as the primary surface without a heavy drop.  -->
@@ -175,6 +177,14 @@
                 <Setter Property="SnapsToDevicePixels" Value="True" />
             </Style>
 
+            <Style x:Key="ValidationBanner" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource DangerBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="14,12" />
+            </Style>
+
             <!--  Button — the foundation of every CTA. Keyboard-focus state is
                   explicit (tinted outline) so Tab navigation is not invisible;
                   hover/press states are subtle enough to read as a single surface.  -->
@@ -266,7 +276,7 @@
             <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                 <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
                 <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
-                <Setter Property="BorderBrush" Value="#44E86D8F" />
+                <Setter Property="BorderBrush" Value="{StaticResource DangerBorderBrush}" />
             </Style>
 
             <!--  Icon-only — 36x36 square; fits symbol glyphs with no label.  -->

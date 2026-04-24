@@ -59,7 +59,7 @@
                         <ComboBox x:Name="ThemeBox"
                                   DisplayMemberPath="Name"
                                   SelectedValuePath="Id" />
-                        <TextBlock Margin="0,6,0,0" Text="Dark is the default; Graphite, Light, and High contrast are included for different working environments." Style="{StaticResource BodyMutedText}" />
+                        <TextBlock Margin="0,6,0,0" Text="System follows Windows app mode; Dark, Graphite, Light, and High contrast are available for fixed environments." Style="{StaticResource BodyMutedText}" />
                     </StackPanel>
                 </Border>
 

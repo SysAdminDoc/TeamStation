@@ -49,11 +49,7 @@
         <Border x:Name="ValidationBorder"
                 Grid.Row="1"
                 Margin="0,16,0,0"
-                Padding="14,12"
-                Background="{StaticResource RedSoftBrush}"
-                BorderBrush="#44E86D8F"
-                BorderThickness="1"
-                CornerRadius="8"
+                Style="{StaticResource ValidationBanner}"
                 Visibility="Collapsed">
             <StackPanel Orientation="Horizontal">
                 <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
@@ -99,11 +95,36 @@
                         </Grid>
 
                         <WrapPanel Margin="0,12,0,0">
-                            <Button Content="Blue" Tag="#7CB8FF" Margin="0,0,8,8" Click="AccentPreset_Click" />
-                            <Button Content="Mint" Tag="#9AE6B4" Margin="0,0,8,8" Click="AccentPreset_Click" />
-                            <Button Content="Rose" Tag="#FFA2B6" Margin="0,0,8,8" Click="AccentPreset_Click" />
-                            <Button Content="Gold" Tag="#F4D27A" Margin="0,0,8,8" Click="AccentPreset_Click" />
-                            <Button Content="Lavender" Tag="#D4B0FF" Margin="0,0,8,8" Click="AccentPreset_Click" />
+                            <Button Tag="#7CB8FF" Margin="0,0,8,8" ToolTip="Blue" Click="AccentPreset_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="14" Height="14" CornerRadius="4" Background="#7CB8FF" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" Margin="0,0,7,0" />
+                                    <TextBlock Text="Blue" />
+                                </StackPanel>
+                            </Button>
+                            <Button Tag="#9AE6B4" Margin="0,0,8,8" ToolTip="Mint" Click="AccentPreset_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="14" Height="14" CornerRadius="4" Background="#9AE6B4" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" Margin="0,0,7,0" />
+                                    <TextBlock Text="Mint" />
+                                </StackPanel>
+                            </Button>
+                            <Button Tag="#FFA2B6" Margin="0,0,8,8" ToolTip="Rose" Click="AccentPreset_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="14" Height="14" CornerRadius="4" Background="#FFA2B6" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" Margin="0,0,7,0" />
+                                    <TextBlock Text="Rose" />
+                                </StackPanel>
+                            </Button>
+                            <Button Tag="#F4D27A" Margin="0,0,8,8" ToolTip="Gold" Click="AccentPreset_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="14" Height="14" CornerRadius="4" Background="#F4D27A" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" Margin="0,0,7,0" />
+                                    <TextBlock Text="Gold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Tag="#D4B0FF" Margin="0,0,8,8" ToolTip="Lavender" Click="AccentPreset_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="14" Height="14" CornerRadius="4" Background="#D4B0FF" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" Margin="0,0,7,0" />
+                                    <TextBlock Text="Lavender" />
+                                </StackPanel>
+                            </Button>
                             <Button Content="Clear" Style="{StaticResource GhostButton}" Margin="0,0,0,8" Click="ClearAccent_Click" />
                         </WrapPanel>
 

@@ -1049,6 +1049,9 @@
                                         <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsMouseOver}" Value="True">
                                             <Setter TargetName="FolderRow" Property="Background" Value="{StaticResource Surface1Brush}" />
                                         </DataTrigger>
+                                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsKeyboardFocusWithin}" Value="True">
+                                            <Setter TargetName="FolderRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
+                                        </DataTrigger>
                                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                             <Setter TargetName="FolderRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
                                             <Setter TargetName="FolderRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
@@ -1101,6 +1104,9 @@
                                     <DataTemplate.Triggers>
                                         <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsMouseOver}" Value="True">
                                             <Setter TargetName="EntryRow" Property="Background" Value="{StaticResource Surface1Brush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsKeyboardFocusWithin}" Value="True">
+                                            <Setter TargetName="EntryRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                             <Setter TargetName="EntryRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
