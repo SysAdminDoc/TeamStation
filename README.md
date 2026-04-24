@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.0.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.2-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,7 +31,7 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 
 ## Status
 
-`v0.0.1` — Repository scaffold. Implementation in progress. See [ROADMAP.md](ROADMAP.md) for the prioritized feature plan.
+`v0.0.2` — Solution scaffold builds cleanly (0 warnings / 0 errors) and the WPF window opens. Core models, CVE-2020-13699-hardened CLI/URI builders, and the TeamViewer path resolver are in place. The `TvLaunchSpike` console tool is ready to run the two feasibility tests queued in [ROADMAP.md](ROADMAP.md). No data persistence yet; no launch wired to the UI. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Planned feature highlights (v0.1.0)
 
@@ -53,20 +53,30 @@ Full roadmap with P0 / P1 / P2 prioritization: [ROADMAP.md](ROADMAP.md).
 - **Known residual risk:** launching a session passes `--Password` on the TeamViewer command line. That value is visible to any process on the machine that can read the command line of another user-owned process during the brief launch window. This is inherent to the TeamViewer CLI and affects any launcher, including manually-typed commands. TeamStation will default to `--Base64Password` (still inspectable but obscured) and document this transparently.
 - TeamStation never phones home. There is no telemetry, no update ping, no cloud account.
 
-## Build (planned)
+## Build
+
+Requires:
+- .NET 9 SDK (`9.0.313` or newer; pinned via [`global.json`](global.json))
+- Windows 10 1809+ or Windows 11
+- TeamViewer 15 Classic or TeamViewer Remote (full client) — only needed at runtime, not at build time
 
 ```powershell
-# Will require:
-#   - .NET 9 SDK
-#   - Windows 10 1809+ or Windows 11
-#   - TeamViewer 15 Classic or TeamViewer Remote (full client, not QuickSupport)
-
 dotnet restore
 dotnet build -c Release
-dotnet publish -c Release -r win-x64 --self-contained false
 ```
 
-Release binaries will be published on the [Releases](../../releases) page once the first working build ships.
+Run the WPF shell:
+```powershell
+dotnet run --project src/TeamStation.App -c Release
+```
+
+Run the launch-feasibility spike (needs a real TeamViewer peer you own):
+```powershell
+dotnet run --project tools/TvLaunchSpike -c Release -- --id <TV_ID> --password <PW>
+```
+It walks the CLI and URI-handler test matrix, captures operator observations, and writes `spike-report.md` next to the binary.
+
+Release binaries will be published on the [Releases](../../releases) page once the first working build ships as `v0.1.0`.
 
 ## Why not just use mRemoteNG?
 
