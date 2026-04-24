@@ -124,18 +124,54 @@ Each of these needs a 1–2 hour prototype before committing architecture around
 
 ---
 
-## v0.3.0 — in flight (iteration 1, 2026-04-24)
+## v0.3.0 — in flight (iteration 1 shipped, 2026-04-24)
 
 The advanced workflow features from the v0.1.2 internal / v0.2.0 / v0.2.1 waves landed on `main` without a GitHub release. v0.3.0 cuts them together with a security-and-test-coverage hardening pass.
 
-- [ ] **P0 — Version cut.** Bump `Directory.Build.props`, README badge, and the `v0.3.0` CHANGELOG entry to reflect the sum of the v0.1.2, v0.2.0, and v0.2.1 content already on HEAD. No feature re-delivery — this is the first external release of that work.
-- [ ] **P0 — CVE-2020-13699 regression suite.** Curated vector tests derived from the 2020 advisory (argv injection via `--play`, `\\UNC` smuggling, colon/slash splitters, whitespace encoding, leading-hyphen probes) driven against both `LaunchInputValidator` and `UriSchemeBuilder`. Pinned test file so any regression fails CI before code review.
-- [ ] **P0 — LaunchInputValidator fuzz coverage.** Randomized input fuzz (10k+ draws per run) asserting the contract invariant: *any* rejection surfaces as `LaunchValidationException`, never an unhandled exception. Catches `IndexOutOfRange`, `NullReference`, `Regex` engine edge cases.
-- [ ] **P0 — DPAPI / AES-GCM round-trip edge cases.** Empty-string, null-byte-embedded, maximum-length (512 KiB), surrogate-pair and invariant-culture plaintexts. Tamper-probe each ciphertext byte independently and assert `CryptographicException` every time.
-- [ ] **P0 — Schema migration with malformed rows.** Seed a synthetic v1 database whose `entries` rows contain out-of-range enum ints (`mode=99`), NULL text columns not allowed by later schema, and trailing whitespace in primary keys. Migrate to v3 and assert either a defined quarantine path or a clean rescue of every recoverable row — never a silent data drop.
+- [x] **P0 — Version cut.** Bump `Directory.Build.props`, README badge, and the `v0.3.0` CHANGELOG entry to reflect the sum of the v0.1.2, v0.2.0, and v0.2.1 content already on HEAD. Shipped in iteration 1.
+- [x] **P0 — CVE-2020-13699 regression suite.** `CveRegressionTests` drives curated vectors against the validator, CLI argv builder, and URI scheme builder. Uncovered two real validator bugs fixed in the same iteration (ASCII-only ID regex, proxy host hardening).
+- [x] **P0 — LaunchInputValidator fuzz coverage.** `ValidatorFuzzTests` — 10k draws per run assert the exception-contract invariant.
+- [x] **P0 — DPAPI / AES-GCM round-trip edge cases.** `CryptoEdgeCaseTests` covers empty / null-byte / 512 KiB / surrogate / invariant-culture / per-byte tamper / nonce-uniqueness / corrupt-salt.
+- [x] **P0 — Schema migration with malformed rows.** `SchemaMigrationTests` seeds v1 rows with out-of-range enum ints, whitespace-laden IDs, and oversized notes; asserts v1 → v3 rescues every recoverable row and that downstream builders never throw unexpected framework exceptions.
 - [ ] **P1 — Atomic-write crash simulation.** Force a failed `File.Move` (target directory read-only, file locked) during JSON backup export and during `SettingsService.Save`. Assert the original file is unchanged and the temp sidecar is cleaned up on the next run.
 - [ ] **P1 — DPAPI DEK rotation path.** Add a `CryptoService.RotateDek` entry point that generates a new DEK, re-encrypts every password column across `folders` + `entries` inside a single transaction, and replaces the wrapped DEK atomically. Rollback on any failure. Ship with a test that proves all plaintexts survive across rotation.
 - [ ] **P1 — Competitor gap matrix.** One-time landscape scan against mRemoteNG (external tools, inheritance), Royal TSX / Server (document-based vaults, SSH bastion), and Devolutions RDM free tier (entry templates, connection logs). Feed anything we're missing into this roadmap with a P-tier.
 - [ ] **P2 — Release rehearsal.** Local `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true` followed by a smoke-run of the packaged exe. Confirm the ~189 MB artifact boots and that the first-run trust notice fires before any persistence path executes.
 - [ ] **P2 — Continuation brief to CLAUDE.md.** Record what each iteration changed, what remains open, and any non-obvious lessons — so the next session resumes without rediscovering state.
 - [ ] **P1 — IPv6 proxy endpoint support.** `LaunchInputValidator.ValidateProxyEndpoint` splits on `:` and rejects any IPv6 literal (`[::1]:8080` becomes four parts). Known-limitation per existing tests; flagged again by the iteration-1 audit. Parse with `Uri` / `IPEndPoint.Parse` instead of `Split(':')`, keep the argv-injection guard on the host component, and extend `ProxyEndpointExploitVectors` with IPv6 shapes.
+
+### Iteration 2 additions (2026-04-24)
+
+- [x] **P1 — DPAPI DEK rotation.** `CryptoService.RotateDek(IKeyStore, Action<old, new> migrator)` landed, with four xUnit cases covering happy path, migrator-throws rollback, missing-DEK guard, refusal on master-password envelopes, and two-rotations-in-sequence distinctness.
+- [x] **P1 — Atomic-write crash simulation for `SettingsService.Save`.** Target path is forced into a directory so the rename step fails deterministically; tests assert the original file (or directory) is unchanged and no `*.tmp` residue survives, even after repeated failures.
+- [ ] **P1 — `CliArgvBuilder` range-checks for Quality / AccessControl.** Today an out-of-range int sourced from a malformed DB row is emitted as `--quality 55` / `--ac -7`. TeamViewer will reject them but the guard belongs in the builder. Drop unknown enum values (same pattern as unknown `Mode`), log the fallback at Warning severity.
+- [ ] **P2 — Extend fuzz coverage to `ProxyHost` + `ProxyUsername` + `ProxyPassword`.** The iteration-1 fuzz targets only the four public validator methods; full argv/URI-builder fuzz would catch boundary bugs missed by individual validators.
+- [ ] **P1 — Surface `RotateDek` in Settings UI.** Now that the crypto primitive exists, wire a "Rotate encryption key" button that runs the migrator across `folders` + `entries` inside a single `BEGIN IMMEDIATE` transaction. Rollback on any failure, toast + log on success.
+- [ ] **P1 — Apply atomic-write pattern to `JsonBackup` export.** Current `Export` path writes to temp + atomic move but lacks the exception-rollback-and-cleanup sidecar test proved necessary for `SettingsService`. Mirror the guarantee and pin it with a twin of `AtomicWriteCrashTests`.
+
+### Competitor gap matrix (iteration 2, 2026-04-24)
+
+One-time scan of the three most-cited OSS / freemium alternatives sysadmins compare TeamStation against. Surface existing parity first, then open gaps.
+
+**mRemoteNG** (GPL, C#, .NET Framework, multi-protocol) — parity on nested folders, drag-reorder, folder-level inheritance, credential encryption, external-tool launcher, quick-connect, search/filter. Gaps vs. TeamStation are intentional (TeamViewer-only charter). Areas where mRemoteNG still beats us:
+
+- [ ] **P1 — Bulk operations.** Multi-select entries to set proxy / mode / AC / tag in one pass. Currently in P2; promoting to P1 on the strength of r/sysadmin threads calling it the #1 migration-friction point.
+- [ ] **P2 — Connection confirmation dialog.** Per-folder opt-in "ask before connecting" prompt. Hostile-environment use case; mRemoteNG's checkbox is widely used.
+
+**Royal TSX / Royal Server** (commercial, document-based, multi-vault) — parity on folder tree, credential inheritance, entry editor. Document-based vaults are explicitly out of scope (we're single-database). Real gaps:
+
+- [ ] **P2 — Entry templates.** A "template" folder whose children inherit from it by reference (not by creation-time snapshot). New entries from that folder pick up updates when the template changes. Superset of current folder-default cascade.
+- [ ] **P2 — Credential providers beyond the local DB.** KeePass / Bitwarden / 1Password read-only lookup at launch time. Already in P2 backlog; noted here for cross-reference.
+
+**Devolutions Remote Desktop Manager free tier** (commercial, multi-protocol, 2026) — parity on tray-menu quick launch, pin/unpin entries, drag-reorder, session history export, tags. Gaps:
+
+- [ ] **P2 — Per-entry TOTP seed (RFC 6238).** Already in P2 — restated because RDM's implementation is the benchmark to beat. Click-to-copy, never transmitted.
+- [ ] **P1 — Session-report dashboard (read-only).** Top-N devices by hours, day-of-week heatmap, pulled from the existing session_history table. Cross-referenced with the Web API `/reports/connections` endpoint in the v1.0.0 block.
+- [ ] **P2 — Import from Devolutions RDM XML export.** CSV already supports the TeamViewer Management Console format; RDM exports XML. Add a second importer that maps `<Connection type="TeamViewer">` rows.
+
+**Where TeamStation wins today** — worth keeping in the README's "Why TeamStation" pitch:
+
+- Open-source, MIT. No freemium gate on credential storage.
+- TeamViewer-only focus means the URI matrix, CVE-2020-13699 hardening, and launch heuristics are tighter than any multi-protocol competitor that supports TeamViewer as one of twenty.
+- DPAPI-wrapped AES-GCM + Argon2id portable-mode KEK, audit log, and now DEK rotation — a full credential-handling story without a subscription.
+- Runtime inheritance resolver with a nullable-enum storage model: "inherit from folder" is a first-class value, not a magic-string sentinel.

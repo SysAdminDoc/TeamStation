@@ -19,6 +19,12 @@ Iteration 1 of the v0.3.0 cycle adds a hardening-and-coverage pass focused on se
 - **`LaunchInputValidator` fuzz.** 10k randomized-draw fuzz run per test invocation asserting the contract invariant: every rejection surfaces as `LaunchValidationException`, never an unhandled framework exception (`IndexOutOfRange`, `NullReference`, `Regex` engine quirks).
 - **Crypto edge cases.** Empty-string, null-byte-embedded, maximum-length (512 KiB), surrogate-pair, and invariant-culture plaintexts round-trip intact. Tamper-probe on each ciphertext byte independently still trips `CryptographicException`.
 - **Schema migration with malformed rows.** Synthetic v1 database whose rows carry out-of-range enum integers and trailing-whitespace IDs; v1 → v3 migration rescues every recoverable row without a silent data drop.
+- **Crypto rotation.** `CryptoRotationTests` exercises happy path (store rewrap + new ciphertext works + old ciphertext fails with tag mismatch), migrator-throws rollback (store untouched, original data still decrypts), guard paths (empty store, master-password envelope), and two-rotations-in-sequence produce three distinct wraps.
+- **Atomic-write crash simulation.** `AtomicWriteCrashTests` forces `SettingsService.Save`'s rename step to fail (target path made a directory), then asserts original is untouched, no `*.tmp` sidecar residue, and that a subsequent save still lands cleanly after the obstacle is removed.
+
+### Added — Feature
+
+- **`CryptoService.RotateDek(IKeyStore, Action<old, new> migrator)`.** Break-glass path when a user suspects their DPAPI profile is compromised. Generates a fresh 256-bit DEK and drives the caller-supplied migrator so every password column across `folders` + `entries` can be decrypted under the old DEK and re-encrypted under the new one. Ordering stages the new wrap into the store *before* the migrator runs; if the migrator throws, the old wrap is restored so downstream ciphertexts keep decrypting. The old DEK buffer is `ZeroMemory`'d once rotation completes. Master-password envelopes explicitly refuse rotation — that flow requires re-prompting and deriving a fresh Argon2id salt, which is a separate UX.
 
 ### Changed
 

@@ -222,6 +222,84 @@ public sealed class CryptoService
         return argon2.GetBytes(KeySize);
     }
 
+    /// <summary>
+    /// Generates a fresh 256-bit DEK and drives the caller-supplied
+    /// <paramref name="migrator"/> so every field currently encrypted under
+    /// the old DEK can be decrypted and re-encrypted under the new one.
+    /// The wrapped DEK in <paramref name="keyStore"/> is only replaced if
+    /// the migrator returns cleanly — any exception rolls back to the old
+    /// DEK so no row ends up orphaned in an indeterminate state.
+    /// </summary>
+    /// <remarks>
+    /// Rotation is currently DPAPI-only. Master-password envelopes are not
+    /// supported here — that path requires re-prompting for the master
+    /// password and deriving a fresh Argon2id salt, which is a separate
+    /// UX flow.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Raised when <paramref name="keyStore"/> has no wrapped DEK yet (nothing
+    /// to rotate from), or when the store holds a master-password envelope.
+    /// </exception>
+    public static CryptoService RotateDek(IKeyStore keyStore, Action<CryptoService, CryptoService> migrator)
+    {
+        ArgumentNullException.ThrowIfNull(keyStore);
+        ArgumentNullException.ThrowIfNull(migrator);
+
+        if (keyStore is ISecretStore secret && secret.LoadValue(MasterWrappedDekKey) is not null)
+            throw new InvalidOperationException(
+                "DEK rotation is not supported while the database is unlocked with a master password. "
+              + "Re-lock with DPAPI or implement the master-password rotation flow first.");
+
+        var oldWrapped = keyStore.Load()
+            ?? throw new InvalidOperationException("No DEK is stored; nothing to rotate from.");
+        var oldDek = ProtectedData.Unprotect(oldWrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+        if (oldDek.Length != KeySize)
+            throw new CryptographicException("Stored DEK has unexpected length.");
+
+        var newDek = RandomNumberGenerator.GetBytes(KeySize);
+        var oldSvc = new CryptoService(oldDek);
+        var newSvc = new CryptoService(newDek);
+        var newWrapped = ProtectedData.Protect(newDek, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+
+        // Ordering matters: stage the new wrap into the store BEFORE the
+        // migrator runs. The inverse ordering (migrate first, save second)
+        // leaves the DB in an indeterminate state if the final save step
+        // fails — rows already re-encrypted under the new DEK but the
+        // store still serving the old DEK means every password column
+        // becomes unrecoverable garbage.
+        //
+        // With this ordering, the two failure modes are:
+        //   1. Save fails: nothing downstream ran, no data touched.
+        //   2. Save succeeds but migrator throws: restore the old wrap
+        //      below so both the store and the (unchanged) DB rows fall
+        //      back to the old DEK consistently.
+        keyStore.Save(newWrapped);
+        try
+        {
+            migrator(oldSvc, newSvc);
+        }
+        catch
+        {
+            // Restore the previous wrap so the old ciphertexts keep
+            // decrypting. A subsequent Save-failure here is the one
+            // pathological case we cannot paper over — it is surfaced as
+            // the original migrator exception so the caller can react.
+            try { keyStore.Save(oldWrapped); }
+            catch { /* surface original */ }
+            throw;
+        }
+        finally
+        {
+            // The old DEK is no longer needed for anything — oldSvc is
+            // local and not returned. Zero the managed buffer so a heap
+            // snapshot or crash dump taken after rotation does not leak
+            // the previous key.
+            CryptographicOperations.ZeroMemory(oldDek);
+        }
+
+        return newSvc;
+    }
+
     public byte[]? EncryptString(string? plaintext)
     {
         if (plaintext is null) return null;
