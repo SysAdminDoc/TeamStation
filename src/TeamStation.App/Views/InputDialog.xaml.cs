@@ -8,6 +8,7 @@ public partial class InputDialog : Window
     {
         InitializeComponent();
         Title = title;
+        DialogTitleText.Text = title;
         PromptText.Text = prompt;
         ValueBox.Text = initialValue;
         Loaded += (_, _) => { ValueBox.Focus(); ValueBox.SelectAll(); };

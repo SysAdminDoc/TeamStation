@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.Versioning;
 using System.Windows;
+using System.Windows.Media;
 using TeamStation.App.Mvvm;
 using TeamStation.App.Views;
 using TeamStation.Core.Models;
@@ -35,6 +36,13 @@ public sealed class MainViewModel : ViewModelBase
     private readonly string _startupVersion;
     private readonly string? _startupDbPath;
     private readonly object _logLock = new();
+    private readonly bool _isTeamViewerReady;
+    private Brush _statusBrush = Brushes.Transparent;
+    private string _statusTag = "Ready";
+    private int _folderCount;
+    private int _entryCount;
+    private int _visibleFolderCount;
+    private int _visibleEntryCount;
 
     public MainViewModel(
         EntryRepository entries,
@@ -59,6 +67,7 @@ public sealed class MainViewModel : ViewModelBase
         _chooseImportPath = chooseImportPath;
         _chooseImportCsvPath = chooseImportCsvPath;
         _confirmDialog = confirmDialog;
+        _isTeamViewerReady = !string.IsNullOrWhiteSpace(tvExePath);
         _tvExePath = tvExePath ?? "TeamViewer.exe not found — install TeamViewer before launching";
         _startupVersion = startupVersion ?? "dev";
         _startupDbPath = startupDbPath;
@@ -70,11 +79,12 @@ public sealed class MainViewModel : ViewModelBase
         MoveCommand = new RelayCommand(Move, () => Selected is not null);
         DeleteCommand = new RelayCommand(Delete, () => Selected is not null);
         EditCommand = new RelayCommand(EditSelected, () => Selected is not null);
-        LaunchCommand = new RelayCommand(Launch, () => Selected is EntryNode);
+        LaunchCommand = new RelayCommand(Launch, () => Selected is EntryNode && IsTeamViewerReady);
         ExportCommand = new RelayCommand(Export);
         ImportCommand = new RelayCommand(Import);
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
         ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
+        ClearLogCommand = new RelayCommand(ClearLog, () => Log.Count > 0);
         ToggleLogCommand = new RelayCommand(() => IsLogVisible = !IsLogVisible);
 
         // Enable cross-thread access for collection bindings; all *mutations*
@@ -104,24 +114,57 @@ public sealed class MainViewModel : ViewModelBase
                     ((RelayCommand)cmd).RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(SelectedIsEntry));
                 OnPropertyChanged(nameof(SelectedIsFolder));
+                OnPropertyChanged(nameof(HasSelection));
+                OnPropertyChanged(nameof(ShowSelectionPlaceholder));
             }
         }
     }
 
     public bool SelectedIsEntry => Selected is EntryNode;
     public bool SelectedIsFolder => Selected is FolderNode;
+    public bool HasSelection => Selected is not null;
+    public bool ShowSelectionPlaceholder => Selected is null;
 
     public string Status { get => _status; private set => SetField(ref _status, value); }
+    public string StatusTag { get => _statusTag; private set => SetField(ref _statusTag, value); }
+    public Brush StatusBrush { get => _statusBrush; private set => SetField(ref _statusBrush, value); }
+    public bool IsTeamViewerReady => _isTeamViewerReady;
+    public string TeamViewerStatusText => _isTeamViewerReady ? "TeamViewer ready" : "Install TeamViewer";
+    public string DatabasePathDisplay => _startupDbPath ?? "Database path unavailable";
+    public string DatabaseLocationDisplay => _startupDbPath is null
+        ? "Portable mode"
+        : Path.GetDirectoryName(_startupDbPath) ?? _startupDbPath;
+    public int FolderCount { get => _folderCount; private set => SetField(ref _folderCount, value); }
+    public int EntryCount { get => _entryCount; private set => SetField(ref _entryCount, value); }
+    public int VisibleFolderCount { get => _visibleFolderCount; private set => SetField(ref _visibleFolderCount, value); }
+    public int VisibleEntryCount { get => _visibleEntryCount; private set => SetField(ref _visibleEntryCount, value); }
+    public bool HasAnyItems => FolderCount + EntryCount > 0;
+    public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
+    public bool ShowWelcomeState => !HasAnyItems;
+    public bool ShowNoSearchResultsState => HasAnyItems && HasSearchText && VisibleFolderCount + VisibleEntryCount == 0;
+    public string TreeSummary => HasSearchText
+        ? $"{DisplayText.Count(VisibleEntryCount, "matching connection")}, {DisplayText.Count(VisibleFolderCount, "visible folder")}"
+        : $"{DisplayText.Count(EntryCount, "connection")}, {DisplayText.Count(FolderCount, "folder")}";
+    public string SearchHintText => HasSearchText
+        ? $"Filtering names, IDs, notes, and tags for \"{SearchText.Trim()}\"."
+        : "Search names, TeamViewer IDs, notes, or tags. Double-click a connection to launch it.";
+    public string LogSummary => Log.Count == 0
+        ? "No activity yet."
+        : $"Showing the latest {Log.Count} event{(Log.Count == 1 ? string.Empty : "s")}.";
+    public string ActivityButtonText => IsLogVisible ? "Hide activity" : "Show activity";
 
     private void AppendLog(LogLevel level, string message)
     {
         Log.Add(new LogEntry(DateTimeOffset.Now, level, message));
         while (Log.Count > MaxLogEntries) Log.RemoveAt(0);
+        OnPropertyChanged(nameof(LogSummary));
+        ((RelayCommand)ClearLogCommand).RaiseCanExecuteChanged();
     }
 
     private void ReportStatus(LogLevel level, string message)
     {
         Status = message;
+        ApplyStatusTone(level);
         AppendLog(level, message);
     }
     public string TvExePath { get => _tvExePath; private set => SetField(ref _tvExePath, value); }
@@ -138,6 +181,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand ImportCommand { get; }
     public System.Windows.Input.ICommand ImportCsvCommand { get; }
     public System.Windows.Input.ICommand ClearSearchCommand { get; }
+    public System.Windows.Input.ICommand ClearLogCommand { get; }
     public System.Windows.Input.ICommand ToggleLogCommand { get; }
 
     public ObservableCollection<LogEntry> Log { get; } = new();
@@ -145,7 +189,11 @@ public sealed class MainViewModel : ViewModelBase
     public bool IsLogVisible
     {
         get => _isLogVisible;
-        set => SetField(ref _isLogVisible, value);
+        set
+        {
+            if (SetField(ref _isLogVisible, value))
+                OnPropertyChanged(nameof(ActivityButtonText));
+        }
     }
 
     public string SearchText
@@ -154,12 +202,16 @@ public sealed class MainViewModel : ViewModelBase
         set
         {
             if (SetField(ref _searchText, value ?? string.Empty))
+            {
                 ApplyFilter();
+                NotifySurfacePropertyChanges();
+            }
         }
     }
 
     public void Reload()
     {
+        var selectedId = Selected?.Id;
         var folders = _folders.GetAll();
         var entries = _entries.GetAll();
 
@@ -199,13 +251,35 @@ public sealed class MainViewModel : ViewModelBase
         RootNodes.Clear();
         foreach (var r in roots) RootNodes.Add(r);
 
-        var folderCount = folders.Count;
-        var entryCount = entries.Count;
-        Status = (folderCount, entryCount) switch
+        FolderCount = folders.Count;
+        EntryCount = entries.Count;
+        ApplyFilter();
+
+        if (selectedId is { } id && FindById(RootNodes, id) is not null)
         {
-            (0, 0) => "No folders or entries yet — right-click the empty tree to add one.",
-            _ => $"{folderCount} folder{(folderCount == 1 ? "" : "s")}, {entryCount} entr{(entryCount == 1 ? "y" : "ies")}"
-        };
+            SelectById(id);
+        }
+        else if (FindFirstVisibleNode(RootNodes) is { } firstVisible)
+        {
+            SelectById(firstVisible.Id);
+        }
+        else
+        {
+            Selected = null;
+        }
+
+        if (!HasAnyItems)
+        {
+            Status = "Create a folder or connection to start building your TeamViewer workspace.";
+            ApplyStatusTone(LogLevel.Info);
+        }
+        else if (string.IsNullOrWhiteSpace(Status))
+        {
+            Status = "Workspace ready. Select a connection to inspect it or double-click to launch.";
+            ApplyStatusTone(LogLevel.Info);
+        }
+
+        NotifySurfacePropertyChanges();
     }
 
     private static int CompareNodes(TreeNode a, TreeNode b)
@@ -225,6 +299,44 @@ public sealed class MainViewModel : ViewModelBase
         folder.Children.Clear();
         foreach (var c in ordered) folder.Children.Add(c);
     }
+
+    private void UpdateVisibleCounts()
+    {
+        VisibleFolderCount = EnumerateAll(RootNodes).Count(node => node.IsVisible && node is FolderNode);
+        VisibleEntryCount = EnumerateAll(RootNodes).Count(node => node.IsVisible && node is EntryNode);
+    }
+
+    private void NotifySurfacePropertyChanges()
+    {
+        OnPropertyChanged(nameof(HasAnyItems));
+        OnPropertyChanged(nameof(HasSearchText));
+        OnPropertyChanged(nameof(ShowWelcomeState));
+        OnPropertyChanged(nameof(ShowNoSearchResultsState));
+        OnPropertyChanged(nameof(TreeSummary));
+        OnPropertyChanged(nameof(SearchHintText));
+    }
+
+    private void ApplyStatusTone(LogLevel level)
+    {
+        StatusTag = level switch
+        {
+            LogLevel.Success => "Saved",
+            LogLevel.Warning => "Attention",
+            LogLevel.Error => "Problem",
+            _ => "Ready",
+        };
+
+        StatusBrush = level switch
+        {
+            LogLevel.Success => TryBrush("GreenBrush", Brushes.LightGreen),
+            LogLevel.Warning => TryBrush("YellowBrush", Brushes.Khaki),
+            LogLevel.Error => TryBrush("RedBrush", Brushes.Salmon),
+            _ => TryBrush("BlueBrush", Brushes.LightSkyBlue),
+        };
+    }
+
+    private static Brush TryBrush(string key, Brush fallback) =>
+        Application.Current?.TryFindResource(key) as Brush ?? fallback;
 
     // ---- Entry commands ----
 
@@ -253,6 +365,7 @@ public sealed class MainViewModel : ViewModelBase
             _entries.Upsert(draft);
             Reload();
             SelectById(draft.Id);
+            ReportStatus(LogLevel.Success, $"Created connection \"{draft.Name}\".");
         }
     }
 
@@ -290,11 +403,14 @@ public sealed class MainViewModel : ViewModelBase
         {
             foreach (var node in EnumerateAll(RootNodes))
                 node.IsVisible = true;
+            UpdateVisibleCounts();
             return;
         }
 
         foreach (var root in RootNodes)
             _ = ComputeVisibility(root, query);
+
+        UpdateVisibleCounts();
     }
 
     private static bool ComputeVisibility(TreeNode node, string query)
@@ -345,6 +461,20 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private static TreeNode? FindFirstVisibleNode(IEnumerable<TreeNode> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.IsVisible)
+                return node;
+
+            if (node is FolderNode folder && FindFirstVisibleNode(folder.Children) is { } child)
+                return child;
+        }
+
+        return null;
+    }
+
     private void Export()
     {
         var path = _chooseExportPath(Application.Current?.MainWindow);
@@ -353,11 +483,11 @@ public sealed class MainViewModel : ViewModelBase
         var anyPasswords = _entries.GetAll().Any(e => !string.IsNullOrEmpty(e.Password))
                            || _folders.GetAll().Any(f => !string.IsNullOrEmpty(f.DefaultPassword));
         if (anyPasswords && !_confirmDialog(Application.Current?.MainWindow,
-                "This export contains passwords in PLAINTEXT.\n\n" +
-                "Anyone with access to the resulting file can read them. Store it only where you would store a password manager vault.\n\n" +
+                "This backup contains saved passwords in plain text.\n\n" +
+                "Anyone who can open the file can read those credentials. Store it only where you would store a password vault export.\n\n" +
                 "Continue?"))
         {
-            ReportStatus(LogLevel.Warning, "Export cancelled.");
+            ReportStatus(LogLevel.Warning, "Backup cancelled.");
             return;
         }
 
@@ -365,12 +495,12 @@ public sealed class MainViewModel : ViewModelBase
         {
             var backup = JsonBackup.Build(_folders.GetAll(), _entries.GetAll());
             AtomicWriteAllText(path, backup);
-            ReportStatus(LogLevel.Success, $"Exported to {path}.");
+            ReportStatus(LogLevel.Success, $"Backup written to {path}.");
         }
         catch (Exception ex)
         {
-            ReportStatus(LogLevel.Error, $"Export failed: {ex.Message}");
-            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Export failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            ReportStatus(LogLevel.Error, $"Backup failed: {ex.Message}");
+            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Backup failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -407,10 +537,10 @@ public sealed class MainViewModel : ViewModelBase
             var (folders, entries) = JsonBackup.Parse(text);
 
             if (!_confirmDialog(Application.Current?.MainWindow,
-                $"Import {folders.Count} folder(s) and {entries.Count} entr{(entries.Count == 1 ? "y" : "ies")} from\n\n{path}\n\n" +
-                "Existing rows with matching IDs will be overwritten. Continue?"))
+                $"Restore {DisplayText.Count(folders.Count, "folder")} and {DisplayText.Count(entries.Count, "connection")} from\n\n{path}\n\n" +
+                "Existing items with matching IDs will be overwritten. Continue?"))
             {
-                ReportStatus(LogLevel.Warning, "Import cancelled.");
+                ReportStatus(LogLevel.Warning, "Restore cancelled.");
                 return;
             }
 
@@ -430,13 +560,22 @@ public sealed class MainViewModel : ViewModelBase
             foreach (var f in folders) _folders.Upsert(f);
             foreach (var e in entries) _entries.Upsert(e);
             Reload();
-            ReportStatus(LogLevel.Success, $"Imported {folders.Count} folder(s) and {entries.Count} entr{(entries.Count == 1 ? "y" : "ies")}.");
+            ReportStatus(LogLevel.Success, $"Restored {DisplayText.Count(folders.Count, "folder")} and {DisplayText.Count(entries.Count, "connection")}.");
         }
         catch (Exception ex)
         {
-            ReportStatus(LogLevel.Error, $"Import failed: {ex.Message}");
-            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Import failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            ReportStatus(LogLevel.Error, $"Restore failed: {ex.Message}");
+            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Restore failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void ClearLog()
+    {
+        Log.Clear();
+        OnPropertyChanged(nameof(LogSummary));
+        ((RelayCommand)ClearLogCommand).RaiseCanExecuteChanged();
+        Status = "Activity cleared.";
+        ApplyStatusTone(LogLevel.Info);
     }
 
     private void ImportCsvFile()
@@ -452,15 +591,15 @@ public sealed class MainViewModel : ViewModelBase
             if (result.Errors.Count > 0)
             {
                 foreach (var err in result.Errors) AppendLog(LogLevel.Error, $"CSV: {err}");
-                ReportStatus(LogLevel.Error, "CSV import aborted — see log for column-mapping errors.");
+                ReportStatus(LogLevel.Error, "CSV import stopped. Review the activity panel for column-mapping errors.");
                 MessageBox.Show(Application.Current?.MainWindow!,
                     string.Join('\n', result.Errors),
                     "CSV import", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            var message = $"CSV has {result.Folders.Count} new folder(s) and {result.Entries.Count} entr{(result.Entries.Count == 1 ? "y" : "ies")} to import from\n\n{path}\n\n" +
-                          (result.Skipped.Count > 0 ? $"{result.Skipped.Count} row(s) will be skipped — see log.\n\n" : string.Empty) +
+            var message = $"CSV will add {DisplayText.Count(result.Folders.Count, "new folder")} and {DisplayText.Count(result.Entries.Count, "connection")} from\n\n{path}\n\n" +
+                          (result.Skipped.Count > 0 ? $"{DisplayText.Count(result.Skipped.Count, "row")} will be skipped. Review the activity panel for details.\n\n" : string.Empty) +
                           "Continue?";
             if (!_confirmDialog(Application.Current?.MainWindow, message))
             {
@@ -487,8 +626,8 @@ public sealed class MainViewModel : ViewModelBase
 
             Reload();
             ReportStatus(LogLevel.Success,
-                $"Imported {result.Entries.Count} entr{(result.Entries.Count == 1 ? "y" : "ies")} " +
-                $"and {result.Folders.Count} new folder(s){(result.Skipped.Count > 0 ? $"; {result.Skipped.Count} skipped" : "")}.");
+                $"Imported {DisplayText.Count(result.Entries.Count, "connection")} and {DisplayText.Count(result.Folders.Count, "new folder")}" +
+                $"{(result.Skipped.Count > 0 ? $"; {result.Skipped.Count} skipped" : string.Empty)}.");
         }
         catch (Exception ex)
         {
@@ -540,24 +679,26 @@ public sealed class MainViewModel : ViewModelBase
 
     private void AddFolder()
     {
-        var name = InputDialog.Prompt(Application.Current?.MainWindow, "New folder", "Folder name:");
+        var name = InputDialog.Prompt(Application.Current?.MainWindow, "Create folder", "Name the new folder:");
         if (name is null) return;
         var folder = new Folder { Name = name };
         _folders.Upsert(folder);
         Reload();
         SelectById(folder.Id);
+        ReportStatus(LogLevel.Success, $"Created folder \"{folder.Name}\".");
     }
 
     private void AddSubfolder()
     {
         if (Selected is not FolderNode parent) return;
-        var name = InputDialog.Prompt(Application.Current?.MainWindow, "New subfolder", $"Subfolder under \"{parent.Name}\":");
+        var name = InputDialog.Prompt(Application.Current?.MainWindow, "Create subfolder", $"Name the folder inside \"{parent.Name}\":");
         if (name is null) return;
         var folder = new Folder { Name = name, ParentFolderId = parent.Id };
         _folders.Upsert(folder);
         parent.IsExpanded = true;
         Reload();
         SelectById(folder.Id);
+        ReportStatus(LogLevel.Success, $"Created folder \"{folder.Name}\" inside \"{parent.Name}\".");
     }
 
     // ---- Unified commands ----
@@ -565,7 +706,8 @@ public sealed class MainViewModel : ViewModelBase
     private void Rename()
     {
         if (Selected is null) return;
-        var newName = InputDialog.Prompt(Application.Current?.MainWindow, "Rename", "New name:", Selected.Name);
+        var oldName = Selected.Name;
+        var newName = InputDialog.Prompt(Application.Current?.MainWindow, "Rename", "New name:", oldName);
         if (newName is null) return;
 
         switch (Selected)
@@ -581,6 +723,7 @@ public sealed class MainViewModel : ViewModelBase
         }
         Reload();
         SelectById(Selected.Id);
+        ReportStatus(LogLevel.Success, $"Renamed \"{oldName}\" to \"{newName}\".");
     }
 
     private void Move()
@@ -605,22 +748,27 @@ public sealed class MainViewModel : ViewModelBase
                 break;
         }
         var movedId = Selected.Id;
+        var movedName = Selected.Name;
         Reload();
         SelectById(movedId);
+        ReportStatus(LogLevel.Success, newParent is null
+            ? $"Moved \"{movedName}\" to the top level."
+            : $"Moved \"{movedName}\" to \"{FindById(RootNodes, newParent.Value)?.Name ?? "selected folder"}\".");
     }
 
     private void Delete()
     {
         if (Selected is null) return;
+        var deletedName = Selected.Name;
         var kind = Selected is FolderNode ? "folder" : "entry";
         var suffix = Selected is FolderNode f && (f.Children.Count > 0)
-            ? "\n\nNested subfolders will also be deleted. Entries inside will become unassigned (moved to root)."
+            ? "\n\nNested subfolders will also be deleted. Connections inside will become unassigned and move to the top level."
             : string.Empty;
 
         var choice = MessageBox.Show(
             Application.Current?.MainWindow!,
-            $"Delete {kind} \"{Selected.Name}\"?{suffix}",
-            "Confirm delete",
+            $"Delete {kind} \"{deletedName}\"?{suffix}",
+            "Delete item",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
             MessageBoxResult.No);
@@ -636,6 +784,7 @@ public sealed class MainViewModel : ViewModelBase
                 break;
         }
         Reload();
+        ReportStatus(LogLevel.Warning, $"Deleted {kind} \"{deletedName}\".");
     }
 
     private void Launch()

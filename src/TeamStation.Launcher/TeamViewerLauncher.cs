@@ -42,7 +42,7 @@ public sealed class TeamViewerLauncher
     private LaunchOutcome LaunchViaCli(ConnectionEntry entry, LaunchOptions options)
     {
         var exe = _pathResolver() ?? throw new FileNotFoundException(
-            "TeamViewer.exe not found. Install TeamViewer or set the path manually in Settings.");
+            "TeamViewer.exe not found. Install TeamViewer and make sure the full client is available in its normal install location.");
 
         var argv = CliArgvBuilder.Build(entry, base64Password: options.UseBase64Password);
         var psi = new ProcessStartInfo

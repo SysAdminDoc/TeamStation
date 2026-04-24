@@ -29,6 +29,26 @@ public sealed class FolderNode : TreeNode
     }
 
     public ObservableCollection<TreeNode> Children { get; } = new();
+    public string PathDisplay => DisplayText.FormatPath(this);
+    public int FolderCount => Children.OfType<FolderNode>().Count();
+    public int EntryCount => Children.OfType<EntryNode>().Count();
+    public string ChildSummary => $"{DisplayText.Count(FolderCount, "subfolder")}, {DisplayText.Count(EntryCount, "connection")}";
+    public bool HasAccentColor => !string.IsNullOrWhiteSpace(Model.AccentColor);
+    public string AccentColorDisplay => Model.AccentColor ?? "Using the default folder accent";
+    public bool HasDefaults =>
+        Model.DefaultMode is not null ||
+        Model.DefaultQuality is not null ||
+        Model.DefaultAccessControl is not null ||
+        !string.IsNullOrWhiteSpace(Model.DefaultPassword);
+    public bool HasDefaultPassword => !string.IsNullOrWhiteSpace(Model.DefaultPassword);
+    public string DefaultModeDisplay => DisplayText.ModeLabel(Model.DefaultMode, "Entry decides");
+    public string DefaultQualityDisplay => DisplayText.QualityLabel(Model.DefaultQuality, "Entry decides");
+    public string DefaultAccessControlDisplay => DisplayText.AccessLabel(Model.DefaultAccessControl, "Entry decides");
+    public string PasswordPolicyDisplay => HasDefaultPassword ? "Default password available" : "No default password";
+    public string DefaultsSummary => HasDefaults
+        ? $"{DefaultModeDisplay} • {DefaultQualityDisplay} • {DefaultAccessControlDisplay}"
+        : "No folder defaults configured";
+    public string ParentSummary => Parent is null ? "Top-level folder" : $"Inside {Parent.Name}";
 
     /// <summary>
     /// Brush for the tree-item dot. Parses the folder's <c>#RRGGBB</c> accent
@@ -75,6 +95,20 @@ public sealed class FolderNode : TreeNode
         _accentCache = null;
         _accentCacheKey = null;
         OnPropertyChanged(nameof(AccentBrush));
+        OnPropertyChanged(nameof(PathDisplay));
+        OnPropertyChanged(nameof(FolderCount));
+        OnPropertyChanged(nameof(EntryCount));
+        OnPropertyChanged(nameof(ChildSummary));
+        OnPropertyChanged(nameof(HasAccentColor));
+        OnPropertyChanged(nameof(AccentColorDisplay));
+        OnPropertyChanged(nameof(HasDefaults));
+        OnPropertyChanged(nameof(HasDefaultPassword));
+        OnPropertyChanged(nameof(DefaultModeDisplay));
+        OnPropertyChanged(nameof(DefaultQualityDisplay));
+        OnPropertyChanged(nameof(DefaultAccessControlDisplay));
+        OnPropertyChanged(nameof(PasswordPolicyDisplay));
+        OnPropertyChanged(nameof(DefaultsSummary));
+        OnPropertyChanged(nameof(ParentSummary));
     }
 
     private static Brush DefaultAccent() =>

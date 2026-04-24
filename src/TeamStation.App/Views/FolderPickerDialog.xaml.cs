@@ -58,6 +58,12 @@ public partial class FolderPickerDialog : Window
         }
     }
 
+    private void Tree_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (OkButton.IsEnabled)
+            Ok_Click(sender, e);
+    }
+
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = false;

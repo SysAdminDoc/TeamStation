@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using TeamStation.Core.Models;
@@ -13,6 +14,18 @@ public partial class EntryEditorWindow : Window
     {
         InitializeComponent();
         _entry = entry;
+
+        var isNew = string.IsNullOrWhiteSpace(entry.TeamViewerId);
+        DialogTitleText.Text = isNew ? "New connection" : "Edit connection";
+        Title = DialogTitleText.Text;
+        SaveButton.Content = isNew ? "Create connection" : "Save connection";
+
+        Loaded += (_, _) =>
+        {
+            NameBox.Focus();
+            NameBox.SelectAll();
+        };
+
         Load();
     }
 
@@ -26,37 +39,102 @@ public partial class EntryEditorWindow : Window
         SelectNullableEnum(AcBox, _entry.AccessControl);
         NotesBox.Text = _entry.Notes ?? string.Empty;
         TagsBox.Text = string.Join(", ", _entry.Tags);
+
+        if (_entry.Proxy is { } proxy)
+        {
+            ProxyHostBox.Text = proxy.Host;
+            ProxyPortBox.Text = proxy.Port.ToString(CultureInfo.InvariantCulture);
+            ProxyUserBox.Text = proxy.Username ?? string.Empty;
+            ProxyPasswordBox.Password = proxy.Password ?? string.Empty;
+        }
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
+        ClearValidation();
+
         var name = NameBox.Text.Trim();
         if (string.IsNullOrEmpty(name))
         {
-            ValidationError("Friendly name is required.");
+            ShowValidation("Friendly name is required.");
             NameBox.Focus();
             return;
         }
 
         var id = IdBox.Text.Trim();
-        try { LaunchInputValidator.ValidateTeamViewerId(id); }
+        try
+        {
+            LaunchInputValidator.ValidateTeamViewerId(id);
+        }
         catch (LaunchValidationException ex)
         {
-            ValidationError(ex.Message);
+            ShowValidation(ex.Message);
             IdBox.Focus();
             return;
         }
 
-        var password = PasswordBox.Password;
+        var password = PasswordBox.Password.Trim();
         if (!string.IsNullOrEmpty(password))
         {
-            try { LaunchInputValidator.ValidatePassword(password); }
+            try
+            {
+                LaunchInputValidator.ValidatePassword(password);
+            }
             catch (LaunchValidationException ex)
             {
-                ValidationError(ex.Message);
+                ShowValidation(ex.Message);
                 PasswordBox.Focus();
                 return;
             }
+        }
+
+        ProxySettings? proxy = null;
+        var proxyHost = ProxyHostBox.Text.Trim();
+        var proxyPortText = ProxyPortBox.Text.Trim();
+        var proxyUser = ProxyUserBox.Text.Trim();
+        var proxyPassword = ProxyPasswordBox.Password.Trim();
+        var hasAnyProxyField =
+            !string.IsNullOrEmpty(proxyHost) ||
+            !string.IsNullOrEmpty(proxyPortText) ||
+            !string.IsNullOrEmpty(proxyUser) ||
+            !string.IsNullOrEmpty(proxyPassword);
+
+        if (hasAnyProxyField)
+        {
+            if (string.IsNullOrEmpty(proxyHost))
+            {
+                ShowValidation("Proxy host is required when proxy routing is enabled.");
+                ProxyHostBox.Focus();
+                return;
+            }
+
+            if (string.IsNullOrEmpty(proxyPortText) ||
+                !int.TryParse(proxyPortText, NumberStyles.None, CultureInfo.InvariantCulture, out var proxyPort))
+            {
+                ShowValidation("Proxy port must be a number between 1 and 65535.");
+                ProxyPortBox.Focus();
+                return;
+            }
+
+            try
+            {
+                LaunchInputValidator.ValidateProxyEndpoint($"{proxyHost}:{proxyPort}");
+                LaunchInputValidator.ValidateProxyUsername(proxyUser);
+                if (!string.IsNullOrEmpty(proxyPassword))
+                    LaunchInputValidator.ValidatePassword(proxyPassword);
+            }
+            catch (LaunchValidationException ex)
+            {
+                ShowValidation(ex.Message);
+                ProxyHostBox.Focus();
+                return;
+            }
+
+            proxy = new ProxySettings(
+                Host: proxyHost,
+                Port: proxyPort,
+                Username: string.IsNullOrEmpty(proxyUser) ? null : proxyUser,
+                Password: string.IsNullOrEmpty(proxyPassword) ? null : proxyPassword);
         }
 
         _entry.Name = name;
@@ -65,8 +143,8 @@ public partial class EntryEditorWindow : Window
         _entry.Mode = GetNullableEnum<ConnectionMode>(ModeBox);
         _entry.Quality = GetNullableEnum<ConnectionQuality>(QualityBox);
         _entry.AccessControl = GetNullableEnum<AccessControl>(AcBox);
+        _entry.Proxy = proxy;
         _entry.Notes = string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim();
-        // Split, trim, dedupe case-insensitively while preserving first-seen order.
         _entry.Tags = TagsBox.Text
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -82,9 +160,16 @@ public partial class EntryEditorWindow : Window
         Close();
     }
 
-    private void ValidationError(string message)
+    private void ShowValidation(string message)
     {
-        MessageBox.Show(this, message, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+        ValidationText.Text = message;
+        ValidationBorder.Visibility = Visibility.Visible;
+    }
+
+    private void ClearValidation()
+    {
+        ValidationText.Text = string.Empty;
+        ValidationBorder.Visibility = Visibility.Collapsed;
     }
 
     private static void SelectNullableEnum<T>(ComboBox combo, T? value) where T : struct, Enum
@@ -94,12 +179,15 @@ public partial class EntryEditorWindow : Window
             if (value is null && item.Tag is null) { combo.SelectedItem = item; return; }
             if (value is T v && item.Tag is T tag && tag.Equals(v)) { combo.SelectedItem = item; return; }
         }
+
         combo.SelectedIndex = 0;
     }
 
     private static T? GetNullableEnum<T>(ComboBox combo) where T : struct, Enum
     {
-        if (combo.SelectedItem is ComboBoxItem item && item.Tag is T tag) return tag;
+        if (combo.SelectedItem is ComboBoxItem item && item.Tag is T tag)
+            return tag;
+
         return null;
     }
 }

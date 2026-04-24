@@ -1,120 +1,230 @@
 <Window x:Class="TeamStation.App.Views.EntryEditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:models="clr-namespace:TeamStation.Core.Models;assembly=TeamStation.Core"
-        Title="Edit connection"
-        Width="520" Height="640"
-        MinWidth="480" MinHeight="560"
+        Title="Connection"
+        Width="760"
+        Height="820"
+        MinWidth="660"
+        MinHeight="700"
         WindowStartupLocation="CenterOwner"
-        ShowInTaskbar="False"
-        Background="{StaticResource BaseBrush}"
-        Foreground="{StaticResource TextBrush}"
-        FontFamily="Segoe UI Variable Text, Segoe UI"
-        FontSize="13">
+        ShowInTaskbar="False">
     <Window.Resources>
-        <Style TargetType="TextBlock" x:Key="FieldLabel">
-            <Setter Property="Foreground" Value="{StaticResource Subtext1Brush}" />
-            <Setter Property="Margin" Value="0,12,0,4" />
-            <Setter Property="FontSize" Value="12" />
-        </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
+        <Style x:Key="EditorCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource MantleBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
-            <Setter Property="SelectionBrush" Value="{StaticResource BlueBrush}" />
-        </Style>
-        <Style TargetType="PasswordBox">
-            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
-        </Style>
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
-            <Setter Property="Padding" Value="8,6" />
-        </Style>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="14,8" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="18" />
         </Style>
     </Window.Resources>
 
     <Grid Margin="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+        <StackPanel Grid.Row="0">
+            <TextBlock x:Name="DialogTitleText" FontSize="28" FontWeight="SemiBold" />
+            <TextBlock x:Name="DialogSubtitleText"
+                       Margin="0,10,0,0"
+                       Text="Store a TeamViewer peer, keep launch behavior predictable, and capture the operational context your team needs."
+                       Style="{StaticResource SectionSubtitleText}" />
+        </StackPanel>
+
+        <Border x:Name="ValidationBorder"
+                Grid.Row="1"
+                Margin="0,18,0,0"
+                Padding="14,12"
+                Background="{StaticResource RedSoftBrush}"
+                BorderBrush="#44E86D8F"
+                BorderThickness="1"
+                CornerRadius="12"
+                Visibility="Collapsed">
+            <TextBlock x:Name="ValidationText" Foreground="{StaticResource RedBrush}" TextWrapping="Wrap" />
+        </Border>
+
+        <ScrollViewer Grid.Row="2" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock Text="Friendly name" Style="{StaticResource FieldLabel}" />
-                <TextBox x:Name="NameBox" />
+                <Border Style="{StaticResource EditorCard}">
+                    <StackPanel>
+                        <TextBlock Text="Basics" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Give the connection a human-readable name and enter the TeamViewer peer details you actually use day to day."
+                                   Style="{StaticResource SectionSubtitleText}" />
 
-                <TextBlock Text="TeamViewer ID" Style="{StaticResource FieldLabel}" />
-                <TextBox x:Name="IdBox" />
-                <TextBlock Foreground="{StaticResource Subtext0Brush}" FontSize="11"
-                           Margin="0,4,0,0"
-                           Text="Numeric peer ID, 8-12 digits." />
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Password" Style="{StaticResource FieldLabel}" />
-                <PasswordBox x:Name="PasswordBox" />
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Friendly name" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="NameBox" />
+                            </StackPanel>
 
-                <TextBlock Text="Connection mode" Style="{StaticResource FieldLabel}" />
-                <ComboBox x:Name="ModeBox">
-                    <ComboBoxItem Tag="{x:Null}" Content="(inherit from folder)" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.RemoteControl}" Content="Remote Control" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.FileTransfer}" Content="File Transfer" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Vpn}" Content="VPN" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Chat}" Content="Chat (URI handler)" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.VideoCall}" Content="Video call (URI handler)" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Presentation}" Content="Presentation (URI handler)" />
-                </ComboBox>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="TeamViewer ID" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="IdBox" />
+                                <TextBlock Margin="0,6,0,0" Text="Numeric peer ID, 8 to 12 digits." Style="{StaticResource BodyMutedText}" />
+                            </StackPanel>
+                        </Grid>
 
-                <TextBlock Text="Quality" Style="{StaticResource FieldLabel}" />
-                <ComboBox x:Name="QualityBox">
-                    <ComboBoxItem Tag="{x:Null}" Content="(inherit from folder)" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.AutoSelect}" Content="Auto" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeQuality}" Content="Optimize quality" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeSpeed}" Content="Optimize speed" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.CustomSettings}" Content="Custom" />
-                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.Undefined}" Content="Undefined" />
-                </ComboBox>
+                        <TextBlock Margin="0,18,0,0" Text="Password" Style="{StaticResource FieldLabelText}" />
+                        <PasswordBox x:Name="PasswordBox" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="Saved locally and encrypted at rest. TeamViewer still receives it when a launch starts."
+                                   Style="{StaticResource BodyMutedText}" />
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="Access control" Style="{StaticResource FieldLabel}" />
-                <ComboBox x:Name="AcBox">
-                    <ComboBoxItem Tag="{x:Null}" Content="(inherit from folder)" />
-                    <ComboBoxItem Tag="{x:Static models:AccessControl.Undefined}" Content="Undefined (use TeamViewer default)" />
-                    <ComboBoxItem Tag="{x:Static models:AccessControl.FullAccess}" Content="Full access" />
-                    <ComboBoxItem Tag="{x:Static models:AccessControl.ConfirmAll}" Content="Confirm all" />
-                    <ComboBoxItem Tag="{x:Static models:AccessControl.ViewAndShow}" Content="View and show" />
-                    <ComboBoxItem Tag="{x:Static models:AccessControl.CustomSettings}" Content="Custom settings" />
-                </ComboBox>
+                <Border Style="{StaticResource EditorCard}" Margin="0,18,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Launch behavior" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Use explicit settings when this connection needs its own behavior, or inherit from the folder to keep a customer or site consistent."
+                                   Style="{StaticResource SectionSubtitleText}" />
 
-                <TextBlock Text="Notes" Style="{StaticResource FieldLabel}" />
-                <TextBox x:Name="NotesBox" AcceptsReturn="True" TextWrapping="Wrap" Height="88"
-                         VerticalScrollBarVisibility="Auto" />
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Tags (comma-separated)" Style="{StaticResource FieldLabel}" />
-                <TextBox x:Name="TagsBox" />
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Connection mode" Style="{StaticResource FieldLabelText}" />
+                                <ComboBox x:Name="ModeBox">
+                                    <ComboBoxItem Tag="{x:Null}" Content="Inherit from folder" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.RemoteControl}" Content="Remote Control" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.FileTransfer}" Content="File Transfer" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Vpn}" Content="VPN" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Chat}" Content="Chat (URI handler)" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.VideoCall}" Content="Video call (URI handler)" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Presentation}" Content="Presentation (URI handler)" />
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Quality" Style="{StaticResource FieldLabelText}" />
+                                <ComboBox x:Name="QualityBox">
+                                    <ComboBoxItem Tag="{x:Null}" Content="Inherit from folder" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.AutoSelect}" Content="Auto" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeQuality}" Content="Optimize quality" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeSpeed}" Content="Optimize speed" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.CustomSettings}" Content="Custom" />
+                                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.Undefined}" Content="Undefined" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Margin="0,18,0,0" Text="Access control" Style="{StaticResource FieldLabelText}" />
+                        <ComboBox x:Name="AcBox">
+                            <ComboBoxItem Tag="{x:Null}" Content="Inherit from folder" />
+                            <ComboBoxItem Tag="{x:Static models:AccessControl.Undefined}" Content="Undefined (use TeamViewer default)" />
+                            <ComboBoxItem Tag="{x:Static models:AccessControl.FullAccess}" Content="Full access" />
+                            <ComboBoxItem Tag="{x:Static models:AccessControl.ConfirmAll}" Content="Confirm all" />
+                            <ComboBoxItem Tag="{x:Static models:AccessControl.ViewAndShow}" Content="View and show" />
+                            <ComboBoxItem Tag="{x:Static models:AccessControl.CustomSettings}" Content="Custom settings" />
+                        </ComboBox>
+
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Chat, video call, and presentation use TeamViewer URI handlers. Remote control, file transfer, and VPN launch through TeamViewer.exe."
+                                   Style="{StaticResource BodyMutedText}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource EditorCard}" Margin="0,18,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Proxy routing" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Optional. Configure this only when the TeamViewer launch needs to go through a proxy."
+                                   Style="{StaticResource SectionSubtitleText}" />
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="140" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Host" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="ProxyHostBox" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Port" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="ProxyPortBox" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Username" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="ProxyUserBox" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Password" Style="{StaticResource FieldLabelText}" />
+                                <PasswordBox x:Name="ProxyPasswordBox" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Proxy credentials use the same launch-time restrictions as TeamViewer passwords. Leave every proxy field empty to disable it."
+                                   Style="{StaticResource BodyMutedText}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource EditorCard}" Margin="0,18,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Operational context" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Capture what will help the next support session: notes, tags, and any customer-specific context that should live with the connection."
+                                   Style="{StaticResource SectionSubtitleText}" />
+
+                        <TextBlock Margin="0,18,0,0" Text="Notes" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="NotesBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="120"
+                                 VerticalScrollBarVisibility="Auto"
+                                 VerticalContentAlignment="Top" />
+
+                        <TextBlock Margin="0,18,0,0" Text="Tags" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="TagsBox" />
+                        <TextBlock Margin="0,6,0,0" Text="Comma-separated. Example: billing, warehouse, reception." Style="{StaticResource BodyMutedText}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-            <Button x:Name="CancelButton" Content="Cancel" Click="CancelButton_Click" IsCancel="True" />
-            <Button x:Name="SaveButton" Content="Save" Click="SaveButton_Click" IsDefault="True"
-                    Background="{StaticResource BlueBrush}" Foreground="{StaticResource Crust}" FontWeight="SemiBold" />
-        </StackPanel>
+        <DockPanel Grid.Row="3" Margin="0,20,0,0" LastChildFill="False">
+            <Button x:Name="CancelButton"
+                    DockPanel.Dock="Right"
+                    Content="Cancel"
+                    Style="{StaticResource GhostButton}"
+                    Margin="8,0,0,0"
+                    Click="CancelButton_Click"
+                    IsCancel="True" />
+            <Button x:Name="SaveButton"
+                    DockPanel.Dock="Right"
+                    Content="Save connection"
+                    Style="{StaticResource PrimaryButton}"
+                    Click="SaveButton_Click"
+                    IsDefault="True" />
+        </DockPanel>
     </Grid>
 </Window>

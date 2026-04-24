@@ -7,50 +7,273 @@
         xmlns:behaviors="clr-namespace:TeamStation.App.Mvvm"
         mc:Ignorable="d"
         Title="TeamStation"
-        Height="720" Width="1200"
-        MinHeight="480" MinWidth="720"
-        Background="{StaticResource BaseBrush}"
-        Foreground="{StaticResource TextBrush}"
-        FontFamily="Segoe UI Variable Text, Segoe UI"
-        FontSize="13"
+        Height="860"
+        Width="1420"
+        MinHeight="680"
+        MinWidth="1120"
         WindowStartupLocation="CenterScreen"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}">
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis" />
-        <Style TargetType="Button" x:Key="ToolbarButton">
-            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="14,8" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-            <Setter Property="MinWidth" Value="96" />
-        </Style>
-        <Style TargetType="Button" x:Key="PrimaryButton" BasedOn="{StaticResource ToolbarButton}">
-            <Setter Property="Background" Value="{StaticResource BlueBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource Crust}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style TargetType="Button" x:Key="IconButton" BasedOn="{StaticResource ToolbarButton}">
-            <Setter Property="MinWidth" Value="44" />
-            <Setter Property="Padding" Value="10,8" />
-        </Style>
-        <Style TargetType="TreeViewItem">
-            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
-            <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVis}}" />
-            <Setter Property="Padding" Value="2,3" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-        </Style>
-        <Style TargetType="TextBox" x:Key="SearchBox">
-            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
+        <Style x:Key="PanelCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource MantleBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="MinWidth" Value="220" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Padding" Value="18" />
         </Style>
+
+        <Style x:Key="SubPanelCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+
+        <Style x:Key="ChipBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+
+        <Style x:Key="InspectorLabelText" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelText}">
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+
+        <Style x:Key="InspectorValueText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+
+        <Style x:Key="TreeRowBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+
+        <DataTemplate x:Key="EntryInspectorTemplate" DataType="{x:Type vm:EntryNode}">
+            <StackPanel>
+                <TextBlock Text="Connection" Style="{StaticResource CaptionText}" Foreground="{StaticResource BlueBrush}" />
+                <DockPanel Margin="0,8,0,0" LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Left" Width="520">
+                        <TextBlock Text="{Binding Name}" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ParentPathDisplay}" Style="{StaticResource SectionSubtitleText}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right" Margin="18,0,0,0">
+                        <Button Content="Launch"
+                                Style="{StaticResource PrimaryButton}"
+                                Margin="0,0,8,8"
+                                Command="{Binding DataContext.LaunchCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="Edit"
+                                Margin="0,0,8,8"
+                                Command="{Binding DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="Move"
+                                Margin="0,0,8,8"
+                                Command="{Binding DataContext.MoveCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="Delete"
+                                Style="{StaticResource DangerButton}"
+                                Margin="0,0,0,8"
+                                Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    </WrapPanel>
+                </DockPanel>
+
+                <WrapPanel Margin="0,18,0,0">
+                    <Border Style="{StaticResource ChipBorderStyle}" Background="{StaticResource BlueSoftBrush}" BorderBrush="{StaticResource BlueSoftBrush}">
+                        <TextBlock Text="{Binding TeamViewerId}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" />
+                    </Border>
+                    <Border Style="{StaticResource ChipBorderStyle}">
+                        <TextBlock Text="{Binding RouteBadge}" Foreground="{StaticResource Subtext1Brush}" FontWeight="SemiBold" />
+                    </Border>
+                    <Border Style="{StaticResource ChipBorderStyle}">
+                        <TextBlock Text="{Binding PasswordStateDisplay}" Foreground="{StaticResource Subtext1Brush}" />
+                    </Border>
+                    <Border Style="{StaticResource ChipBorderStyle}" Visibility="{Binding HasLastConnected, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding LastConnectedDisplay}" Foreground="{StaticResource Subtext1Brush}" />
+                    </Border>
+                </WrapPanel>
+
+                <Grid Margin="0,22,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource SubPanelCard}">
+                        <StackPanel>
+                            <TextBlock Text="Launch profile" Style="{StaticResource SectionTitleText}" />
+                            <TextBlock Text="How this connection behaves when TeamStation opens TeamViewer." Style="{StaticResource BodyMutedText}" Margin="0,6,0,16" />
+
+                            <TextBlock Text="Mode" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding ModeDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Quality" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding QualityDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Access control" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding AccessControlDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Launch route" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding RouteDisplay}" Style="{StaticResource InspectorValueText}" Margin="0,0,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Style="{StaticResource SubPanelCard}">
+                        <StackPanel>
+                            <TextBlock Text="Operational details" Style="{StaticResource SectionTitleText}" />
+                            <TextBlock Text="Fast context for support work, routing, and follow-up." Style="{StaticResource BodyMutedText}" Margin="0,6,0,16" />
+
+                            <TextBlock Text="Tags" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding TagsSummary}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Proxy" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding ProxyDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Created" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding CreatedDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Last updated" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding ModifiedDisplay}" Style="{StaticResource InspectorValueText}" Margin="0,0,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Style="{StaticResource SubPanelCard}" Margin="0,18,0,0" Visibility="{Binding HasNotes, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <TextBlock Text="Notes" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Text="{Binding NotesDisplay}" Style="{StaticResource SectionSubtitleText}" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SubPanelCard}" Margin="0,18,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Security" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,10,0,0"
+                                   Text="Passwords stay encrypted at rest. TeamViewer still receives them when a launch starts, so keep exports limited and review proxy credentials before sharing backups."
+                                   Style="{StaticResource SectionSubtitleText}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="FolderInspectorTemplate" DataType="{x:Type vm:FolderNode}">
+            <StackPanel>
+                <TextBlock Text="Folder" Style="{StaticResource CaptionText}" Foreground="{StaticResource MauveBrush}" />
+                <DockPanel Margin="0,8,0,0" LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Left" Width="520">
+                        <TextBlock Text="{Binding Name}" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ParentSummary}" Style="{StaticResource SectionSubtitleText}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right" Margin="18,0,0,0">
+                        <Button Content="New connection"
+                                Margin="0,0,8,8"
+                                Command="{Binding DataContext.AddEntryCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="New subfolder"
+                                Margin="0,0,8,8"
+                                Command="{Binding DataContext.AddSubfolderCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="Edit"
+                                Margin="0,0,8,8"
+                                Command="{Binding DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="Move"
+                                Margin="0,0,8,8"
+                                Command="{Binding DataContext.MoveCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="Delete"
+                                Style="{StaticResource DangerButton}"
+                                Margin="0,0,0,8"
+                                Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    </WrapPanel>
+                </DockPanel>
+
+                <WrapPanel Margin="0,18,0,0">
+                    <Border Style="{StaticResource ChipBorderStyle}" Background="{StaticResource BlueSoftBrush}" BorderBrush="{StaticResource BlueSoftBrush}">
+                        <TextBlock Text="{Binding PathDisplay}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" />
+                    </Border>
+                    <Border Style="{StaticResource ChipBorderStyle}">
+                        <TextBlock Text="{Binding ChildSummary}" Foreground="{StaticResource Subtext1Brush}" />
+                    </Border>
+                    <Border Style="{StaticResource ChipBorderStyle}" Visibility="{Binding HasDefaults, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Defaults configured" Foreground="{StaticResource Subtext1Brush}" />
+                    </Border>
+                </WrapPanel>
+
+                <Grid Margin="0,22,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource SubPanelCard}">
+                        <StackPanel>
+                            <TextBlock Text="Structure" Style="{StaticResource SectionTitleText}" />
+                            <TextBlock Text="What this folder owns right now." Style="{StaticResource BodyMutedText}" Margin="0,6,0,16" />
+
+                            <TextBlock Text="Path" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding PathDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Subfolders" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding FolderCount}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Connections" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding EntryCount}" Style="{StaticResource InspectorValueText}" Margin="0,0,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Style="{StaticResource SubPanelCard}">
+                        <StackPanel>
+                            <TextBlock Text="Inherited defaults" Style="{StaticResource SectionTitleText}" />
+                            <TextBlock Text="Connections inside this folder can inherit these settings automatically." Style="{StaticResource BodyMutedText}" Margin="0,6,0,16" />
+
+                            <TextBlock Text="Mode" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding DefaultModeDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Quality" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding DefaultQualityDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Access control" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding DefaultAccessControlDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Password policy" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding PasswordPolicyDisplay}" Style="{StaticResource InspectorValueText}" Margin="0,0,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Style="{StaticResource SubPanelCard}" Margin="0,18,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Appearance" Style="{StaticResource SectionTitleText}" />
+                        <DockPanel Margin="0,10,0,0">
+                            <Border Width="22"
+                                    Height="22"
+                                    CornerRadius="6"
+                                    Background="{Binding AccentBrush}"
+                                    BorderBrush="{StaticResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Margin="0,0,10,0"
+                                    DockPanel.Dock="Left" />
+                            <TextBlock Text="{Binding AccentColorDisplay}" Style="{StaticResource SectionSubtitleText}" />
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SubPanelCard}" Margin="0,18,0,0">
+                    <StackPanel>
+                        <TextBlock Text="How inheritance works" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,10,0,0"
+                                   Text="Any connection left on 'inherit from folder' resolves its mode, quality, access control, and password from the nearest folder that defines them. Changing folder defaults updates every inheriting connection automatically."
+                                   Style="{StaticResource SectionSubtitleText}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -62,167 +285,488 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="{StaticResource MantleBrush}" Padding="16,10">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <TextBlock Text="TeamStation" FontSize="18" FontWeight="SemiBold"
-                               Foreground="{StaticResource BlueBrush}" />
-                    <TextBlock x:Name="VersionBadge" Margin="8,2,0,0"
-                               Foreground="{StaticResource Subtext0Brush}" FontSize="11"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
-                           Foreground="{StaticResource Subtext0Brush}"
-                           Text="{Binding TvExePath}"
-                           ToolTip="{Binding TvExePath}" />
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="1" Background="{StaticResource MantleBrush}" Padding="16,10"
-                BorderThickness="0,1,0,0" BorderBrush="{StaticResource CrustBrush}">
+        <Border Grid.Row="0" Margin="18,18,18,0" Style="{StaticResource PanelCard}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="360" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <Button Content="Launch" Style="{StaticResource PrimaryButton}" Command="{Binding LaunchCommand}" />
-                    <Button Content="Add entry" Style="{StaticResource ToolbarButton}" Command="{Binding AddEntryCommand}" />
-                    <Button Content="Add folder" Style="{StaticResource ToolbarButton}" Command="{Binding AddFolderCommand}" />
-                    <Button Content="Edit" Style="{StaticResource ToolbarButton}" Command="{Binding EditCommand}" />
-                    <Button Content="Rename" Style="{StaticResource ToolbarButton}" Command="{Binding RenameCommand}" />
-                    <Button Content="Move" Style="{StaticResource ToolbarButton}" Command="{Binding MoveCommand}" />
-                    <Button Content="Delete" Style="{StaticResource ToolbarButton}" Command="{Binding DeleteCommand}" />
-                    <Button Content="Import JSON" Style="{StaticResource ToolbarButton}" Command="{Binding ImportCommand}" />
-                    <Button Content="Import CSV" Style="{StaticResource ToolbarButton}" Command="{Binding ImportCsvCommand}"
-                            ToolTip="Import entries from a CSV with a header row. Common column names are auto-detected (name/alias, teamviewer_id/id, group/folder, password, notes, tags)." />
-                    <Button Content="Export" Style="{StaticResource ToolbarButton}" Command="{Binding ExportCommand}" />
-                    <Button Content="Log" Style="{StaticResource ToolbarButton}" Command="{Binding ToggleLogCommand}" />
+                <StackPanel>
+                    <TextBlock Text="LOCAL TEAMVIEWER WORKSPACE" Style="{StaticResource CaptionText}" Foreground="{StaticResource BlueBrush}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock Text="TeamStation" FontSize="30" FontWeight="SemiBold" />
+                        <Border Margin="12,4,0,0"
+                                Padding="10,4"
+                                CornerRadius="999"
+                                Background="{StaticResource Surface0Brush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                VerticalAlignment="Top">
+                            <TextBlock x:Name="VersionBadge" Foreground="{StaticResource Subtext1Brush}" FontSize="11" FontWeight="SemiBold" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Margin="0,10,0,0"
+                               Text="Organize unattended machines in a clear folder tree, inspect launch details before connecting, and keep TeamViewer credentials in a local encrypted workspace."
+                               Style="{StaticResource SectionSubtitleText}" />
                 </StackPanel>
 
-                <Grid Grid.Column="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBox Grid.Column="0" Style="{StaticResource SearchBox}"
-                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
-                    <Button Grid.Column="1" Content="Clear" Style="{StaticResource IconButton}"
-                            Margin="8,0,0,0" Command="{Binding ClearSearchCommand}" />
-                </Grid>
-            </Grid>
-        </Border>
+                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                    <WrapPanel HorizontalAlignment="Right">
+                        <Border Padding="10,6" CornerRadius="999" BorderThickness="1" BorderBrush="{StaticResource PanelBorderBrush}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource GreenSoftBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsTeamViewerReady}" Value="False">
+                                            <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding TeamViewerStatusText}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" />
+                        </Border>
+                        <Border Style="{StaticResource ChipBorderStyle}" Background="{StaticResource BlueSoftBrush}" BorderBrush="{StaticResource BlueSoftBrush}">
+                            <TextBlock Text="{Binding TreeSummary}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" />
+                        </Border>
+                    </WrapPanel>
 
-        <Border Grid.Row="2" Margin="16,12,16,12" Background="{StaticResource MantleBrush}" CornerRadius="6">
-            <TreeView x:Name="Tree"
-                      ItemsSource="{Binding RootNodes}"
-                      Background="Transparent"
-                      BorderThickness="0"
-                      Foreground="{StaticResource TextBrush}"
-                      SelectedItemChanged="Tree_SelectedItemChanged"
-                      MouseDoubleClick="Tree_MouseDoubleClick"
-                      Padding="8">
-                <TreeView.Resources>
-                    <HierarchicalDataTemplate DataType="{x:Type vm:FolderNode}" ItemsSource="{Binding Children}">
-                        <StackPanel Orientation="Horizontal">
-                            <Rectangle Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center"
-                                       Fill="{Binding AccentBrush}" RadiusX="2" RadiusY="2" />
-                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" />
+                    <Border Margin="0,14,0,0" Style="{StaticResource SubPanelCard}">
+                        <StackPanel>
+                            <TextBlock Text="Launch target" Style="{StaticResource CaptionText}" />
+                            <TextBlock Margin="0,6,0,0" Text="{Binding TvExePath}" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,14,0,0" Text="Database location" Style="{StaticResource CaptionText}" />
+                            <TextBlock Margin="0,6,0,0" Text="{Binding DatabaseLocationDisplay}" TextWrapping="Wrap" />
                         </StackPanel>
-                    </HierarchicalDataTemplate>
-                    <DataTemplate DataType="{x:Type vm:EntryNode}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Rectangle Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center"
-                                       Fill="{StaticResource BlueBrush}" RadiusX="5" RadiusY="5" />
-                            <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" />
-                            <TextBlock Grid.Column="2" Text="{Binding Summary}" Margin="16,0,8,0"
-                                       Foreground="{StaticResource Subtext0Brush}" FontSize="11" />
-                        </Grid>
-                    </DataTemplate>
-                </TreeView.Resources>
-                <TreeView.ContextMenu>
-                    <ContextMenu DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                        <MenuItem Header="Launch" Command="{Binding LaunchCommand}" FontWeight="SemiBold" />
-                        <Separator />
-                        <MenuItem Header="Add entry" Command="{Binding AddEntryCommand}" />
-                        <MenuItem Header="Add folder" Command="{Binding AddFolderCommand}" />
-                        <MenuItem Header="Add subfolder" Command="{Binding AddSubfolderCommand}" />
-                        <Separator />
-                        <MenuItem Header="Edit..." Command="{Binding EditCommand}" />
-                        <MenuItem Header="Rename..." Command="{Binding RenameCommand}" />
-                        <MenuItem Header="Move to..." Command="{Binding MoveCommand}" />
-                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
-                    </ContextMenu>
-                </TreeView.ContextMenu>
-            </TreeView>
+                    </Border>
+                </StackPanel>
+            </Grid>
         </Border>
+
+        <Border Grid.Row="1" Margin="18,12,18,0" Style="{StaticResource PanelCard}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="360" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="Workspace actions" Style="{StaticResource CaptionText}" />
+                    <WrapPanel Margin="0,12,0,0">
+                        <Button Content="Launch" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" Command="{Binding LaunchCommand}" />
+                        <Button Content="New connection" Margin="0,0,8,8" Command="{Binding AddEntryCommand}" />
+                        <Button Content="New folder" Margin="0,0,8,8" Command="{Binding AddFolderCommand}" />
+                        <Button Content="Edit" Margin="0,0,8,8" Command="{Binding EditCommand}" />
+                        <Button Content="Rename" Margin="0,0,8,8" Command="{Binding RenameCommand}" />
+                        <Button Content="Move" Margin="0,0,8,8" Command="{Binding MoveCommand}" />
+                        <Button Content="Delete" Style="{StaticResource DangerButton}" Margin="0,0,8,8" Command="{Binding DeleteCommand}" />
+                        <Button Content="Restore JSON" Margin="0,0,8,8" Command="{Binding ImportCommand}" />
+                        <Button Content="Import CSV" Margin="0,0,8,8" Command="{Binding ImportCsvCommand}"
+                                ToolTip="Import a header-based CSV. TeamStation auto-detects common aliases such as name, TeamViewer ID, folder, password, notes, and tags." />
+                        <Button Content="Back up" Margin="0,0,8,8" Command="{Binding ExportCommand}" />
+                        <Button Content="{Binding ActivityButtonText}" Margin="0,0,0,8" Command="{Binding ToggleLogCommand}" />
+                    </WrapPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="18,0,0,0">
+                    <TextBlock Text="Search workspace" Style="{StaticResource CaptionText}" />
+                    <Grid Margin="0,12,0,0">
+                        <TextBox Padding="14,10,46,10"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
+                        <TextBlock Margin="14,0,46,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource Subtext0Brush}"
+                                   IsHitTestVisible="False"
+                                   Text="Search name, ID, note, or tag">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasSearchText}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <Button HorizontalAlignment="Right"
+                                Width="34"
+                                Margin="0,3,3,3"
+                                Style="{StaticResource IconButton}"
+                                Content="X"
+                                Visibility="{Binding HasSearchText, Converter={StaticResource BoolToVis}}"
+                                Command="{Binding ClearSearchCommand}" />
+                    </Grid>
+                    <TextBlock Margin="0,8,0,0" Text="{Binding SearchHintText}" Style="{StaticResource BodyMutedText}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="18,12,18,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="430" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource PanelCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="Connection library" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,6,0,0" Text="{Binding TreeSummary}" Style="{StaticResource SectionSubtitleText}" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="1" Margin="0,16,0,0">
+                        <Border Style="{StaticResource SubPanelCard}" Padding="10">
+                            <TreeView x:Name="Tree"
+                                      ItemsSource="{Binding RootNodes}"
+                                      SelectedItemChanged="Tree_SelectedItemChanged"
+                                      MouseDoubleClick="Tree_MouseDoubleClick"
+                                      PreviewMouseRightButtonDown="Tree_PreviewMouseRightButtonDown"
+                                      Padding="0">
+                                <TreeView.Resources>
+                                    <HierarchicalDataTemplate DataType="{x:Type vm:FolderNode}" ItemsSource="{Binding Children}">
+                                        <Border x:Name="FolderRow" Style="{StaticResource TreeRowBorderStyle}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border Width="14"
+                                                        Height="14"
+                                                        CornerRadius="4"
+                                                        Background="{Binding AccentBrush}"
+                                                        BorderBrush="{StaticResource PanelBorderBrush}"
+                                                        BorderThickness="1"
+                                                        VerticalAlignment="Top"
+                                                        Margin="0,2,12,0" />
+
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding ChildSummary}" Style="{StaticResource BodyMutedText}" Margin="0,4,0,0" />
+                                                    <TextBlock Text="{Binding DefaultsSummary}"
+                                                               Style="{StaticResource BodyMutedText}"
+                                                               Margin="0,4,0,0"
+                                                               Visibility="{Binding HasDefaults, Converter={StaticResource BoolToVis}}" />
+                                                </StackPanel>
+
+                                                <Border Grid.Column="2"
+                                                        Style="{StaticResource ChipBorderStyle}"
+                                                        Margin="12,0,0,0"
+                                                        VerticalAlignment="Top"
+                                                        Visibility="{Binding HasDefaults, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="Defaults" Foreground="{StaticResource Subtext1Brush}" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                        <HierarchicalDataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsMouseOver}" Value="True">
+                                                <Setter TargetName="FolderRow" Property="Background" Value="{StaticResource Surface0Brush}" />
+                                                <Setter TargetName="FolderRow" Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter TargetName="FolderRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
+                                                <Setter TargetName="FolderRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
+                                            </DataTrigger>
+                                        </HierarchicalDataTemplate.Triggers>
+                                    </HierarchicalDataTemplate>
+
+                                    <DataTemplate DataType="{x:Type vm:EntryNode}">
+                                        <Border x:Name="EntryRow" Style="{StaticResource TreeRowBorderStyle}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border Width="42"
+                                                        Height="28"
+                                                        CornerRadius="8"
+                                                        Background="{StaticResource BlueSoftBrush}"
+                                                        BorderBrush="{StaticResource BlueSoftBrush}"
+                                                        BorderThickness="1"
+                                                        Margin="0,0,12,0"
+                                                        VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding RouteBadge}"
+                                                               Foreground="{StaticResource BlueBrush}"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Summary}" Style="{StaticResource BodyMutedText}" Margin="0,4,0,0" />
+                                                    <TextBlock Text="{Binding TagsSummary}"
+                                                               Style="{StaticResource BodyMutedText}"
+                                                               Margin="0,4,0,0"
+                                                               Visibility="{Binding HasTags, Converter={StaticResource BoolToVis}}" />
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2" Margin="12,0,0,0" HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding LastConnectedDisplay}"
+                                                               Style="{StaticResource BodyMutedText}"
+                                                               TextAlignment="Right" />
+                                                    <TextBlock Text="{Binding PasswordStateDisplay}" Style="{StaticResource CaptionText}" Margin="0,6,0,0" TextAlignment="Right" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsMouseOver}" Value="True">
+                                                <Setter TargetName="EntryRow" Property="Background" Value="{StaticResource Surface0Brush}" />
+                                                <Setter TargetName="EntryRow" Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter TargetName="EntryRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
+                                                <Setter TargetName="EntryRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </TreeView.Resources>
+
+                                <TreeView.ContextMenu>
+                                    <ContextMenu DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem Header="Launch connection" Command="{Binding LaunchCommand}" FontWeight="SemiBold" />
+                                        <Separator />
+                                        <MenuItem Header="New connection" Command="{Binding AddEntryCommand}" />
+                                        <MenuItem Header="New folder" Command="{Binding AddFolderCommand}" />
+                                        <MenuItem Header="New subfolder" Command="{Binding AddSubfolderCommand}" />
+                                        <Separator />
+                                        <MenuItem Header="Edit" Command="{Binding EditCommand}" />
+                                        <MenuItem Header="Rename" Command="{Binding RenameCommand}" />
+                                        <MenuItem Header="Move" Command="{Binding MoveCommand}" />
+                                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+                                    </ContextMenu>
+                                </TreeView.ContextMenu>
+                            </TreeView>
+                        </Border>
+
+                        <Border Style="{StaticResource SubPanelCard}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center"
+                                Width="320"
+                                Visibility="{Binding ShowWelcomeState, Converter={StaticResource BoolToVis}}">
+                            <StackPanel>
+                                <TextBlock Text="No connections yet" FontSize="24" FontWeight="SemiBold" TextAlignment="Center" />
+                                <TextBlock Margin="0,12,0,0"
+                                           Text="Create your first connection or folder to start launching TeamViewer sessions from a local encrypted workspace."
+                                           Style="{StaticResource SectionSubtitleText}"
+                                           TextAlignment="Center" />
+                                <WrapPanel Margin="0,18,0,0" HorizontalAlignment="Center">
+                                    <Button Content="New connection" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" Command="{Binding AddEntryCommand}" />
+                                    <Button Content="New folder" Margin="0,0,0,8" Command="{Binding AddFolderCommand}" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource SubPanelCard}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center"
+                                Width="320"
+                                Visibility="{Binding ShowNoSearchResultsState, Converter={StaticResource BoolToVis}}">
+                            <StackPanel>
+                                <TextBlock Text="No matches found" FontSize="22" FontWeight="SemiBold" TextAlignment="Center" />
+                                <TextBlock Margin="0,12,0,0"
+                                           Text="Try a broader search term or clear the filter to see the full workspace again."
+                                           Style="{StaticResource SectionSubtitleText}"
+                                           TextAlignment="Center" />
+                                <Button Content="Clear search"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Margin="0,18,0,0"
+                                        HorizontalAlignment="Center"
+                                        Command="{Binding ClearSearchCommand}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="2" Style="{StaticResource SubPanelCard}" Margin="0,14,0,0" Padding="14,12">
+                        <TextBlock Text="Double-click any connection to launch it. Drag folders or connections to regroup the tree. Search covers names, TeamViewer IDs, notes, and tags."
+                                   Style="{StaticResource BodyMutedText}" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                <Grid>
+                    <Border Style="{StaticResource SubPanelCard}"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Width="540"
+                            Visibility="{Binding ShowSelectionPlaceholder, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="Select a connection or folder" FontSize="26" FontWeight="SemiBold" TextAlignment="Center" />
+                            <TextBlock Margin="0,12,0,0"
+                                       Text="Launch details, inherited defaults, notes, and status cues appear here so you can verify what will happen before you connect."
+                                       Style="{StaticResource SectionSubtitleText}"
+                                       TextAlignment="Center" />
+
+                            <Grid Margin="0,22,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" Style="{StaticResource SubPanelCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="Why it feels safe" Style="{StaticResource SectionTitleText}" />
+                                        <TextBlock Margin="0,10,0,0"
+                                                   Text="Passwords stay encrypted at rest and TeamStation never depends on a remote account or cloud sync."
+                                                   Style="{StaticResource SectionSubtitleText}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Column="2" Style="{StaticResource SubPanelCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="How to move faster" Style="{StaticResource SectionTitleText}" />
+                                        <TextBlock Margin="0,10,0,0"
+                                                   Text="Use folders for customer or site grouping, then let child connections inherit launch defaults until they need exceptions."
+                                                   Style="{StaticResource SectionSubtitleText}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <WrapPanel Margin="0,22,0,0" HorizontalAlignment="Center">
+                                <Button Content="New connection" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" Command="{Binding AddEntryCommand}" />
+                                <Button Content="New folder" Margin="0,0,8,8" Command="{Binding AddFolderCommand}" />
+                                <Button Content="Restore JSON" Margin="0,0,0,8" Command="{Binding ImportCommand}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
+                        <ContentControl Content="{Binding Selected}">
+                            <ContentControl.Resources>
+                                <DataTemplate DataType="{x:Type vm:EntryNode}">
+                                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource EntryInspectorTemplate}" />
+                                </DataTemplate>
+                                <DataTemplate DataType="{x:Type vm:FolderNode}">
+                                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource FolderInspectorTemplate}" />
+                                </DataTemplate>
+                            </ContentControl.Resources>
+                        </ContentControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
 
         <Border Grid.Row="3"
-                Background="{StaticResource MantleBrush}"
-                BorderThickness="0,1,0,0"
-                BorderBrush="{StaticResource CrustBrush}"
-                Height="180"
+                Margin="18,0,18,12"
+                Style="{StaticResource PanelCard}"
                 Visibility="{Binding IsLogVisible, Converter={StaticResource BoolToVis}}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="Log" Foreground="{StaticResource Subtext1Brush}"
-                           FontWeight="SemiBold" Margin="16,8,16,4" />
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="Activity" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,6,0,0" Text="{Binding LogSummary}" Style="{StaticResource SectionSubtitleText}" />
+                    </StackPanel>
+
+                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
+                        <Button Content="Clear" Margin="0,0,8,0" Command="{Binding ClearLogCommand}" />
+                        <Button Content="Hide" Command="{Binding ToggleLogCommand}" />
+                    </WrapPanel>
+                </Grid>
+
                 <ListBox Grid.Row="1"
+                         Margin="0,18,0,0"
                          ItemsSource="{Binding Log}"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         Foreground="{StaticResource TextBrush}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         HorizontalContentAlignment="Stretch"
-                         Margin="8,0,8,8"
                          behaviors:AutoScrollBehavior.AutoScrollToEnd="True"
-                         AutomationProperties.Name="Log">
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="Background" Value="Transparent" />
-                            <Setter Property="BorderThickness" Value="0" />
-                            <Setter Property="Padding" Value="8,2" />
-                            <Setter Property="Focusable" Value="False" />
-                        </Style>
-                    </ListBox.ItemContainerStyle>
+                         AutomationProperties.Name="Activity log">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="{Binding TimeDisplay}"
-                                           Foreground="{StaticResource Subtext0Brush}" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
-                                <TextBlock Grid.Column="1" Text="{Binding LevelTag}" Margin="10,0,10,0"
-                                           Foreground="{Binding LevelBrush}" FontFamily="Cascadia Mono, Consolas" FontSize="11" Width="48" />
-                                <TextBlock Grid.Column="2" Text="{Binding Message}"
-                                           Foreground="{StaticResource TextBrush}" FontFamily="Cascadia Mono, Consolas" FontSize="11"
-                                           TextWrapping="Wrap" />
-                            </Grid>
+                            <Border Style="{StaticResource SubPanelCard}" Padding="12" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding TimeDisplay}"
+                                               Foreground="{StaticResource Subtext0Brush}"
+                                               FontFamily="Cascadia Mono, Consolas"
+                                               FontSize="11"
+                                               VerticalAlignment="Top" />
+
+                                    <Border Grid.Column="1"
+                                            Margin="12,0,12,0"
+                                            Padding="8,3"
+                                            CornerRadius="999"
+                                            Background="{Binding LevelBrush}">
+                                        <TextBlock Text="{Binding LevelTag}"
+                                                   Foreground="{StaticResource CrustBrush}"
+                                                   FontFamily="Cascadia Mono, Consolas"
+                                                   FontSize="10"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Message}"
+                                               Foreground="{StaticResource TextBrush}"
+                                               TextWrapping="Wrap"
+                                               VerticalAlignment="Top" />
+                                </Grid>
+                            </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Background="{StaticResource CrustBrush}" Padding="16,6">
-            <TextBlock Foreground="{StaticResource Subtext0Brush}" FontSize="11"
-                       Text="{Binding Status}" />
+        <Border Grid.Row="4" Background="{StaticResource CrustBrush}" Padding="18,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="10"
+                            Height="10"
+                            CornerRadius="5"
+                            Background="{Binding StatusBrush}"
+                            VerticalAlignment="Center"
+                            Margin="0,0,10,0" />
+                    <Border Padding="10,4"
+                            CornerRadius="999"
+                            Background="{StaticResource Surface0Brush}"
+                            BorderBrush="{StaticResource PanelBorderBrush}"
+                            BorderThickness="1"
+                            Margin="0,0,10,0">
+                        <TextBlock Text="{Binding StatusTag}" Foreground="{Binding StatusBrush}" FontSize="11" FontWeight="SemiBold" />
+                    </Border>
+                    <TextBlock Text="{Binding Status}" Foreground="{StaticResource Subtext1Brush}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding SearchHintText}"
+                           Foreground="{StaticResource Subtext0Brush}"
+                           FontSize="11"
+                           VerticalAlignment="Center" />
+            </Grid>
         </Border>
     </Grid>
 </Window>

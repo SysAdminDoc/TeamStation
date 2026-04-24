@@ -42,4 +42,17 @@ public partial class MainWindow : Window
         if (vm.LaunchCommand.CanExecute(null))
             vm.LaunchCommand.Execute(null);
     }
+
+    private void Tree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var hit = e.OriginalSource as DependencyObject;
+        while (hit is not null and not TreeViewItem)
+            hit = VisualTreeHelper.GetParent(hit);
+
+        if (hit is TreeViewItem item)
+        {
+            item.Focus();
+            item.IsSelected = true;
+        }
+    }
 }
