@@ -12,6 +12,9 @@
         MinHeight="620"
         MinWidth="1040"
         WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BaseBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{StaticResource UiFont}"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}">
     <Window.Resources>
 
@@ -34,14 +37,12 @@
             <Setter Property="Padding" Value="12" />
         </Style>
 
-        <!--  Chip — pill-shaped, tight padding. Used for TeamViewer ID, route
-              badge, last-connected display, status cues. Corner radius is large
-              enough (999) to always render as a full capsule regardless of height.  -->
+        <!--  Compact metadata chip. Kept rectangular enough to avoid badge clutter.  -->
         <Style x:Key="ChipBorderStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="10,4" />
             <Setter Property="Margin" Value="0,0,6,6" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
@@ -429,7 +430,7 @@
                                 <TextBlock Text="Folder" Style="{StaticResource CaptionText}" Foreground="{StaticResource MauveBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <Border Width="10" Height="10" CornerRadius="999" Background="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <Border Width="10" Height="10" CornerRadius="3" Background="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
                                 <TextBlock Text="{Binding Name}" Style="{StaticResource DisplayText}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <TextBlock Text="{Binding ParentSummary}" Style="{StaticResource SectionSubtitleText}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" />
@@ -711,23 +712,9 @@
                 Padding="8,6">
             <DockPanel LastChildFill="True">
 
-                <!--  Right-side status cluster (brand + status chips)  -->
+                <!--  Right-side status cluster  -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,4,0">
-                    <Border ToolTip="{Binding TvExePath}" VerticalAlignment="Center" Margin="0,0,6,0">
-                        <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource ChipBorderStyle}">
-                                <Setter Property="Margin" Value="0" />
-                                <Setter Property="Background" Value="{StaticResource GreenSoftBrush}" />
-                                <Setter Property="BorderBrush" Value="{StaticResource GreenSoftBrush}" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsTeamViewerReady}" Value="False">
-                                        <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource RedSoftBrush}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <StackPanel Orientation="Horizontal">
+                    <StackPanel Orientation="Horizontal" ToolTip="{Binding TvExePath}" VerticalAlignment="Center" Margin="0,0,12,0">
                             <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol" FontSize="10" VerticalAlignment="Center" Margin="0,0,5,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -743,11 +730,8 @@
                                 </TextBlock.Style>
                             </TextBlock>
                             <TextBlock Text="{Binding TeamViewerStatusText}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource ChipBorderStyle}" Margin="0" Background="{StaticResource BlueSoftBrush}" BorderBrush="{StaticResource BlueSoftBrush}">
-                        <TextBlock Text="{Binding TreeSummary}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" FontSize="12" />
-                    </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding TreeSummary}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
                 </StackPanel>
 
                 <!--  Toolbar groups (left-aligned, wrap on narrow windows)  -->
@@ -1321,7 +1305,7 @@
                                 <Border Grid.Column="1"
                                         Margin="12,4,12,4"
                                         Padding="7,2"
-                                        CornerRadius="999"
+                                        CornerRadius="4"
                                         MinWidth="64"
                                         Background="{Binding LevelBrush}">
                                     <TextBlock Text="{Binding LevelTag}"
@@ -1358,14 +1342,14 @@
 
                 <Border Grid.Column="0"
                         Padding="8,2"
-                        CornerRadius="999"
+                        CornerRadius="4"
                         Background="Transparent"
                         BorderBrush="{StaticResource PanelBorderBrush}"
                         BorderThickness="1"
                         Margin="0,0,10,0"
                         VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <Border Width="7" Height="7" CornerRadius="999" Background="{Binding StatusBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <Border Width="7" Height="7" CornerRadius="3" Background="{Binding StatusBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding StatusTag}" Foreground="{Binding StatusBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
@@ -1386,7 +1370,7 @@
                                TextTrimming="CharacterEllipsis"
                                MaxWidth="520"
                                Margin="0,0,12,0" />
-                    <Border Padding="6,2" CornerRadius="999" Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" VerticalAlignment="Center">
+                    <Border Padding="6,2" CornerRadius="4" Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" VerticalAlignment="Center">
                         <TextBlock x:Name="VersionBadge" Foreground="{StaticResource Subtext1Brush}" FontSize="10" FontWeight="SemiBold" FontFamily="{StaticResource MonoFont}" />
                     </Border>
                 </StackPanel>

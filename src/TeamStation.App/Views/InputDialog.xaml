@@ -6,6 +6,9 @@
         SizeToContent="Height"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BaseBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{StaticResource UiFont}"
         ShowInTaskbar="False">
     <Border Margin="16"
             Background="{StaticResource MantleBrush}"

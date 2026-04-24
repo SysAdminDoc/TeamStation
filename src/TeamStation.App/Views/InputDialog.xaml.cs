@@ -1,4 +1,5 @@
 using System.Windows;
+using TeamStation.App.Services;
 
 namespace TeamStation.App.Views;
 
@@ -7,6 +8,7 @@ public partial class InputDialog : Window
     public InputDialog(string title, string prompt, string initialValue = "")
     {
         InitializeComponent();
+        ThemeManager.ConfigureWindow(this);
         Title = title;
         DialogTitleText.Text = title;
         PromptText.Text = prompt;

@@ -8,6 +8,9 @@
         MinWidth="620"
         MinHeight="660"
         WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BaseBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{StaticResource UiFont}"
         ShowInTaskbar="False">
     <Window.Resources>
         <Style x:Key="EditorCard" TargetType="Border">

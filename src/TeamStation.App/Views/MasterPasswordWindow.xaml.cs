@@ -1,4 +1,5 @@
 using System.Windows;
+using TeamStation.App.Services;
 
 namespace TeamStation.App.Views;
 
@@ -9,6 +10,7 @@ public partial class MasterPasswordWindow : Window
     public MasterPasswordWindow(bool createNew)
     {
         InitializeComponent();
+        ThemeManager.ConfigureWindow(this);
         _createNew = createNew;
         TitleText.Text = createNew ? "Create portable master password" : "Unlock TeamStation";
         SubtitleText.Text = createNew

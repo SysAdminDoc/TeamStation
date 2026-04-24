@@ -12,6 +12,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(AppSettings settings)
     {
         InitializeComponent();
+        ThemeManager.ConfigureWindow(this);
         _settings = settings;
         ThemeBox.ItemsSource = ThemeManager.Themes;
         ThemeBox.SelectedValue = ThemeManager.Normalize(settings.Theme);

@@ -1,5 +1,8 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Runtime.InteropServices;
 
 namespace TeamStation.App.Services;
 
@@ -7,6 +10,10 @@ public sealed record AppTheme(string Id, string Name);
 
 public static class ThemeManager
 {
+    private const int DwmAttributeUseImmersiveDarkMode = 20;
+    private const int DwmAttributeUseImmersiveDarkModeBefore20H1 = 19;
+    private static string _currentThemeId = "Dark";
+
     public static IReadOnlyList<AppTheme> Themes { get; } =
     [
         new("Dark", "Dark"),
@@ -115,7 +122,8 @@ public static class ThemeManager
         if (Application.Current is not { } app)
             return;
 
-        var palette = Palettes[Normalize(themeId)];
+        _currentThemeId = Normalize(themeId);
+        var palette = Palettes[_currentThemeId];
         Set(app, nameof(Palette.Base), palette.Base);
         Set(app, nameof(Palette.Mantle), palette.Mantle);
         Set(app, nameof(Palette.Crust), palette.Crust);
@@ -137,6 +145,17 @@ public static class ThemeManager
         Set(app, nameof(Palette.YellowSoft), palette.YellowSoft);
         Set(app, nameof(Palette.PanelBorder), palette.PanelBorder);
         Set(app, nameof(Palette.InputBorder), palette.InputBorder);
+
+        foreach (Window window in app.Windows)
+            ApplyWindowChrome(window);
+    }
+
+    public static void ConfigureWindow(Window window)
+    {
+        window.SetResourceReference(Window.BackgroundProperty, "BaseBrush");
+        window.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+        window.SourceInitialized += (_, _) => ApplyWindowChrome(window);
+        ApplyWindowChrome(window);
     }
 
     private static void Set(Application app, string key, Color color)
@@ -160,6 +179,29 @@ public static class ThemeManager
         // which is acceptable for the rare freeze path.
         app.Resources[brushKey] = new SolidColorBrush(color);
     }
+
+    private static void ApplyWindowChrome(Window window)
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero)
+                return;
+
+            var useDarkTitleBar = string.Equals(_currentThemeId, "Light", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+            if (DwmSetWindowAttribute(hwnd, DwmAttributeUseImmersiveDarkMode, ref useDarkTitleBar, sizeof(int)) != 0)
+                _ = DwmSetWindowAttribute(hwnd, DwmAttributeUseImmersiveDarkModeBefore20H1, ref useDarkTitleBar, sizeof(int));
+        }
+        catch (DllNotFoundException)
+        {
+        }
+        catch (EntryPointNotFoundException)
+        {
+        }
+    }
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int attributeValue, int attributeSize);
 
     private sealed record Palette(
         Color Base,

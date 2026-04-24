@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
+using TeamStation.App.Services;
 using TeamStation.App.ViewModels;
 
 namespace TeamStation.App.Views;
@@ -16,6 +17,7 @@ public partial class FolderPickerDialog : Window
     private FolderPickerDialog(IEnumerable<FolderNode> roots, Guid? excludeSubtreeOf)
     {
         InitializeComponent();
+        ThemeManager.ConfigureWindow(this);
         RootFolders = new ObservableCollection<PickerFolderItem>(
             roots.Select(r => PickerFolderItem.Build(r, excludeSubtreeOf))
                  .Where(item => item is not null)

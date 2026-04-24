@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using TeamStation.App.Services;
 using TeamStation.Core.Models;
 using TeamStation.Launcher.Validation;
 
@@ -14,6 +15,7 @@ public partial class EntryEditorWindow : Window
     public EntryEditorWindow(ConnectionEntry entry)
     {
         InitializeComponent();
+        ThemeManager.ConfigureWindow(this);
         _entry = entry;
 
         var isNew = string.IsNullOrWhiteSpace(entry.TeamViewerId);

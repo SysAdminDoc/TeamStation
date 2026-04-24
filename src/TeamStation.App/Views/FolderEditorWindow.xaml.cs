@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using TeamStation.App.Services;
 using TeamStation.Core.Models;
 using TeamStation.Launcher.Validation;
 
@@ -15,6 +16,7 @@ public partial class FolderEditorWindow : Window
     public FolderEditorWindow(Folder folder)
     {
         InitializeComponent();
+        ThemeManager.ConfigureWindow(this);
         _folder = folder;
 
         var isNew = string.IsNullOrWhiteSpace(folder.Name);

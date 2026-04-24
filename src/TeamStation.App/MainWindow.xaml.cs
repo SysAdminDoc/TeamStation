@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
+        ThemeManager.ConfigureWindow(this);
         DataContext = viewModel;
 
         var version = Assembly.GetExecutingAssembly()
