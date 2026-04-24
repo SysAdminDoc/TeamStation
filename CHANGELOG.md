@@ -4,6 +4,8 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-24
+
 Focused security-hardening patch closing three of the v0.3.0 postflight audit follow-ups. No public API removed; one breaking change to the `ISecretStore` interface (new `DeleteValue` member — only relevant to downstream packagers that implemented the interface themselves).
 
 ### Security

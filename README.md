@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.1-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,6 +31,8 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 > **Prerequisite:** The full TeamViewer client must be installed on the launching machine (`TeamViewer.exe` on the `PATH` or at its default install location). TeamStation does not bundle or replace TeamViewer.
 
 ## Status
+
+`v0.3.1` — **Security-hardening patch.** Closes two of the three v0.3.0 postflight audit P1 items. `CryptoService` is now `IDisposable` — the unwrapped DEK is allocated pinned (`GC.AllocateArray<byte>(pinned: true)`) and zeroed via `CryptographicOperations.ZeroMemory` on dispose, so a memory dump or swap-file snapshot taken after shutdown cannot recover the key. `RotateDek` is now two-phase commit with a `dek_v1_pending` tombstone; startup classifies `None` / `PendingOrphan` / `InterruptedMidRotation` and auto-reconciles the orphan case, refusing the ambiguous mid-rotation case so recovery UX can inspect DB row state before choosing `ForceCommit` or `ForceRollback`. The shared `TeamStation.Core.Io.AtomicFile` helper now backs both `SettingsService.Save` and the JSON-backup export, pinned by a twin of the settings crash tests. Test count 330 → 355, build clean at 0 warnings / 0 errors. See [CHANGELOG.md](CHANGELOG.md).
 
 `v0.3.0` — **First external release.** Bundles every wave of work since the v0.1.x MVP — Argon2id portable-mode KEK, the sub-view-model split, service relocation into `TeamStation.Core`, v0.2.1 hardening (lossy-backup fix, atomic-rename `CloudMirrorService`, single-instance guard, log auto-scroll, retention-based pruning) — plus a focused security and test-coverage hardening pass. Highlights: ASCII-only device ID regex (replaces `\d{8,12}` which accepted Arabic-Indic and full-width digits), argv-injection guard on proxy hosts, bracket-form IPv6 proxy endpoints, `Enum.IsDefined` range-check on `Quality` / `AccessControl` so out-of-range DB rows never reach the argv, a `CryptoService.RotateDek` primitive with save-before-migrate ordering + rollback + old-DEK zero, pinned CVE-2020-13699 regression vectors, 10k-draw validator fuzz asserting only `LaunchValidationException` ever surfaces, atomic-write crash simulation for `SettingsService`. Test count 131 → 330, build clean at 0 warnings / 0 errors. See [CHANGELOG.md](CHANGELOG.md).
 
