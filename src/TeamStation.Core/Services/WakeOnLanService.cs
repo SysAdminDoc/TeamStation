@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 
-namespace TeamStation.App.Services;
+namespace TeamStation.Core.Services;
 
 public static partial class WakeOnLanService
 {

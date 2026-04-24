@@ -1,6 +1,7 @@
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
+using Konscious.Security.Cryptography;
 
 namespace TeamStation.Data.Security;
 
@@ -11,13 +12,12 @@ namespace TeamStation.Data.Security;
 /// AES-256-GCM encrypted with that DEK using a fresh 96-bit nonce.
 ///
 /// Wire format per field: <c>nonce(12) | tag(16) | ciphertext(n)</c>.
+///
+/// Portable mode wraps the DEK with a master-password-derived KEK. New wraps
+/// use Argon2id (wire format tag <c>argon2id_v1</c>); legacy PBKDF2-SHA256
+/// wraps (<c>pbkdf2_v1</c>) are still readable for upgrade, and are
+/// re-wrapped with Argon2id opportunistically on next unlock.
 /// </summary>
-/// <remarks>
-/// DPAPI binding is per-user, per-machine by default. That means a portable
-/// database copied to a different Windows account will not decrypt — this is
-/// intentional for the default mode. Portable-mode master-password KEK
-/// wrapping lands in a later release (see ROADMAP).
-/// </remarks>
 [SupportedOSPlatform("windows")]
 public sealed class CryptoService
 {
@@ -25,10 +25,16 @@ public sealed class CryptoService
     private const int TagSize = 16;
     private const int KeySize = 32;
     private const int MasterSaltSize = 32;
-    private const int MasterIterations = 310_000;
+    private const int LegacyPbkdf2Iterations = 310_000;
+    private const int Argon2TimeCost = 3;
+    private const int Argon2MemoryKiB = 64 * 1024; // 64 MiB
+    private const int Argon2Parallelism = 2;
     private const string DpapiDekKey = "dek_v1";
     private const string MasterWrappedDekKey = "dek_master_v1";
     private const string MasterSaltKey = "dek_master_salt_v1";
+    private const string MasterKdfTag = "dek_master_kdf_v1";
+    private const string KdfIdPbkdf2 = "pbkdf2_v1";
+    private const string KdfIdArgon2id = "argon2id_v1";
 
     private readonly byte[] _dek;
 
@@ -83,27 +89,51 @@ public sealed class CryptoService
 
         var salt = secretStore.LoadValue(MasterSaltKey);
         var wrapped = secretStore.LoadValue(MasterWrappedDekKey);
+        var kdfTag = ReadKdfTag(secretStore);
 
         byte[] dek;
         if (wrapped is null)
         {
             dek = TryLoadDpapiDek(keyStore) ?? RandomNumberGenerator.GetBytes(KeySize);
             salt = RandomNumberGenerator.GetBytes(MasterSaltSize);
-            var protectedDek = ProtectWithMasterPassword(dek, masterPassword, salt);
+            var protectedDek = ProtectWithMasterPassword(dek, masterPassword, salt, KdfIdArgon2id);
             secretStore.SaveValue(MasterSaltKey, salt);
             secretStore.SaveValue(MasterWrappedDekKey, protectedDek);
+            WriteKdfTag(secretStore, KdfIdArgon2id);
         }
         else
         {
             if (salt is null || salt.Length != MasterSaltSize)
                 throw new CryptographicException("Stored master-password salt is missing or invalid.");
-            dek = UnprotectWithMasterPassword(wrapped, masterPassword, salt);
+            dek = UnprotectWithMasterPassword(wrapped, masterPassword, salt, kdfTag);
+            if (!string.Equals(kdfTag, KdfIdArgon2id, StringComparison.Ordinal))
+            {
+                // Opportunistic upgrade to Argon2id — next launch is faster-to-fail and GPU-resistant.
+                var newSalt = RandomNumberGenerator.GetBytes(MasterSaltSize);
+                var upgraded = ProtectWithMasterPassword(dek, masterPassword, newSalt, KdfIdArgon2id);
+                secretStore.SaveValue(MasterSaltKey, newSalt);
+                secretStore.SaveValue(MasterWrappedDekKey, upgraded);
+                WriteKdfTag(secretStore, KdfIdArgon2id);
+            }
         }
 
         if (dek.Length != KeySize)
             throw new CryptographicException("Stored DEK has unexpected length.");
 
         return new CryptoService(dek);
+    }
+
+    private static string ReadKdfTag(ISecretStore secretStore)
+    {
+        var raw = secretStore.LoadValue(MasterKdfTag);
+        if (raw is null || raw.Length == 0)
+            return KdfIdPbkdf2; // Pre-Argon2 wraps have no tag stored.
+        return Encoding.UTF8.GetString(raw);
+    }
+
+    private static void WriteKdfTag(ISecretStore secretStore, string tag)
+    {
+        secretStore.SaveValue(MasterKdfTag, Encoding.UTF8.GetBytes(tag));
     }
 
     private static byte[]? TryLoadDpapiDek(IKeyStore keyStore)
@@ -121,51 +151,75 @@ public sealed class CryptoService
         }
     }
 
-    private static byte[] ProtectWithMasterPassword(byte[] dek, string masterPassword, byte[] salt)
+    private static byte[] ProtectWithMasterPassword(byte[] dek, string masterPassword, byte[] salt, string kdfId)
     {
-        var key = DeriveMasterKey(masterPassword, salt);
-        var nonce = RandomNumberGenerator.GetBytes(NonceSize);
-        var cipher = new byte[dek.Length];
-        var tag = new byte[TagSize];
-        using var aes = new AesGcm(key, TagSize);
-        aes.Encrypt(nonce, dek, cipher, tag);
-        CryptographicOperations.ZeroMemory(key);
+        var key = DeriveMasterKey(masterPassword, salt, kdfId);
+        try
+        {
+            var nonce = RandomNumberGenerator.GetBytes(NonceSize);
+            var cipher = new byte[dek.Length];
+            var tag = new byte[TagSize];
+            using var aes = new AesGcm(key, TagSize);
+            aes.Encrypt(nonce, dek, cipher, tag);
 
-        var output = new byte[NonceSize + TagSize + cipher.Length];
-        Buffer.BlockCopy(nonce, 0, output, 0, NonceSize);
-        Buffer.BlockCopy(tag, 0, output, NonceSize, TagSize);
-        Buffer.BlockCopy(cipher, 0, output, NonceSize + TagSize, cipher.Length);
-        return output;
+            var output = new byte[NonceSize + TagSize + cipher.Length];
+            Buffer.BlockCopy(nonce, 0, output, 0, NonceSize);
+            Buffer.BlockCopy(tag, 0, output, NonceSize, TagSize);
+            Buffer.BlockCopy(cipher, 0, output, NonceSize + TagSize, cipher.Length);
+            return output;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
     }
 
-    private static byte[] UnprotectWithMasterPassword(byte[] wrapped, string masterPassword, byte[] salt)
+    private static byte[] UnprotectWithMasterPassword(byte[] wrapped, string masterPassword, byte[] salt, string kdfId)
     {
         if (wrapped.Length < NonceSize + TagSize)
             throw new CryptographicException("Stored master-password envelope is too short.");
 
-        var key = DeriveMasterKey(masterPassword, salt);
-        var nonce = new byte[NonceSize];
-        var tag = new byte[TagSize];
-        var cipher = new byte[wrapped.Length - NonceSize - TagSize];
-        Buffer.BlockCopy(wrapped, 0, nonce, 0, NonceSize);
-        Buffer.BlockCopy(wrapped, NonceSize, tag, 0, TagSize);
-        Buffer.BlockCopy(wrapped, NonceSize + TagSize, cipher, 0, cipher.Length);
+        var key = DeriveMasterKey(masterPassword, salt, kdfId);
+        try
+        {
+            var nonce = new byte[NonceSize];
+            var tag = new byte[TagSize];
+            var cipher = new byte[wrapped.Length - NonceSize - TagSize];
+            Buffer.BlockCopy(wrapped, 0, nonce, 0, NonceSize);
+            Buffer.BlockCopy(wrapped, NonceSize, tag, 0, TagSize);
+            Buffer.BlockCopy(wrapped, NonceSize + TagSize, cipher, 0, cipher.Length);
 
-        var dek = new byte[cipher.Length];
-        using var aes = new AesGcm(key, TagSize);
-        aes.Decrypt(nonce, cipher, tag, dek);
-        CryptographicOperations.ZeroMemory(key);
-        return dek;
+            var dek = new byte[cipher.Length];
+            using var aes = new AesGcm(key, TagSize);
+            aes.Decrypt(nonce, cipher, tag, dek);
+            return dek;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
     }
 
-    private static byte[] DeriveMasterKey(string masterPassword, byte[] salt)
+    private static byte[] DeriveMasterKey(string masterPassword, byte[] salt, string kdfId) => kdfId switch
     {
-        return Rfc2898DeriveBytes.Pbkdf2(
-            masterPassword,
-            salt,
-            MasterIterations,
-            HashAlgorithmName.SHA256,
-            KeySize);
+        KdfIdArgon2id => DeriveArgon2id(masterPassword, salt),
+        KdfIdPbkdf2 => DerivePbkdf2(masterPassword, salt),
+        _ => throw new CryptographicException($"Unknown master-key KDF: {kdfId}"),
+    };
+
+    private static byte[] DerivePbkdf2(string masterPassword, byte[] salt) =>
+        Rfc2898DeriveBytes.Pbkdf2(masterPassword, salt, LegacyPbkdf2Iterations, HashAlgorithmName.SHA256, KeySize);
+
+    private static byte[] DeriveArgon2id(string masterPassword, byte[] salt)
+    {
+        using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(masterPassword))
+        {
+            Salt = salt,
+            Iterations = Argon2TimeCost,
+            MemorySize = Argon2MemoryKiB,
+            DegreeOfParallelism = Argon2Parallelism,
+        };
+        return argon2.GetBytes(KeySize);
     }
 
     public byte[]? EncryptString(string? plaintext)

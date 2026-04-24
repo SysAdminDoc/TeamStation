@@ -6,11 +6,12 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.1.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![TeamViewer](https://img.shields.io/badge/TeamViewer-15%2B-0E8EE9)](https://www.teamviewer.com/)
+[![CI](https://github.com/SysAdminDoc/TeamStation/actions/workflows/ci.yml/badge.svg)](https://github.com/SysAdminDoc/TeamStation/actions/workflows/ci.yml)
 
 </div>
 
@@ -31,9 +32,9 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 
 ## Status
 
-`main` after `v0.1.1` — Product pass on top of the hardened MVP. Adds app settings, first-run trust notice, portable master-password unlock, quick connect, pinned/recent tray launching, TeamViewer history import, optional TeamViewer Web API pull, Wake-on-LAN, per-entry/per-folder launch scripts, external tools, saved searches, session history export, audit log storage, optional encrypted DB mirroring to a cloud folder, and optional Authenticode signing in the release workflow. The xUnit suite now has 118 tests. See [CHANGELOG.md](CHANGELOG.md).
+`v0.2.0` — **Architecture + security pass.** Argon2id replaces PBKDF2-SHA256 for the portable-mode master-password KEK (legacy wraps still unlock and upgrade in place); cloud / Wake-on-LAN / external-tool services moved into `TeamStation.Core` so an eventual Avalonia port has one less barrier; `MainViewModel` carved into `LogPanelViewModel`, `QuickConnectViewModel`, `SearchViewModel` with a single `IDialogService` replacing six constructor delegates; optional clipboard-password launch mode for hostile multi-user hosts; dedicated `ci.yml` build-and-test workflow. See [CHANGELOG.md](CHANGELOG.md).
 
-`v0.1.1` — Hardening pass on top of the MVP. Fixed the folder-picker bug that blocked moving a folder to a sibling, broadened CSV header matching so "Friendly Name" / "TV ID" / "Remote Control ID" columns work, made JSON import tolerant of hand-edited backups (null arrays, camelCase keys, dangling parent references), atomic export writes, a single-instance guard, numeric sort on legacy `Version*` directories, tray-menu cleanup, log auto-scroll, and a 109-test xUnit suite wired into the solution. See [CHANGELOG.md](CHANGELOG.md).
+`v0.1.1` — Hardening pass on top of the MVP. Fixed the folder-picker bug that blocked moving a folder to a sibling, broadened CSV header matching so "Friendly Name" / "TV ID" / "Remote Control ID" columns work, made JSON import tolerant of hand-edited backups (null arrays, camelCase keys, dangling parent references), atomic export writes, a single-instance guard, numeric sort on legacy `Version*` directories, tray-menu cleanup, log auto-scroll, and the first xUnit suite wired into the solution. See [CHANGELOG.md](CHANGELOG.md).
 
 `v0.1.0` — **First MVP release.** TeamStation now has everything a sysadmin needs to replace the built-in TeamViewer contact list: a nested folder tree with drag-to-reorder, entries with name / ID / password / mode / quality / access-control / notes / tags, DPAPI-wrapped AES-256-GCM at rest, one-click launch that walks folder-chain inheritance at launch time, debounced multi-field search, CSV import (TeamViewer Management Console, Remote Desktop Manager, mRemoteNG, and ad-hoc spreadsheet formats all supported via flexible column aliases), JSON backup with round-trip fidelity, an embedded log panel, and a system tray with minimize-to-tray. See [CHANGELOG.md](CHANGELOG.md).
 
@@ -57,17 +58,26 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 - System tray with minimize-to-tray, pinned connections, recent connections, Show, Settings, and Exit
 - Single-instance enforcement so two launches don't race on one SQLite file
 - Portable mode via a marker file next to the exe
+- Optional clipboard-password launch mode (clears automatically after 30s) for shared or hostile hosts
 - Dark-first UI (Catppuccin Mocha)
 
 Roadmap / backlog: [ROADMAP.md](ROADMAP.md).
 
+## Screens
+
+Screenshot exports live in [`docs/screenshots/`](docs/screenshots/). See the
+capture guide in that folder for the required set; re-capture on any UI change.
+
+> Screenshots are regenerated as part of each release pass. The latest shots
+> match the installed `TeamStation.exe` version in the badge above.
+
 ## Security model
 
 - Passwords are encrypted at rest with **AES-256-GCM**. In normal mode, the data-encryption key is wrapped by **Windows DPAPI** bound to the current user account, so the database is only decryptable by you on this machine.
-- Portable mode uses a master password instead of DPAPI. The master password derives an AES-GCM wrapping key with PBKDF2-SHA256 and a per-database salt, so the database can move between machines while still staying encrypted at rest.
+- Portable mode uses a master password instead of DPAPI. New master-password wraps use **Argon2id** (time=3, memory=64 MiB, parallelism=2) with a per-database 32-byte salt; legacy PBKDF2-SHA256 wraps from v0.1.x keep unlocking and are silently re-wrapped to Argon2id on next unlock.
 - The optional TeamViewer Web API token is stored in the settings file as a DPAPI-protected value for the current Windows user.
 - A cloud mirror folder can receive an encrypted copy of the SQLite database after changes. It is a mirror/backup mechanism, not a multi-writer merge engine.
-- **Known residual risk:** launching a session passes `--Password` on the TeamViewer command line. That value is visible to any process on the machine that can read the command line of another user-owned process during the brief launch window. This is inherent to the TeamViewer CLI and affects any launcher, including manually-typed commands. TeamStation will default to `--Base64Password` (still inspectable but obscured) and document this transparently.
+- **Known residual risk:** launching a session normally passes `--PasswordB64` on the TeamViewer command line. That value is visible to any process on the machine that can read the command line of another user-owned process during the brief launch window. Toggle **Settings → Launch without password on the command line** to stage the password on the clipboard instead — TeamStation clears the clipboard 30s after launch.
 - TeamStation never phones home. There is no telemetry, no update ping, no cloud account.
 
 ## Download
@@ -113,7 +123,7 @@ Run the test suite:
 ```powershell
 dotnet test -c Release
 ```
-118 tests cover crypto, portable master-password unlock, inheritance, TeamViewer history import, CSV/JSON parsing, the CLI/URI builders, session/audit storage, and end-to-end SQLite repo operations against a temp DB.
+Tests cover crypto (including Argon2id upgrade from legacy PBKDF2 wraps), portable master-password unlock, inheritance, TeamViewer history import, CSV/JSON parsing, the CLI/URI builders, session/audit storage, and end-to-end SQLite repo operations against a temp DB. The CI workflow at [`.github/workflows/ci.yml`](.github/workflows/ci.yml) builds and tests every push and pull request.
 
 ## Why not just use mRemoteNG?
 

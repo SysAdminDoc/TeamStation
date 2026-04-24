@@ -94,6 +94,22 @@ WHERE id = $id;";
         File.WriteAllLines(path, lines);
     }
 
+    /// <summary>
+    /// Deletes session records older than <paramref name="retention"/>.
+    /// Safe no-op when the argument is non-positive. Returns the number of
+    /// rows removed.
+    /// </summary>
+    public int Prune(TimeSpan retention)
+    {
+        if (retention <= TimeSpan.Zero) return 0;
+        var cutoff = DateTimeOffset.UtcNow - retention;
+        using var c = _db.OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "DELETE FROM session_history WHERE started_utc < $cutoff;";
+        cmd.Parameters.AddWithValue("$cutoff", cutoff.ToString("O", CultureInfo.InvariantCulture));
+        return cmd.ExecuteNonQuery();
+    }
+
     private static void Bind(SqliteCommand cmd, SessionRecord record)
     {
         cmd.Parameters.AddWithValue("$id", record.Id.ToString("D"));

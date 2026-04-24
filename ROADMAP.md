@@ -121,3 +121,21 @@ Each of these needs a 1–2 hour prototype before committing architecture around
 - Alternative remote-desktop protocols (RDP, VNC, SSH, AnyDesk, ScreenConnect). Per project charter, TeamViewer-only.
 - Reimplementing the TeamViewer protocol or MITM'ing sessions.
 - Telemetry, update pings, cloud accounts, or any network traffic beyond the user-initiated Web API sync.
+
+---
+
+## v0.3.0 — in flight (iteration 1, 2026-04-24)
+
+The advanced workflow features from the v0.1.2 internal / v0.2.0 / v0.2.1 waves landed on `main` without a GitHub release. v0.3.0 cuts them together with a security-and-test-coverage hardening pass.
+
+- [ ] **P0 — Version cut.** Bump `Directory.Build.props`, README badge, and the `v0.3.0` CHANGELOG entry to reflect the sum of the v0.1.2, v0.2.0, and v0.2.1 content already on HEAD. No feature re-delivery — this is the first external release of that work.
+- [ ] **P0 — CVE-2020-13699 regression suite.** Curated vector tests derived from the 2020 advisory (argv injection via `--play`, `\\UNC` smuggling, colon/slash splitters, whitespace encoding, leading-hyphen probes) driven against both `LaunchInputValidator` and `UriSchemeBuilder`. Pinned test file so any regression fails CI before code review.
+- [ ] **P0 — LaunchInputValidator fuzz coverage.** Randomized input fuzz (10k+ draws per run) asserting the contract invariant: *any* rejection surfaces as `LaunchValidationException`, never an unhandled exception. Catches `IndexOutOfRange`, `NullReference`, `Regex` engine edge cases.
+- [ ] **P0 — DPAPI / AES-GCM round-trip edge cases.** Empty-string, null-byte-embedded, maximum-length (512 KiB), surrogate-pair and invariant-culture plaintexts. Tamper-probe each ciphertext byte independently and assert `CryptographicException` every time.
+- [ ] **P0 — Schema migration with malformed rows.** Seed a synthetic v1 database whose `entries` rows contain out-of-range enum ints (`mode=99`), NULL text columns not allowed by later schema, and trailing whitespace in primary keys. Migrate to v3 and assert either a defined quarantine path or a clean rescue of every recoverable row — never a silent data drop.
+- [ ] **P1 — Atomic-write crash simulation.** Force a failed `File.Move` (target directory read-only, file locked) during JSON backup export and during `SettingsService.Save`. Assert the original file is unchanged and the temp sidecar is cleaned up on the next run.
+- [ ] **P1 — DPAPI DEK rotation path.** Add a `CryptoService.RotateDek` entry point that generates a new DEK, re-encrypts every password column across `folders` + `entries` inside a single transaction, and replaces the wrapped DEK atomically. Rollback on any failure. Ship with a test that proves all plaintexts survive across rotation.
+- [ ] **P1 — Competitor gap matrix.** One-time landscape scan against mRemoteNG (external tools, inheritance), Royal TSX / Server (document-based vaults, SSH bastion), and Devolutions RDM free tier (entry templates, connection logs). Feed anything we're missing into this roadmap with a P-tier.
+- [ ] **P2 — Release rehearsal.** Local `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true` followed by a smoke-run of the packaged exe. Confirm the ~189 MB artifact boots and that the first-run trust notice fires before any persistence path executes.
+- [ ] **P2 — Continuation brief to CLAUDE.md.** Record what each iteration changed, what remains open, and any non-obvious lessons — so the next session resumes without rediscovering state.
+- [ ] **P1 — IPv6 proxy endpoint support.** `LaunchInputValidator.ValidateProxyEndpoint` splits on `:` and rejects any IPv6 literal (`[::1]:8080` becomes four parts). Known-limitation per existing tests; flagged again by the iteration-1 audit. Parse with `Uri` / `IPEndPoint.Parse` instead of `Split(':')`, keep the argv-injection guard on the host component, and extend `ProxyEndpointExploitVectors` with IPv6 shapes.

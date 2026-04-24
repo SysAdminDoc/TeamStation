@@ -13,7 +13,11 @@ public static partial class LaunchInputValidator
     public const int MaxPasswordLength = 256;
     public const int MaxProxyUserLength = 128;
 
-    [GeneratedRegex(@"^\d{8,12}$", RegexOptions.CultureInvariant)]
+    // ASCII-only digit class. .NET's `\d` matches any Unicode Nd category
+    // character (Arabic-Indic, full-width, Bengali, etc.), which would let
+    // a device ID written in non-ASCII digits slip past the regex even
+    // though the TeamViewer CLI only accepts ASCII decimal IDs.
+    [GeneratedRegex(@"^[0-9]{8,12}$", RegexOptions.CultureInvariant)]
     private static partial Regex IdPattern();
 
     private static readonly char[] ForbiddenInPassword =
@@ -65,6 +69,20 @@ public static partial class LaunchInputValidator
             !int.TryParse(parts[1], out var port) || port is < 1 or > 65535)
         {
             throw new LaunchValidationException("Proxy endpoint must be host:port with a port in 1-65535.");
+        }
+
+        // Host must not smuggle argv injection shapes: whitespace (splits
+        // the field into flags), leading dash (argv-flag shape), UNC
+        // prefix, or any of the substrings we already ban in passwords.
+        var host = parts[0];
+        if (host.StartsWith('-'))
+            throw new LaunchValidationException("Proxy host must not start with '-'.");
+        if (host.IndexOfAny(ForbiddenInPassword) >= 0)
+            throw new LaunchValidationException("Proxy host contains a forbidden character.");
+        foreach (var bad in ForbiddenSubstringsInAny)
+        {
+            if (host.Contains(bad, StringComparison.OrdinalIgnoreCase))
+                throw new LaunchValidationException($"Proxy host contains forbidden substring '{bad}'.");
         }
     }
 

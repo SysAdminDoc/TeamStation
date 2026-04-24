@@ -26,23 +26,15 @@ public sealed class MainViewModel : ViewModelBase
     private readonly AppSettings _settings;
     private readonly SettingsService _settingsService;
     private readonly TeamViewerCloudSyncService _cloudSync = new();
-    private readonly Func<ConnectionEntry, Window?, bool> _editEntryDialog;
-    private readonly Func<Folder, Window?, bool> _editFolderDialog;
-    private readonly Func<Window?, string?> _chooseExportPath;
-    private readonly Func<Window?, string?> _chooseImportPath;
-    private readonly Func<Window?, string?> _chooseImportCsvPath;
-    private readonly Func<Window?, string, bool> _confirmDialog;
+    private readonly IDialogService _dialogs;
 
     private TreeNode? _selected;
     private string _status = string.Empty;
     private string _tvExePath;
-    private string _searchText = string.Empty;
-    private bool _isLogVisible;
     private Dictionary<Guid, Folder> _foldersById = new();
-    private const int MaxLogEntries = 500;
     private readonly string _startupVersion;
     private readonly string? _startupDbPath;
-    private readonly object _logLock = new();
+    private readonly object _rootsLock = new();
     private bool _isTeamViewerReady;
     private Brush _statusBrush = Brushes.Transparent;
     private string _statusTag = "Ready";
@@ -50,21 +42,12 @@ public sealed class MainViewModel : ViewModelBase
     private int _entryCount;
     private int _visibleFolderCount;
     private int _visibleEntryCount;
-    private string _quickName = string.Empty;
-    private string _quickTeamViewerId = string.Empty;
-    private string _quickPassword = string.Empty;
-    private bool _quickSaveConnection;
 
     public MainViewModel(
         EntryRepository entries,
         FolderRepository folders,
         TeamViewerLauncher launcher,
-        Func<ConnectionEntry, Window?, bool> editEntryDialog,
-        Func<Folder, Window?, bool> editFolderDialog,
-        Func<Window?, string?> chooseExportPath,
-        Func<Window?, string?> chooseImportPath,
-        Func<Window?, string?> chooseImportCsvPath,
-        Func<Window?, string, bool> confirmDialog,
+        IDialogService dialogs,
         AppSettings settings,
         SettingsService settingsService,
         SessionRepository sessions,
@@ -80,16 +63,32 @@ public sealed class MainViewModel : ViewModelBase
         _launcher = launcher;
         _settings = settings;
         _settingsService = settingsService;
-        _editEntryDialog = editEntryDialog;
-        _editFolderDialog = editFolderDialog;
-        _chooseExportPath = chooseExportPath;
-        _chooseImportPath = chooseImportPath;
-        _chooseImportCsvPath = chooseImportCsvPath;
-        _confirmDialog = confirmDialog;
+        _dialogs = dialogs;
         _isTeamViewerReady = !string.IsNullOrWhiteSpace(tvExePath);
         _tvExePath = tvExePath ?? "TeamViewer.exe not found — install TeamViewer before launching";
         _startupVersion = startupVersion ?? "dev";
         _startupDbPath = startupDbPath;
+
+        LogPanel = new LogPanelViewModel();
+        LogPanel.PropertyChanged += OnLogPanelPropertyChanged;
+        QuickConnect = new QuickConnectViewModel(
+            (entry, save) => QuickLaunch(entry, save),
+            () => IsTeamViewerReady);
+        QuickConnect.PropertyChanged += OnQuickConnectPropertyChanged;
+        Search = new SearchViewModel(settings, settingsService);
+        Search.PropertyChanged += OnSearchPropertyChanged;
+        Search.SearchTextChanged += (_, _) =>
+        {
+            ApplyFilter();
+            NotifySurfacePropertyChanges();
+            OnPropertyChanged(nameof(SearchHintText));
+        };
+        Search.SavedSearchApplied += s => ReportStatus(LogLevel.Info, $"Applied saved search \"{s}\".");
+        Search.SavedSearchAdded += s =>
+        {
+            Audit("create", "saved-search", null, $"Saved search \"{s}\".");
+            ReportStatus(LogLevel.Success, $"Saved search \"{s}\".");
+        };
 
         AddEntryCommand = new RelayCommand(AddEntry);
         AddFolderCommand = new RelayCommand(AddFolder);
@@ -102,36 +101,126 @@ public sealed class MainViewModel : ViewModelBase
         ExportCommand = new RelayCommand(Export);
         ImportCommand = new RelayCommand(Import);
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
-        QuickConnectCommand = new RelayCommand(QuickConnect, () => IsTeamViewerReady && !string.IsNullOrWhiteSpace(QuickTeamViewerId));
         TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
         OpenSettingsCommand = new RelayCommand(OpenSettings);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
         SyncTeamViewerCloudCommand = new RelayCommand(() => _ = SyncTeamViewerCloudAsync());
         ExportSessionsCommand = new RelayCommand(ExportSessions);
-        SaveSearchCommand = new RelayCommand(SaveSearch, () => HasSearchText);
-        ApplySavedSearchCommand = new RelayCommand(ApplySavedSearch, parameter => parameter is string { Length: > 0 });
-        RunExternalToolCommand = new RelayCommand(RunExternalTool, parameter => Selected is EntryNode && parameter is ExternalToolDefinition);
-        ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
-        ClearLogCommand = new RelayCommand(ClearLog, () => Log.Count > 0);
-        ToggleLogCommand = new RelayCommand(() => IsLogVisible = !IsLogVisible);
+        RunExternalToolCommand = new RelayCommand(RunExternalTool,
+            parameter => Selected is EntryNode && parameter is ExternalToolDefinition);
 
-        // Enable cross-thread access for collection bindings; all *mutations*
-        // still happen on the UI thread, but this makes future async writes safe.
-        System.Windows.Data.BindingOperations.EnableCollectionSynchronization(Log, _logLock);
-        System.Windows.Data.BindingOperations.EnableCollectionSynchronization(RootNodes, _logLock);
+        System.Windows.Data.BindingOperations.EnableCollectionSynchronization(RootNodes, _rootsLock);
 
         Reload();
-        AppendLog(LogLevel.Info, $"TeamStation v{_startupVersion} started.");
+        LogPanel.Append(LogLevel.Info, $"TeamStation v{_startupVersion} started.");
         if (!string.IsNullOrEmpty(_startupDbPath))
-            AppendLog(LogLevel.Info, $"Database: {_startupDbPath}");
-        AppendLog(LogLevel.Info, tvExePath is null
+            LogPanel.Append(LogLevel.Info, $"Database: {_startupDbPath}");
+        LogPanel.Append(LogLevel.Info, tvExePath is null
             ? "TeamViewer.exe not found — launches will be disabled until TeamViewer is installed."
             : $"TeamViewer.exe: {tvExePath}");
+        if (!string.IsNullOrEmpty(_settingsService.LastLoadError))
+            LogPanel.Append(LogLevel.Warning, _settingsService.LastLoadError!);
+        PruneHistory();
+    }
+
+    private void PruneHistory()
+    {
+        var days = _settings.HistoryRetentionDays;
+        if (days <= 0) return;
+        var retention = TimeSpan.FromDays(days);
+        try
+        {
+            var removedSessions = _sessions.Prune(retention);
+            var removedAudit = _auditLog.Prune(retention);
+            if (removedSessions + removedAudit > 0)
+            {
+                LogPanel.Append(LogLevel.Info,
+                    $"Pruned history older than {days} days: {removedSessions} session{(removedSessions == 1 ? string.Empty : "s")}, " +
+                    $"{removedAudit} audit event{(removedAudit == 1 ? string.Empty : "s")}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogPanel.Append(LogLevel.Warning, $"History prune skipped: {ex.Message}");
+        }
     }
 
     public event EventHandler? TrayMenuInvalidated;
 
     public ObservableCollection<TreeNode> RootNodes { get; } = new();
+
+    // Sub-view-models — exposed for future XAML bindings that want the clean shape.
+    public LogPanelViewModel LogPanel { get; }
+    public QuickConnectViewModel QuickConnect { get; }
+    public SearchViewModel Search { get; }
+
+    // ---- Legacy surface proxies (keep XAML binding paths stable) ----
+
+    public ObservableCollection<LogEntry> Log => LogPanel.Entries;
+    public bool IsLogVisible { get => LogPanel.IsVisible; set => LogPanel.IsVisible = value; }
+    public string LogSummary => LogPanel.Summary;
+    public string ActivityButtonText => LogPanel.ButtonText;
+    public System.Windows.Input.ICommand ClearLogCommand => LogPanel.ClearCommand;
+    public System.Windows.Input.ICommand ToggleLogCommand => LogPanel.ToggleCommand;
+
+    public string QuickName { get => QuickConnect.Name; set => QuickConnect.Name = value; }
+    public string QuickTeamViewerId { get => QuickConnect.TeamViewerId; set => QuickConnect.TeamViewerId = value; }
+    public string QuickPassword { get => QuickConnect.Password; set => QuickConnect.Password = value; }
+    public bool QuickSaveConnection { get => QuickConnect.SaveConnection; set => QuickConnect.SaveConnection = value; }
+    public System.Windows.Input.ICommand QuickConnectCommand => QuickConnect.ConnectCommand;
+
+    public string SearchText { get => Search.SearchText; set => Search.SearchText = value; }
+    public bool HasSearchText => Search.HasText;
+    public IReadOnlyList<string> SavedSearches => Search.SavedSearches;
+    public bool HasSavedSearches => Search.HasSavedSearches;
+
+    // Rebroadcast sub-VM property changes under the legacy MainViewModel names
+    // so XAML bindings like {Binding LogSummary} keep updating after the
+    // v0.2.0 sub-VM split. Keep these maps synced with the proxy properties
+    // above whenever a new proxy is added.
+    private void OnLogPanelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(LogPanelViewModel.Entries): OnPropertyChanged(nameof(Log)); break;
+            case nameof(LogPanelViewModel.IsVisible): OnPropertyChanged(nameof(IsLogVisible)); break;
+            case nameof(LogPanelViewModel.Summary): OnPropertyChanged(nameof(LogSummary)); break;
+            case nameof(LogPanelViewModel.ButtonText): OnPropertyChanged(nameof(ActivityButtonText)); break;
+        }
+    }
+
+    private void OnQuickConnectPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(QuickConnectViewModel.Name): OnPropertyChanged(nameof(QuickName)); break;
+            case nameof(QuickConnectViewModel.TeamViewerId): OnPropertyChanged(nameof(QuickTeamViewerId)); break;
+            case nameof(QuickConnectViewModel.Password): OnPropertyChanged(nameof(QuickPassword)); break;
+            case nameof(QuickConnectViewModel.SaveConnection): OnPropertyChanged(nameof(QuickSaveConnection)); break;
+        }
+    }
+
+    private void OnSearchPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(SearchViewModel.SearchText):
+                OnPropertyChanged(nameof(SearchText));
+                break;
+            case nameof(SearchViewModel.HasText):
+                OnPropertyChanged(nameof(HasSearchText));
+                break;
+            case nameof(SearchViewModel.SavedSearches):
+                OnPropertyChanged(nameof(SavedSearches));
+                break;
+            case nameof(SearchViewModel.HasSavedSearches):
+                OnPropertyChanged(nameof(HasSavedSearches));
+                break;
+        }
+    }
+    public System.Windows.Input.ICommand SaveSearchCommand => Search.SaveCommand;
+    public System.Windows.Input.ICommand ApplySavedSearchCommand => Search.ApplyCommand;
+    public System.Windows.Input.ICommand ClearSearchCommand => Search.ClearCommand;
 
     public TreeNode? Selected
     {
@@ -169,7 +258,7 @@ public sealed class MainViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(TeamViewerStatusText));
                 ((RelayCommand)LaunchCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)QuickConnectCommand).RaiseCanExecuteChanged();
+                QuickConnect.RaiseCanLaunchChanged();
             }
         }
     }
@@ -183,7 +272,6 @@ public sealed class MainViewModel : ViewModelBase
     public int VisibleFolderCount { get => _visibleFolderCount; private set => SetField(ref _visibleFolderCount, value); }
     public int VisibleEntryCount { get => _visibleEntryCount; private set => SetField(ref _visibleEntryCount, value); }
     public bool HasAnyItems => FolderCount + EntryCount > 0;
-    public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
     public bool ShowWelcomeState => !HasAnyItems;
     public bool ShowNoSearchResultsState => HasAnyItems && HasSearchText && VisibleFolderCount + VisibleEntryCount == 0;
     public string TreeSummary => HasSearchText
@@ -192,49 +280,13 @@ public sealed class MainViewModel : ViewModelBase
     public string SearchHintText => HasSearchText
         ? $"Filtering names, IDs, notes, and tags for \"{SearchText.Trim()}\"."
         : "Search names, TeamViewer IDs, notes, or tags. Double-click a connection to launch it.";
-    public string LogSummary => Log.Count == 0
-        ? "No activity yet."
-        : $"Showing the latest {Log.Count} event{(Log.Count == 1 ? string.Empty : "s")}.";
-    public string ActivityButtonText => IsLogVisible ? "Hide activity" : "Show activity";
     public IReadOnlyList<ExternalToolDefinition> ExternalTools => _settings.ExternalTools;
     public bool HasExternalTools => ExternalTools.Count > 0;
-    public IReadOnlyList<string> SavedSearches => _settings.SavedSearches;
-    public bool HasSavedSearches => SavedSearches.Count > 0;
-
-    public string QuickName
-    {
-        get => _quickName;
-        set => SetField(ref _quickName, value ?? string.Empty);
-    }
-
-    public string QuickTeamViewerId
-    {
-        get => _quickTeamViewerId;
-        set
-        {
-            if (SetField(ref _quickTeamViewerId, value ?? string.Empty))
-                ((RelayCommand)QuickConnectCommand).RaiseCanExecuteChanged();
-        }
-    }
-
-    public string QuickPassword
-    {
-        get => _quickPassword;
-        set => SetField(ref _quickPassword, value ?? string.Empty);
-    }
-
-    public bool QuickSaveConnection
-    {
-        get => _quickSaveConnection;
-        set => SetField(ref _quickSaveConnection, value);
-    }
 
     private void AppendLog(LogLevel level, string message)
     {
-        Log.Add(new LogEntry(DateTimeOffset.Now, level, message));
-        while (Log.Count > MaxLogEntries) Log.RemoveAt(0);
+        LogPanel.Append(level, message);
         OnPropertyChanged(nameof(LogSummary));
-        ((RelayCommand)ClearLogCommand).RaiseCanExecuteChanged();
     }
 
     private void ReportStatus(LogLevel level, string message)
@@ -286,43 +338,12 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand ExportCommand { get; }
     public System.Windows.Input.ICommand ImportCommand { get; }
     public System.Windows.Input.ICommand ImportCsvCommand { get; }
-    public System.Windows.Input.ICommand QuickConnectCommand { get; }
     public System.Windows.Input.ICommand TogglePinCommand { get; }
     public System.Windows.Input.ICommand OpenSettingsCommand { get; }
     public System.Windows.Input.ICommand ImportTeamViewerHistoryCommand { get; }
     public System.Windows.Input.ICommand SyncTeamViewerCloudCommand { get; }
     public System.Windows.Input.ICommand ExportSessionsCommand { get; }
-    public System.Windows.Input.ICommand SaveSearchCommand { get; }
-    public System.Windows.Input.ICommand ApplySavedSearchCommand { get; }
     public System.Windows.Input.ICommand RunExternalToolCommand { get; }
-    public System.Windows.Input.ICommand ClearSearchCommand { get; }
-    public System.Windows.Input.ICommand ClearLogCommand { get; }
-    public System.Windows.Input.ICommand ToggleLogCommand { get; }
-
-    public ObservableCollection<LogEntry> Log { get; } = new();
-
-    public bool IsLogVisible
-    {
-        get => _isLogVisible;
-        set
-        {
-            if (SetField(ref _isLogVisible, value))
-                OnPropertyChanged(nameof(ActivityButtonText));
-        }
-    }
-
-    public string SearchText
-    {
-        get => _searchText;
-        set
-        {
-            if (SetField(ref _searchText, value ?? string.Empty))
-            {
-                ApplyFilter();
-                NotifySurfacePropertyChanges();
-            }
-        }
-    }
 
     public void Reload()
     {
@@ -430,7 +451,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(TreeSummary));
         OnPropertyChanged(nameof(SearchHintText));
         OnPropertyChanged(nameof(HasSavedSearches));
-        ((RelayCommand)SaveSearchCommand).RaiseCanExecuteChanged();
+        Search.SaveCommand.RaiseCanExecuteChanged();
     }
 
     private void ApplyStatusTone(LogLevel level)
@@ -465,9 +486,6 @@ public sealed class MainViewModel : ViewModelBase
             EntryNode e => e.Parent,
             _ => null
         };
-        // When created inside a folder, start with all inheritable fields set to
-        // null so the entry defers to the folder chain at launch time. Users can
-        // override any field in the editor.
         var draft = new ConnectionEntry
         {
             Name = "New connection",
@@ -478,7 +496,7 @@ public sealed class MainViewModel : ViewModelBase
             Quality = parentFolder is null ? ConnectionQuality.AutoSelect : null,
             AccessControl = parentFolder is null ? AccessControl.Undefined : null,
         };
-        if (_editEntryDialog(draft, Application.Current?.MainWindow))
+        if (_dialogs.EditEntry(draft, Application.Current?.MainWindow))
         {
             _entries.Upsert(draft);
             Reload();
@@ -489,21 +507,9 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
-    private void QuickConnect()
+    private void QuickLaunch(ConnectionEntry entry, bool persist)
     {
-        var id = QuickTeamViewerId.Trim();
-        var entry = new ConnectionEntry
-        {
-            Name = string.IsNullOrWhiteSpace(QuickName) ? $"Quick {id}" : QuickName.Trim(),
-            TeamViewerId = id,
-            ProfileName = "Quick connect",
-            Password = string.IsNullOrWhiteSpace(QuickPassword) ? null : QuickPassword.Trim(),
-            Mode = ConnectionMode.RemoteControl,
-            Quality = ConnectionQuality.AutoSelect,
-            AccessControl = AccessControl.Undefined,
-        };
-
-        if (QuickSaveConnection)
+        if (persist)
         {
             _entries.Upsert(entry);
             Reload();
@@ -512,10 +518,7 @@ public sealed class MainViewModel : ViewModelBase
             MirrorDatabase();
         }
 
-        LaunchEntry(entry, persistLastConnected: QuickSaveConnection);
-        QuickPassword = string.Empty;
-        if (!QuickSaveConnection)
-            QuickName = string.Empty;
+        LaunchEntry(entry, persistLastConnected: persist);
     }
 
     private void EditSelected()
@@ -523,7 +526,7 @@ public sealed class MainViewModel : ViewModelBase
         switch (Selected)
         {
             case EntryNode entry:
-                if (_editEntryDialog(entry.Model, Application.Current?.MainWindow))
+                if (_dialogs.EditEntry(entry.Model, Application.Current?.MainWindow))
                 {
                     _entries.Upsert(entry.Model);
                     entry.Refresh();
@@ -536,7 +539,7 @@ public sealed class MainViewModel : ViewModelBase
                 break;
 
             case FolderNode folder:
-                if (_editFolderDialog(folder.Model, Application.Current?.MainWindow))
+                if (_dialogs.EditFolder(folder.Model, Application.Current?.MainWindow))
                 {
                     _folders.Upsert(folder.Model);
                     Reload();
@@ -551,7 +554,7 @@ public sealed class MainViewModel : ViewModelBase
 
     private void ApplyFilter()
     {
-        var query = _searchText.Trim();
+        var query = Search.SearchText.Trim();
         if (query.Length == 0)
         {
             foreach (var node in EnumerateAll(RootNodes))
@@ -630,12 +633,12 @@ public sealed class MainViewModel : ViewModelBase
 
     private void Export()
     {
-        var path = _chooseExportPath(Application.Current?.MainWindow);
+        var path = _dialogs.ChooseExportPath(Application.Current?.MainWindow);
         if (path is null) return;
 
         var anyPasswords = _entries.GetAll().Any(e => !string.IsNullOrEmpty(e.Password))
                            || _folders.GetAll().Any(f => !string.IsNullOrEmpty(f.DefaultPassword));
-        if (anyPasswords && !_confirmDialog(Application.Current?.MainWindow,
+        if (anyPasswords && !_dialogs.Confirm(Application.Current?.MainWindow,
                 "This backup contains saved passwords in plain text.\n\n" +
                 "Anyone who can open the file can read those credentials. Store it only where you would store a password vault export.\n\n" +
                 "Continue?"))
@@ -654,7 +657,7 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             ReportStatus(LogLevel.Error, $"Backup failed: {ex.Message}");
-            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Backup failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            _dialogs.ShowError(Application.Current?.MainWindow, "Backup failed", ex.ToString());
         }
     }
 
@@ -674,7 +677,6 @@ public sealed class MainViewModel : ViewModelBase
         }
         catch
         {
-            // Best-effort cleanup; ignore cleanup failures so the original error surfaces.
             try { if (File.Exists(temp)) File.Delete(temp); } catch { /* swallow */ }
             throw;
         }
@@ -682,7 +684,7 @@ public sealed class MainViewModel : ViewModelBase
 
     private void Import()
     {
-        var path = _chooseImportPath(Application.Current?.MainWindow);
+        var path = _dialogs.ChooseImportPath(Application.Current?.MainWindow);
         if (path is null) return;
 
         try
@@ -690,7 +692,7 @@ public sealed class MainViewModel : ViewModelBase
             var text = File.ReadAllText(path);
             var (folders, entries) = JsonBackup.Parse(text);
 
-            if (!_confirmDialog(Application.Current?.MainWindow,
+            if (!_dialogs.Confirm(Application.Current?.MainWindow,
                 $"Restore {DisplayText.Count(folders.Count, "folder")} and {DisplayText.Count(entries.Count, "connection")} from\n\n{path}\n\n" +
                 "Existing items with matching IDs will be overwritten. Continue?"))
             {
@@ -698,10 +700,6 @@ public sealed class MainViewModel : ViewModelBase
                 return;
             }
 
-            // Upsert folders before entries so foreign keys resolve. Union of
-            // in-import folder IDs with current-DB IDs is the full set of valid
-            // parent targets; anything outside that set is a dangling pointer
-            // that would trip foreign_keys=ON.
             var knownFolderIds = new HashSet<Guid>(
                 _folders.GetAll().Select(f => f.Id).Concat(folders.Select(f => f.Id)));
             foreach (var f in folders)
@@ -721,17 +719,8 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             ReportStatus(LogLevel.Error, $"Restore failed: {ex.Message}");
-            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Restore failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            _dialogs.ShowError(Application.Current?.MainWindow, "Restore failed", ex.ToString());
         }
-    }
-
-    private void ClearLog()
-    {
-        Log.Clear();
-        OnPropertyChanged(nameof(LogSummary));
-        ((RelayCommand)ClearLogCommand).RaiseCanExecuteChanged();
-        Status = "Activity cleared.";
-        ApplyStatusTone(LogLevel.Info);
     }
 
     private void OpenSettings()
@@ -747,6 +736,7 @@ public sealed class MainViewModel : ViewModelBase
         IsTeamViewerReady = File.Exists(TvExePath);
         OnPropertyChanged(nameof(ExternalTools));
         OnPropertyChanged(nameof(HasExternalTools));
+        Search.RaiseSavedSearchesChanged();
         OnPropertyChanged(nameof(SavedSearches));
         OnPropertyChanged(nameof(HasSavedSearches));
         Audit("settings", "application", null, "Updated settings.");
@@ -807,7 +797,7 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             ReportStatus(LogLevel.Error, $"TeamViewer cloud sync failed: {ex.Message}");
-            MessageBox.Show(Application.Current?.MainWindow!, ex.Message, "TeamViewer cloud sync failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            _dialogs.ShowError(Application.Current?.MainWindow, "TeamViewer cloud sync failed", ex.Message);
         }
     }
 
@@ -823,33 +813,6 @@ public sealed class MainViewModel : ViewModelBase
         _sessions.ExportCsv(path);
         Audit("export", "sessions", null, $"Exported session history to {path}.");
         ReportStatus(LogLevel.Success, $"Session history exported to {path}.");
-    }
-
-    private void SaveSearch()
-    {
-        var value = SearchText.Trim();
-        if (value.Length == 0)
-            return;
-
-        if (!_settings.SavedSearches.Contains(value, StringComparer.OrdinalIgnoreCase))
-        {
-            _settings.SavedSearches.Add(value);
-            _settingsService.Save(_settings);
-            OnPropertyChanged(nameof(SavedSearches));
-            OnPropertyChanged(nameof(HasSavedSearches));
-            Audit("create", "saved-search", null, $"Saved search \"{value}\".");
-        }
-
-        ReportStatus(LogLevel.Success, $"Saved search \"{value}\".");
-    }
-
-    private void ApplySavedSearch(object? parameter)
-    {
-        if (parameter is not string search || string.IsNullOrWhiteSpace(search))
-            return;
-
-        SearchText = search;
-        ReportStatus(LogLevel.Info, $"Applied saved search \"{search}\".");
     }
 
     private void RunExternalTool(object? parameter)
@@ -871,7 +834,7 @@ public sealed class MainViewModel : ViewModelBase
 
     private void ImportCsvFile()
     {
-        var path = _chooseImportCsvPath(Application.Current?.MainWindow);
+        var path = _dialogs.ChooseImportCsvPath(Application.Current?.MainWindow);
         if (path is null) return;
 
         try
@@ -883,27 +846,19 @@ public sealed class MainViewModel : ViewModelBase
             {
                 foreach (var err in result.Errors) AppendLog(LogLevel.Error, $"CSV: {err}");
                 ReportStatus(LogLevel.Error, "CSV import stopped. Review the activity panel for column-mapping errors.");
-                MessageBox.Show(Application.Current?.MainWindow!,
-                    string.Join('\n', result.Errors),
-                    "CSV import", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogs.ShowError(Application.Current?.MainWindow, "CSV import", string.Join('\n', result.Errors));
                 return;
             }
 
             var message = $"CSV will add {DisplayText.Count(result.Folders.Count, "new folder")} and {DisplayText.Count(result.Entries.Count, "connection")} from\n\n{path}\n\n" +
                           (result.Skipped.Count > 0 ? $"{DisplayText.Count(result.Skipped.Count, "row")} will be skipped. Review the activity panel for details.\n\n" : string.Empty) +
                           "Continue?";
-            if (!_confirmDialog(Application.Current?.MainWindow, message))
+            if (!_dialogs.Confirm(Application.Current?.MainWindow, message))
             {
                 ReportStatus(LogLevel.Warning, "CSV import cancelled.");
                 return;
             }
 
-            // Insert folders first so that entries with ParentFolderId = folder.Id
-            // don't trip the foreign-key constraint. CsvImport already guarantees
-            // referenced folders are in result.Folders, but an entry could carry a
-            // stray ParentFolderId pointing at a folder that was neither in this
-            // import nor in the current DB (e.g. re-running a partial import) — null
-            // those out defensively.
             var knownFolderIds = new HashSet<Guid>(
                 _folders.GetAll().Select(f => f.Id).Concat(result.Folders.Select(f => f.Id)));
             foreach (var e in result.Entries)
@@ -925,15 +880,12 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             ReportStatus(LogLevel.Error, $"CSV import failed: {ex.Message}");
-            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "CSV import failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            _dialogs.ShowError(Application.Current?.MainWindow, "CSV import failed", ex.ToString());
         }
     }
 
     public void Reparent(TreeNode source, FolderNode? newParent)
     {
-        // Belt-and-braces: never let a folder land inside its own subtree even
-        // if a caller somehow bypasses the drag/picker guards. Protects the DB
-        // from cycles that would break the recursive tree walks.
         if (source is FolderNode srcFolder && newParent is not null)
         {
             for (var cursor = (FolderNode?)newParent; cursor is not null; cursor = cursor.Parent)
@@ -1140,8 +1092,6 @@ public sealed class MainViewModel : ViewModelBase
 
     private void LaunchEntry(ConnectionEntry source, bool persistLastConnected)
     {
-        // Resolve folder-chain inheritance at launch time so folder default
-        // changes propagate to every entry that defers to them.
         var effective = InheritanceResolver.Resolve(source, _foldersById);
         if (_settings.WakeOnLanBeforeLaunch && !string.IsNullOrWhiteSpace(effective.WakeMacAddress))
         {
@@ -1154,7 +1104,38 @@ public sealed class MainViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(effective.PreLaunchScript))
             ExternalToolRunner.RunScript(effective.PreLaunchScript, effective);
 
-        var outcome = _launcher.Launch(effective);
+        // Clipboard-password mode — send the ID to TeamViewer without the password
+        // on argv and stage the password on the clipboard instead. Avoids the
+        // process-command-line disclosure window for hostile multi-user hosts.
+        LaunchOptions? overrideOptions = null;
+        ConnectionEntry launchTarget = effective;
+        var clipboardStagedPassword = (string?)null;
+        if (ShouldUseClipboardPasswordMode(effective))
+        {
+            if (TryStageClipboardPassword(effective.Password!))
+            {
+                clipboardStagedPassword = effective.Password;
+                launchTarget = CloneWithoutPassword(effective);
+                overrideOptions = new LaunchOptions(UseBase64Password: true, ForceUri: false);
+                AppendLog(LogLevel.Info, "Password staged on clipboard — paste it into the TeamViewer prompt. It will clear in 30s.");
+            }
+        }
+
+        LaunchOutcome outcome;
+        try
+        {
+            outcome = overrideOptions is null
+                ? _launcher.Launch(launchTarget)
+                : _launcher.Launch(launchTarget, overrideOptions);
+        }
+        catch (Exception ex)
+        {
+            ClearClipboardIfMatches(clipboardStagedPassword);
+            ReportStatus(LogLevel.Error, $"Launch failed: {ex.Message}");
+            _dialogs.ShowError(Application.Current?.MainWindow, "Launch failed", ex.ToString());
+            return;
+        }
+
         if (outcome.Success)
         {
             var started = DateTimeOffset.UtcNow;
@@ -1165,7 +1146,7 @@ public sealed class MainViewModel : ViewModelBase
                 TeamViewerId = source.TeamViewerId,
                 ProfileName = source.ProfileName,
                 Mode = effective.Mode,
-                Route = outcome.Uri is not null ? "URI" : "CLI",
+                Route = outcome.Uri is not null ? "URI" : (clipboardStagedPassword is not null ? "CLI+Clipboard" : "CLI"),
                 ProcessId = outcome.ProcessId,
                 StartedUtc = started,
                 Outcome = "Started",
@@ -1185,6 +1166,10 @@ public sealed class MainViewModel : ViewModelBase
 
             Audit("launch", "connection", persistLastConnected ? source.Id : null, $"Launched \"{source.Name}\".");
             TrackSessionExit(session, effective);
+            // Clipboard clear still scheduled 30s out — intentional, so the user
+            // has time to paste into the TeamViewer authorization dialog.
+            if (clipboardStagedPassword is not null)
+                _ = ScheduleClipboardClearAsync(clipboardStagedPassword);
             MirrorDatabase();
             ReportStatus(LogLevel.Success, outcome.Uri is not null
                 ? $"Launched \"{source.Name}\" via URI handler."
@@ -1192,14 +1177,88 @@ public sealed class MainViewModel : ViewModelBase
         }
         else
         {
+            ClearClipboardIfMatches(clipboardStagedPassword);
             ReportStatus(LogLevel.Error, $"Launch failed: {outcome.Error}");
-            MessageBox.Show(
-                Application.Current?.MainWindow!,
-                outcome.Error ?? "Unknown error.",
-                "Launch failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            _dialogs.ShowError(Application.Current?.MainWindow, "Launch failed", outcome.Error ?? "Unknown error.");
         }
+    }
+
+    private bool TryStageClipboardPassword(string password)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetDataObject(password, copy: true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppendLog(LogLevel.Warning, $"Clipboard copy failed; launching with password on argv: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static void ClearClipboardIfMatches(string? expected)
+    {
+        if (expected is null) return;
+        try
+        {
+            if (System.Windows.Clipboard.ContainsText() &&
+                System.Windows.Clipboard.GetText() == expected)
+            {
+                System.Windows.Clipboard.Clear();
+            }
+        }
+        catch
+        {
+            // Clipboard contention — best effort; the 30s scheduled clear will retry.
+        }
+    }
+
+    private bool ShouldUseClipboardPasswordMode(ConnectionEntry effective)
+    {
+        if (!_settings.PreferClipboardPasswordLaunch) return false;
+        if (string.IsNullOrEmpty(effective.Password)) return false;
+        // URI-handler modes already carry the password in the URL — clipboard
+        // mode only helps for CLI launches.
+        return effective.Mode is null or ConnectionMode.RemoteControl
+            or ConnectionMode.FileTransfer or ConnectionMode.Vpn;
+    }
+
+    private static ConnectionEntry CloneWithoutPassword(ConnectionEntry source) => new()
+    {
+        Id = source.Id,
+        ParentFolderId = source.ParentFolderId,
+        Name = source.Name,
+        TeamViewerId = source.TeamViewerId,
+        ProfileName = source.ProfileName,
+        Password = null,
+        Mode = source.Mode,
+        Quality = source.Quality,
+        AccessControl = source.AccessControl,
+        Proxy = source.Proxy,
+        TeamViewerPathOverride = source.TeamViewerPathOverride,
+        IsPinned = source.IsPinned,
+        WakeMacAddress = source.WakeMacAddress,
+        WakeBroadcastAddress = source.WakeBroadcastAddress,
+        PreLaunchScript = source.PreLaunchScript,
+        PostLaunchScript = source.PostLaunchScript,
+        Notes = source.Notes,
+        Tags = source.Tags,
+        LastConnectedUtc = source.LastConnectedUtc,
+        CreatedUtc = source.CreatedUtc,
+        ModifiedUtc = source.ModifiedUtc,
+    };
+
+    private static async Task ScheduleClipboardClearAsync(string expected)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher is null) return;
+            await dispatcher.InvokeAsync(() => ClearClipboardIfMatches(expected));
+        }
+        catch { /* swallow — app may be shutting down */ }
     }
 
     private void TrackSessionExit(SessionRecord session, ConnectionEntry entry)

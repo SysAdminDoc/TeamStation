@@ -40,7 +40,14 @@
                 <PasswordBox x:Name="ApiTokenBox" />
                 <TextBlock Margin="0,6,0,18" Text="Read-only script token used for group/device sync and online status checks." Style="{StaticResource BodyMutedText}" />
 
-                <CheckBox x:Name="WakeBox" Content="Send Wake-on-LAN before launch when a connection has a MAC address" Margin="0,0,0,18" />
+                <CheckBox x:Name="WakeBox" Content="Send Wake-on-LAN before launch when a connection has a MAC address" Margin="0,0,0,10" />
+
+                <CheckBox x:Name="ClipboardPasswordBox"
+                          Content="Launch without password on the command line (stage it on the clipboard instead — clears in 30s)"
+                          Margin="0,0,0,4" />
+                <TextBlock Margin="0,0,0,18"
+                           Text="Reduces the command-line password disclosure window on shared or hostile hosts. You'll paste the password into the TeamViewer prompt."
+                           Style="{StaticResource BodyMutedText}" />
 
                 <TextBlock Text="Cloud sync folder" Style="{StaticResource FieldLabelText}" />
                 <Grid>

@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\TeamStation.Core\TeamStation.Core.csproj" />
     <ProjectReference Include="..\..\src\TeamStation.Data\TeamStation.Data.csproj" />
     <ProjectReference Include="..\..\src\TeamStation.Launcher\TeamStation.Launcher.csproj" />
+    <ProjectReference Include="..\..\src\TeamStation.App\TeamStation.App.csproj" />
   </ItemGroup>
 
   <ItemGroup>

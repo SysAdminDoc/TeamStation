@@ -5,15 +5,37 @@ using System.Text;
 using System.Text.Json;
 using TeamStation.Core.Models;
 
-namespace TeamStation.App.Services;
+namespace TeamStation.Core.Services;
 
+/// <summary>
+/// Read-only TeamViewer Web API sync. Pulls groups, devices, and (optionally)
+/// contacts into a synthetic "TV Cloud" folder tree. The importer merges
+/// against the caller's existing entries by numeric TeamViewer ID.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The auth header is attached per-request on a <see cref="HttpRequestMessage"/>
+/// rather than via <c>DefaultRequestHeaders</c> so the service is safe to call
+/// concurrently with different tokens and never carries a stale token across
+/// calls. The request timeout defaults to 20 seconds to bound UI hangs; pass
+/// an explicit <see cref="CancellationToken"/> from the caller to surface
+/// user-initiated aborts cleanly.
+/// </para>
+/// </remarks>
 public sealed class TeamViewerCloudSyncService
 {
+    private static readonly Uri DefaultBaseAddress = new("https://webapi.teamviewer.com/api/v1/");
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(20);
+
     private readonly HttpClient _http;
 
     public TeamViewerCloudSyncService(HttpClient? http = null)
     {
-        _http = http ?? new HttpClient { BaseAddress = new Uri("https://webapi.teamviewer.com/api/v1/") };
+        _http = http ?? new HttpClient
+        {
+            BaseAddress = DefaultBaseAddress,
+            Timeout = DefaultTimeout,
+        };
     }
 
     public async Task<CloudSyncResult> PullAsync(string apiToken, CancellationToken cancellationToken = default)
@@ -21,8 +43,7 @@ public sealed class TeamViewerCloudSyncService
         if (string.IsNullOrWhiteSpace(apiToken))
             throw new InvalidOperationException("TeamViewer API token is not configured.");
 
-        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
-        var groups = await GetArrayAsync("groups", "groups", cancellationToken).ConfigureAwait(false);
+        var groups = await GetArrayAsync("groups", "groups", apiToken, cancellationToken).ConfigureAwait(false);
         var folders = new List<Folder>();
         var entries = new List<ConnectionEntry>();
         var root = new Folder { Id = StableId("teamviewer-cloud-root"), Name = "TV Cloud", AccentColor = "#89B4FA" };
@@ -30,6 +51,7 @@ public sealed class TeamViewerCloudSyncService
 
         foreach (var group in groups)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var groupId = ReadString(group, "id", "groupid");
             var groupName = ReadString(group, "name") ?? "TeamViewer group";
             var folder = new Folder
@@ -44,8 +66,15 @@ public sealed class TeamViewerCloudSyncService
             if (string.IsNullOrWhiteSpace(groupId))
                 continue;
 
-            foreach (var device in await GetArrayAsync($"devices?groupid={Uri.EscapeDataString(groupId)}", "devices", cancellationToken).ConfigureAwait(false))
+            var devices = await GetArrayAsync(
+                $"devices?groupid={Uri.EscapeDataString(groupId)}",
+                "devices",
+                apiToken,
+                cancellationToken).ConfigureAwait(false);
+
+            foreach (var device in devices)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var id = ReadString(device, "remotecontrol_id", "teamviewer_id", "device_id", "id");
                 if (string.IsNullOrWhiteSpace(id))
                     continue;
@@ -66,9 +95,11 @@ public sealed class TeamViewerCloudSyncService
         return new CloudSyncResult(folders, entries);
     }
 
-    private async Task<List<JsonElement>> GetArrayAsync(string path, string propertyName, CancellationToken cancellationToken)
+    private async Task<List<JsonElement>> GetArrayAsync(string path, string propertyName, string apiToken, CancellationToken cancellationToken)
     {
-        using var response = await _http.GetAsync(path, cancellationToken).ConfigureAwait(false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);

@@ -20,6 +20,7 @@ public partial class App : Application
     private const string SingleInstanceMutexName = "Local\\TeamStation.SingleInstance";
 
     private Mutex? _singleInstanceMutex;
+    private bool _ownsSingleInstanceMutex;
     private TrayManager? _tray;
 
     private void OnStartup(object sender, StartupEventArgs e)
@@ -45,6 +46,7 @@ public partial class App : Application
         try
         {
             _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
+            _ownsSingleInstanceMutex = createdNew;
             if (!createdNew)
             {
                 MessageBox.Show(
@@ -93,54 +95,7 @@ public partial class App : Application
                 entries: entries,
                 folders: folders,
                 launcher: launcher,
-                editEntryDialog: (entry, owner) =>
-                {
-                    var dlg = new EntryEditorWindow(entry) { Owner = owner };
-                    return dlg.ShowDialog() == true;
-                },
-                editFolderDialog: (folder, owner) =>
-                {
-                    var dlg = new FolderEditorWindow(folder) { Owner = owner };
-                    return dlg.ShowDialog() == true;
-                },
-                chooseExportPath: owner =>
-                {
-                    var sfd = new SaveFileDialog
-                    {
-                        Title = "Export TeamStation backup",
-                        Filter = "TeamStation JSON (*.json)|*.json|All files (*.*)|*.*",
-                        DefaultExt = ".json",
-                        FileName = $"teamstation-{DateTime.Now:yyyyMMdd-HHmmss}.json",
-                        OverwritePrompt = true,
-                    };
-                    return sfd.ShowDialog(owner) == true ? sfd.FileName : null;
-                },
-                chooseImportPath: owner =>
-                {
-                    var ofd = new OpenFileDialog
-                    {
-                        Title = "Import TeamStation backup",
-                        Filter = "TeamStation JSON (*.json)|*.json|All files (*.*)|*.*",
-                        DefaultExt = ".json",
-                        CheckFileExists = true,
-                    };
-                    return ofd.ShowDialog(owner) == true ? ofd.FileName : null;
-                },
-                chooseImportCsvPath: owner =>
-                {
-                    var ofd = new OpenFileDialog
-                    {
-                        Title = "Import CSV",
-                        Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                        DefaultExt = ".csv",
-                        CheckFileExists = true,
-                    };
-                    return ofd.ShowDialog(owner) == true ? ofd.FileName : null;
-                },
-                confirmDialog: (owner, message) =>
-                    MessageBox.Show(owner!, message, "TeamStation",
-                        MessageBoxButton.OKCancel, MessageBoxImage.Warning,
-                        MessageBoxResult.Cancel) == MessageBoxResult.OK,
+                dialogs: new WpfDialogService(),
                 settings: settings,
                 settingsService: settingsService,
                 sessions: sessions,
@@ -191,8 +146,11 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         try { _tray?.Dispose(); } catch { /* swallow during exit */ }
-        try { _singleInstanceMutex?.ReleaseMutex(); } catch { /* not owned */ }
-        try { _singleInstanceMutex?.Dispose(); } catch { /* swallow */ }
+        if (_ownsSingleInstanceMutex)
+        {
+            try { _singleInstanceMutex?.ReleaseMutex(); } catch { /* swallow during exit */ }
+        }
+        try { _singleInstanceMutex?.Dispose(); } catch { /* swallow during exit */ }
         base.OnExit(e);
     }
 }

@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using TeamStation.Core.Models;
 
-namespace TeamStation.App.Services;
+namespace TeamStation.Core.Services;
 
 public static partial class ExternalToolRunner
 {

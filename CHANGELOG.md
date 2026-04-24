@@ -2,7 +2,72 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] - 2026-04-24
+
+First public release cut. The advanced workflow content from the v0.1.2 internal / v0.2.0 / v0.2.1 waves landed on `main` but never shipped as a tagged GitHub release — v0.3.0 is that release.
+
+Iteration 1 of the v0.3.0 cycle adds a hardening-and-coverage pass focused on security regression vectors, crypto edge cases, schema migrations, and randomized validator fuzz.
+
+### Security
+
+- **Device-ID validation is now ASCII-only.** `LaunchInputValidator.IdPattern` matched `\d{8,12}` which, by default in .NET, accepts every Unicode decimal digit category character — Arabic-Indic, full-width, Bengali, and others. A device ID written in those scripts would pass the validator even though the TeamViewer CLI only accepts ASCII decimal IDs, giving homograph-style obfuscation headroom. Pattern tightened to `[0-9]{8,12}`.
+- **Proxy-endpoint validator now rejects argv-injection shapes in the host.** `ValidateProxyEndpoint` previously only checked that the port parsed in range, so hosts like `--ProxyIP 1.2.3.4` (embedded flag + space) or `\\attacker\share` were accepted. Host part is now subject to the same forbidden-character and forbidden-substring rules as passwords plus the leading-dash guard.
+- **CVE-2020-13699 regression vectors.** New pinned test suite (`CveRegressionTests`) drives curated argv-injection shapes against `LaunchInputValidator`, `CliArgvBuilder`, and `UriSchemeBuilder`: `--play` smuggling, `\\UNC` prefixes, colon/slash/backslash splitters, whitespace-encoded exploits, leading-hyphen probes, mixed-case variants, and non-ASCII digit ID homographs. Any regression fails CI before code review.
+
+### Tests
+
+- **`LaunchInputValidator` fuzz.** 10k randomized-draw fuzz run per test invocation asserting the contract invariant: every rejection surfaces as `LaunchValidationException`, never an unhandled framework exception (`IndexOutOfRange`, `NullReference`, `Regex` engine quirks).
+- **Crypto edge cases.** Empty-string, null-byte-embedded, maximum-length (512 KiB), surrogate-pair, and invariant-culture plaintexts round-trip intact. Tamper-probe on each ciphertext byte independently still trips `CryptographicException`.
+- **Schema migration with malformed rows.** Synthetic v1 database whose rows carry out-of-range enum integers and trailing-whitespace IDs; v1 → v3 migration rescues every recoverable row without a silent data drop.
+
+### Changed
+
+- Version cut from `0.2.1` to `0.3.0`. No code path regresses; this is the first external GitHub release of the cumulative workflow feature set.
+
+## [0.2.1] - 2026-04-24
+
+### Fixed
+- **JSON backup was lossy.** Export/import silently dropped `ProfileName`, `IsPinned`, `TeamViewerPathOverride`, Wake-on-LAN fields, and pre/post-launch scripts on entries, plus `DefaultTeamViewerPath`, `DefaultWakeBroadcastAddress`, and launch scripts on folders. Backup format bumped to `2`; v1 files still parse with sane defaults.
+- **Cloud mirror could produce corrupt SQLite copies.** Replaced `File.Copy`-then-copy-sidecars with a read-only `VACUUM INTO` snapshot written to a staging path and atomically renamed over the mirror. The mirror is now a single self-consistent file with no WAL/SHM residue.
+- **Sub-VM split left proxy properties stale.** `LogSummary`, `ActivityButtonText`, `SavedSearches`, `HasSavedSearches`, and quick-connect fields were bound to proxies on `MainViewModel` that never rebroadcast sub-VM `PropertyChanged`. Added explicit forwarding for every proxy.
+- **`AutoScrollBehavior` accumulated collection-changed subscriptions** each time a `ListBox` reloaded, causing N scroll-to-end invocations per log append. Rewritten to subscribe exactly once per control and re-bind when `ItemsSource` swaps.
+- **Settings writes were not atomic.** `SettingsService.Save` now writes to a sibling temp file and renames over the target, and `Load` surfaces parse errors via `LastLoadError` and quarantines the bad file so the user sees a warning instead of silently losing saved searches.
+- **Mutex release threw on abnormal exit.** Tracked `_ownsSingleInstanceMutex` so `ReleaseMutex` only runs when the instance actually owns it, removing the swallowed `ApplicationException` from the already-running exit path.
+- **Tray menu leaked `ToolStripMenuItem`s on rebuild.** `DisposeMenuItems` removes and disposes each item before rebuilding.
+- **Session history and audit log grew unbounded.** Added `Prune(TimeSpan)` on both repositories, wired to a `HistoryRetentionDays` setting (default 90 days), run once at startup.
+- **`TeamViewerCloudSyncService` mutated shared default auth headers** and inherited the 100s `HttpClient` default timeout. Now attaches auth per `HttpRequestMessage`, honours a `CancellationToken`, and ships with a 20s default timeout.
+- **`EntryRepository.Materialize` allocated twice per row.** Single-pass construction using the `init`-only timestamp fields directly.
+- **Clipboard-password mode could leave the password on the clipboard** if `Launch` threw or failed — even though no session was started. The clipboard is cleared eagerly on every failure path; the 30s auto-clear still runs on successful launches so the user has time to paste into the TeamViewer prompt.
+- **Audit-log ordering was not deterministic** for events sharing a millisecond. Added a secondary sort on `id`.
+- **Entry/folder editors trimmed passwords on save.** Trimming is data-lossy for credentials that legitimately contain whitespace; the validator now surfaces a clear error instead.
+
+### Changed
+- `CloudMirrorService` moved from `TeamStation.App.Services` to `TeamStation.Data.Storage` so it can be tested in isolation.
+
+### Added
+- xUnit coverage for `CloudMirrorService` (valid SQLite output, atomic replace), session/audit pruning, `SettingsService` round-trip, atomic writes, and corrupt-file quarantine, plus a full-field `JsonBackup` round-trip test. Suite at 131 tests.
+
+## [0.2.0] - 2026-04-24
+
+### Security
+- Portable-mode master-password KEK now derives via **Argon2id** (time=3, memory=64 MiB, parallelism=2) instead of PBKDF2-SHA256. New envelopes are tagged `argon2id_v1` in the database's `_meta` table.
+- Legacy PBKDF2-SHA256 envelopes (`pbkdf2_v1`, implicit on upgrade from v0.1.x) still unlock and are opportunistically re-wrapped to Argon2id with a fresh salt on the next successful unlock.
+- Optional **clipboard-password launch mode** (`Settings → Launch without password on the command line`). When enabled, TeamStation copies the password to the clipboard and launches TeamViewer without `--PasswordB64` on the argv. The clipboard is auto-cleared 30s later, provided it still contains that password. Reduces the command-line-disclosure window on shared or hostile multi-user hosts.
+
+### Changed
+- `MainViewModel` split into focused collaborators: `LogPanelViewModel` (activity log), `QuickConnectViewModel` (quick-connect bar + command), `SearchViewModel` (search + saved searches with `SearchTextChanged`/`SavedSearchApplied`/`SavedSearchAdded` events). Legacy binding paths on `MainViewModel` still resolve — XAML bindings unchanged.
+- Introduced `IDialogService` + `WpfDialogService`. The six `Func<Window?, …>` constructor delegates on `MainViewModel` collapsed to a single injectable interface.
+- `WakeOnLanService`, `ExternalToolRunner`, `TeamViewerCloudSyncService`, `CloudSyncResult`, and `ExternalToolDefinition` moved from `TeamStation.App` into `TeamStation.Core`. The WPF host keeps UI glue; everything testable or portable now lives in `TeamStation.Core`.
+
+### Added
+- `.github/workflows/ci.yml` builds and tests every push and pull request to `main`, uploading `.trx` results as an artifact.
+- `docs/release-runbook.md` — operator checklist covering the launch-feasibility spike, version sync, publish smoke-test, and GitHub Actions release trigger.
+- `docs/screenshots/` folder with a capture guide and the required screenshot set. README gains a **Screens** section that points at it.
+
+### Removed
+- `tests/TeamStation.Tests/UnitTest1.cs` default xUnit scaffolding.
+
+## [0.1.2] - 2026-04-23 (internal)
 
 ### Added
 - App settings window for TeamViewer.exe override, TeamViewer Web API token, Wake-on-LAN, cloud mirror folder, saved searches, and external tools.

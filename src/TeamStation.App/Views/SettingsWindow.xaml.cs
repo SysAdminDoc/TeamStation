@@ -1,6 +1,7 @@
 using System.Windows;
 using Microsoft.Win32;
 using TeamStation.App.Services;
+using TeamStation.Core.Models;
 
 namespace TeamStation.App.Views;
 
@@ -15,6 +16,7 @@ public partial class SettingsWindow : Window
         TeamViewerPathBox.Text = settings.TeamViewerPathOverride ?? string.Empty;
         ApiTokenBox.Password = settings.TeamViewerApiToken ?? string.Empty;
         WakeBox.IsChecked = settings.WakeOnLanBeforeLaunch;
+        ClipboardPasswordBox.IsChecked = settings.PreferClipboardPasswordLaunch;
         CloudFolderBox.Text = settings.CloudSyncFolder ?? string.Empty;
         SavedSearchesBox.Text = string.Join(Environment.NewLine, settings.SavedSearches);
         ExternalToolsBox.Text = string.Join(Environment.NewLine,
@@ -49,6 +51,7 @@ public partial class SettingsWindow : Window
         _settings.TeamViewerPathOverride = BlankToNull(TeamViewerPathBox.Text);
         _settings.TeamViewerApiToken = BlankToNull(ApiTokenBox.Password);
         _settings.WakeOnLanBeforeLaunch = WakeBox.IsChecked == true;
+        _settings.PreferClipboardPasswordLaunch = ClipboardPasswordBox.IsChecked == true;
         _settings.CloudSyncFolder = BlankToNull(CloudFolderBox.Text);
         _settings.SavedSearches = SavedSearchesBox.Text
             .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

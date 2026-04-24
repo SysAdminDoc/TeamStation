@@ -37,10 +37,12 @@ VALUES ($id, $occurred, $action, $target_type, $target_id, $summary, $detail);";
     {
         using var c = _db.OpenConnection();
         using var cmd = c.CreateCommand();
+        // Secondary sort on id so events that share a millisecond (common in
+        // fast bulk-import flows) still return in a stable, deterministic order.
         cmd.CommandText = @"
 SELECT id, occurred_utc, action, target_type, target_id, summary, detail
 FROM audit_log
-ORDER BY occurred_utc DESC
+ORDER BY occurred_utc DESC, id DESC
 LIMIT $limit;";
         cmd.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 1000));
         using var reader = cmd.ExecuteReader();
@@ -60,5 +62,20 @@ LIMIT $limit;";
         }
 
         return events;
+    }
+
+    /// <summary>
+    /// Deletes audit events older than <paramref name="retention"/>. Returns the
+    /// number of rows removed. Safe no-op for non-positive retention.
+    /// </summary>
+    public int Prune(TimeSpan retention)
+    {
+        if (retention <= TimeSpan.Zero) return 0;
+        var cutoff = DateTimeOffset.UtcNow - retention;
+        using var c = _db.OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "DELETE FROM audit_log WHERE occurred_utc < $cutoff;";
+        cmd.Parameters.AddWithValue("$cutoff", cutoff.ToString("O", CultureInfo.InvariantCulture));
+        return cmd.ExecuteNonQuery();
     }
 }

@@ -119,4 +119,56 @@ public class CryptoServiceTests
         Assert.ThrowsAny<CryptographicException>(() =>
             CryptoService.CreateOrLoad(store, CryptoUnlockOptions.WithMasterPassword("wrong-password")));
     }
+
+    [Fact]
+    public void Master_password_fresh_wrap_is_tagged_argon2id()
+    {
+        var store = new MemoryKeyStore();
+        _ = CryptoService.CreateOrLoad(store, CryptoUnlockOptions.WithMasterPassword("horse-battery"));
+
+        var tag = store.LoadValue("dek_master_kdf_v1");
+        Assert.NotNull(tag);
+        Assert.Equal("argon2id_v1", System.Text.Encoding.UTF8.GetString(tag!));
+    }
+
+    [Fact]
+    public void Legacy_pbkdf2_wrap_unlocks_and_is_upgraded_to_argon2id()
+    {
+        // Seed a legacy envelope by using PBKDF2 directly. We build the wrap
+        // the same shape CryptoService.UnprotectWithMasterPassword expects so
+        // the upgrade path on next unlock is exercised end-to-end.
+        var store = new MemoryKeyStore();
+        var dek = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        var salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        const string pw = "legacy-master";
+
+        var legacyKey = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+            pw, salt, 310_000, System.Security.Cryptography.HashAlgorithmName.SHA256, 32);
+        var nonce = System.Security.Cryptography.RandomNumberGenerator.GetBytes(12);
+        var cipher = new byte[dek.Length];
+        var authTag = new byte[16];
+        using (var aes = new System.Security.Cryptography.AesGcm(legacyKey, 16))
+            aes.Encrypt(nonce, dek, cipher, authTag);
+
+        var envelope = new byte[12 + 16 + cipher.Length];
+        Buffer.BlockCopy(nonce, 0, envelope, 0, 12);
+        Buffer.BlockCopy(authTag, 0, envelope, 12, 16);
+        Buffer.BlockCopy(cipher, 0, envelope, 28, cipher.Length);
+
+        store.SaveValue("dek_master_salt_v1", salt);
+        store.SaveValue("dek_master_v1", envelope);
+        // Intentionally do not write a kdf tag — mimics pre-Argon2 install.
+
+        var svc = CryptoService.CreateOrLoad(store, CryptoUnlockOptions.WithMasterPassword(pw));
+        var ct = svc.EncryptString("still me");
+        Assert.Equal("still me", svc.DecryptString(ct));
+
+        var newTag = store.LoadValue("dek_master_kdf_v1");
+        Assert.NotNull(newTag);
+        Assert.Equal("argon2id_v1", System.Text.Encoding.UTF8.GetString(newTag!));
+
+        // Re-open with the same password; must still unlock under Argon2id.
+        var reopened = CryptoService.CreateOrLoad(store, CryptoUnlockOptions.WithMasterPassword(pw));
+        Assert.Equal("still me", reopened.DecryptString(ct));
+    }
 }

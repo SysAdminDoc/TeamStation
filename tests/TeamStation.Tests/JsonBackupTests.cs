@@ -6,7 +6,7 @@ namespace TeamStation.Tests;
 public class JsonBackupTests
 {
     [Fact]
-    public void RoundTrip_preserves_every_significant_field()
+    public void RoundTrip_preserves_every_persisted_field_on_entries_and_folders()
     {
         var folder = new Folder
         {
@@ -17,6 +17,10 @@ public class JsonBackupTests
             DefaultQuality = ConnectionQuality.OptimizeSpeed,
             DefaultAccessControl = AccessControl.ConfirmAll,
             DefaultPassword = "folder-level-pw",
+            DefaultTeamViewerPath = @"C:\Custom\TeamViewer.exe",
+            DefaultWakeBroadcastAddress = "10.0.0.255",
+            PreLaunchScript = "Write-Output folder-pre",
+            PostLaunchScript = "Write-Output folder-post",
         };
 
         var entry = new ConnectionEntry
@@ -24,13 +28,21 @@ public class JsonBackupTests
             ParentFolderId = folder.Id,
             Name = "Reception PC",
             TeamViewerId = "123456789",
+            ProfileName = "Front desk",
             Password = "entry-level-pw",
             Mode = null, // inherit
             Quality = ConnectionQuality.OptimizeQuality,
             AccessControl = null,
             Proxy = new ProxySettings("proxy.internal", 3128, "u", "p"),
+            TeamViewerPathOverride = @"D:\Alt\TeamViewer.exe",
+            IsPinned = true,
+            WakeMacAddress = "AA-BB-CC-DD-EE-FF",
+            WakeBroadcastAddress = "192.168.1.255",
+            PreLaunchScript = "Write-Output entry-pre",
+            PostLaunchScript = "Write-Output entry-post",
             Notes = "Front-of-house kiosk",
             Tags = new List<string> { "kiosk", "lobby" },
+            LastConnectedUtc = new DateTimeOffset(2026, 3, 1, 10, 30, 0, TimeSpan.Zero),
         };
 
         var json = JsonBackup.Build(new[] { folder }, new[] { entry });
@@ -45,11 +57,17 @@ public class JsonBackupTests
         Assert.Equal(folder.DefaultQuality, f.DefaultQuality);
         Assert.Equal(folder.DefaultAccessControl, f.DefaultAccessControl);
         Assert.Equal(folder.DefaultPassword, f.DefaultPassword);
+        Assert.Equal(folder.DefaultTeamViewerPath, f.DefaultTeamViewerPath);
+        Assert.Equal(folder.DefaultWakeBroadcastAddress, f.DefaultWakeBroadcastAddress);
+        Assert.Equal(folder.PreLaunchScript, f.PreLaunchScript);
+        Assert.Equal(folder.PostLaunchScript, f.PostLaunchScript);
 
         var e = Assert.Single(entries);
         Assert.Equal(entry.Id, e.Id);
         Assert.Equal(entry.ParentFolderId, e.ParentFolderId);
+        Assert.Equal(entry.Name, e.Name);
         Assert.Equal(entry.TeamViewerId, e.TeamViewerId);
+        Assert.Equal(entry.ProfileName, e.ProfileName);
         Assert.Equal(entry.Password, e.Password);
         Assert.Null(e.Mode);
         Assert.Equal(entry.Quality, e.Quality);
@@ -59,7 +77,53 @@ public class JsonBackupTests
         Assert.Equal(3128, e.Proxy!.Port);
         Assert.Equal("u", e.Proxy!.Username);
         Assert.Equal("p", e.Proxy!.Password);
-        Assert.Equal(new[] { "kiosk", "lobby" }, e.Tags);
+        Assert.Equal(entry.TeamViewerPathOverride, e.TeamViewerPathOverride);
+        Assert.True(e.IsPinned);
+        Assert.Equal(entry.WakeMacAddress, e.WakeMacAddress);
+        Assert.Equal(entry.WakeBroadcastAddress, e.WakeBroadcastAddress);
+        Assert.Equal(entry.PreLaunchScript, e.PreLaunchScript);
+        Assert.Equal(entry.PostLaunchScript, e.PostLaunchScript);
+        Assert.Equal(entry.Notes, e.Notes);
+        Assert.Equal(entry.Tags, e.Tags);
+        Assert.Equal(entry.LastConnectedUtc, e.LastConnectedUtc);
+    }
+
+    // v1 files (v0.1.x) didn't carry profile, pin, override path, WOL or scripts.
+    // Parsing them must still succeed and populate sensible defaults.
+    [Fact]
+    public void Parse_accepts_format_version_1_files_without_newer_fields()
+    {
+        var v1Json = """
+                     {
+                       "formatVersion": 1,
+                       "exportedAtUtc": "2026-01-01T00:00:00+00:00",
+                       "folders": [
+                         { "id": "11111111-1111-1111-1111-111111111111", "name": "F", "sortOrder": 0 }
+                       ],
+                       "entries": [
+                         {
+                           "id": "22222222-2222-2222-2222-222222222222",
+                           "name": "E",
+                           "teamViewerId": "123456789",
+                           "tags": []
+                         }
+                       ]
+                     }
+                     """;
+        var (folders, entries) = JsonBackup.Parse(v1Json);
+        var f = Assert.Single(folders);
+        Assert.Null(f.DefaultTeamViewerPath);
+        Assert.Null(f.DefaultWakeBroadcastAddress);
+        Assert.Null(f.PreLaunchScript);
+        Assert.Null(f.PostLaunchScript);
+
+        var e = Assert.Single(entries);
+        Assert.Equal("Default", e.ProfileName);
+        Assert.False(e.IsPinned);
+        Assert.Null(e.TeamViewerPathOverride);
+        Assert.Null(e.WakeMacAddress);
+        Assert.Null(e.PreLaunchScript);
+        Assert.Null(e.PostLaunchScript);
     }
 
     [Fact]
@@ -72,9 +136,9 @@ public class JsonBackupTests
     // Covers the v0.1.1 fix: we must tolerate JSON whose `folders` / `entries`
     // arrays are absent or null. Previously Parse() would NullReferenceException.
     [Theory]
-    [InlineData("""{"formatVersion":1,"exportedAtUtc":"2026-04-23T00:00:00+00:00"}""")]
-    [InlineData("""{"formatVersion":1,"exportedAtUtc":"2026-04-23T00:00:00+00:00","folders":null,"entries":null}""")]
-    [InlineData("""{"formatVersion":1,"exportedAtUtc":"2026-04-23T00:00:00+00:00","folders":[]}""")]
+    [InlineData("""{"formatVersion":2,"exportedAtUtc":"2026-04-23T00:00:00+00:00"}""")]
+    [InlineData("""{"formatVersion":2,"exportedAtUtc":"2026-04-23T00:00:00+00:00","folders":null,"entries":null}""")]
+    [InlineData("""{"formatVersion":2,"exportedAtUtc":"2026-04-23T00:00:00+00:00","folders":[]}""")]
     public void Parse_tolerates_missing_or_null_collections(string json)
     {
         var (folders, entries) = JsonBackup.Parse(json);
@@ -107,7 +171,7 @@ public class JsonBackupTests
         var entry = new ConnectionEntry
         {
             Name = "Orphan", TeamViewerId = "123456789",
-            ParentFolderId = ghostFolderId, // references a folder not in the export
+            ParentFolderId = ghostFolderId,
         };
         var folderWithGhostParent = new Folder
         {

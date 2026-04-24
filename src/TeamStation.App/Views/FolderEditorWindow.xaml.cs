@@ -68,7 +68,9 @@ public partial class FolderEditorWindow : Window
 
         _folder.Name = name;
         _folder.AccentColor = string.IsNullOrEmpty(accent) ? null : accent;
-        var password = DefaultPasswordBox.Password.Trim();
+        // Passwords are persisted verbatim — trimming would silently corrupt
+        // credentials that legitimately contain leading/trailing whitespace.
+        var password = DefaultPasswordBox.Password;
         if (!string.IsNullOrEmpty(password))
         {
             try

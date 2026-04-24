@@ -6,19 +6,29 @@ namespace TeamStation.Core.Serialization;
 
 /// <summary>
 /// JSON backup format for TeamStation's folder + entry graph. Includes a
-/// format-version tag so we can evolve the shape without breaking old files.
-/// Passwords are stored **in plaintext** on disk — callers must warn the user
-/// before writing.
+/// format-version tag so the shape can evolve without breaking old files.
+/// Passwords are stored <b>in plaintext</b> on disk — callers must warn the
+/// user before writing.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Format-version history:
+/// <list type="bullet">
+///   <item><c>1</c> — v0.1.x. Core folder/entry fields, proxy, tags, timestamps.</item>
+///   <item><c>2</c> — v0.2.1. Adds every persisted field: profile, pin state,
+///     TeamViewer.exe override, Wake-on-LAN, launch scripts on both entries
+///     and folders. v1 files still parse; missing fields read as null/false.</item>
+/// </list>
+/// </para>
+/// </remarks>
 public static class JsonBackup
 {
-    public const int FormatVersion = 1;
+    public const int FormatVersion = 2;
 
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        // Tolerate lowercase / camelCase keys in hand-edited backups.
         PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() },
     };
@@ -55,7 +65,6 @@ public static class JsonBackup
             throw new InvalidDataException(
                 $"Backup format version {dto.FormatVersion} is newer than this build supports (max {FormatVersion}). Upgrade TeamStation and retry.");
 
-        // Tolerate missing / null collections: older hand-edited backups may omit them.
         var folders = (dto.Folders ?? new()).Select(f => f.ToFolder()).ToList();
         var entries = (dto.Entries ?? new()).Select(e => e.ToEntry()).ToList();
 
@@ -78,8 +87,6 @@ public static class JsonBackup
     {
         public int FormatVersion { get; set; }
         public DateTimeOffset ExportedAtUtc { get; set; }
-        // Nullable on the wire so we can tolerate hand-edited backups that
-        // omit a collection entirely. Parse() defends with `?? new()`.
         public List<FolderDto>? Folders { get; set; }
         public List<EntryDto>? Entries { get; set; }
     }
@@ -95,6 +102,10 @@ public static class JsonBackup
         public ConnectionQuality? DefaultQuality { get; set; }
         public AccessControl? DefaultAccessControl { get; set; }
         public string? DefaultPassword { get; set; }
+        public string? DefaultTeamViewerPath { get; set; }
+        public string? DefaultWakeBroadcastAddress { get; set; }
+        public string? PreLaunchScript { get; set; }
+        public string? PostLaunchScript { get; set; }
 
         public static FolderDto From(Folder f) => new()
         {
@@ -107,6 +118,10 @@ public static class JsonBackup
             DefaultQuality = f.DefaultQuality,
             DefaultAccessControl = f.DefaultAccessControl,
             DefaultPassword = f.DefaultPassword,
+            DefaultTeamViewerPath = f.DefaultTeamViewerPath,
+            DefaultWakeBroadcastAddress = f.DefaultWakeBroadcastAddress,
+            PreLaunchScript = f.PreLaunchScript,
+            PostLaunchScript = f.PostLaunchScript,
         };
 
         public Folder ToFolder() => new()
@@ -120,6 +135,10 @@ public static class JsonBackup
             DefaultQuality = DefaultQuality,
             DefaultAccessControl = DefaultAccessControl,
             DefaultPassword = DefaultPassword,
+            DefaultTeamViewerPath = DefaultTeamViewerPath,
+            DefaultWakeBroadcastAddress = DefaultWakeBroadcastAddress,
+            PreLaunchScript = PreLaunchScript,
+            PostLaunchScript = PostLaunchScript,
         };
     }
 
@@ -129,11 +148,18 @@ public static class JsonBackup
         public Guid? ParentFolderId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string TeamViewerId { get; set; } = string.Empty;
+        public string ProfileName { get; set; } = "Default";
         public string? Password { get; set; }
         public ConnectionMode? Mode { get; set; }
         public ConnectionQuality? Quality { get; set; }
         public AccessControl? AccessControl { get; set; }
         public ProxyDto? Proxy { get; set; }
+        public string? TeamViewerPathOverride { get; set; }
+        public bool IsPinned { get; set; }
+        public string? WakeMacAddress { get; set; }
+        public string? WakeBroadcastAddress { get; set; }
+        public string? PreLaunchScript { get; set; }
+        public string? PostLaunchScript { get; set; }
         public string? Notes { get; set; }
         public List<string> Tags { get; set; } = new();
         public DateTimeOffset? LastConnectedUtc { get; set; }
@@ -146,11 +172,18 @@ public static class JsonBackup
             ParentFolderId = e.ParentFolderId,
             Name = e.Name,
             TeamViewerId = e.TeamViewerId,
+            ProfileName = string.IsNullOrWhiteSpace(e.ProfileName) ? "Default" : e.ProfileName,
             Password = e.Password,
             Mode = e.Mode,
             Quality = e.Quality,
             AccessControl = e.AccessControl,
             Proxy = e.Proxy is null ? null : ProxyDto.From(e.Proxy),
+            TeamViewerPathOverride = e.TeamViewerPathOverride,
+            IsPinned = e.IsPinned,
+            WakeMacAddress = e.WakeMacAddress,
+            WakeBroadcastAddress = e.WakeBroadcastAddress,
+            PreLaunchScript = e.PreLaunchScript,
+            PostLaunchScript = e.PostLaunchScript,
             Notes = e.Notes,
             Tags = e.Tags,
             LastConnectedUtc = e.LastConnectedUtc,
@@ -164,11 +197,18 @@ public static class JsonBackup
             ParentFolderId = ParentFolderId,
             Name = Name,
             TeamViewerId = TeamViewerId,
+            ProfileName = string.IsNullOrWhiteSpace(ProfileName) ? "Default" : ProfileName,
             Password = Password,
             Mode = Mode,
             Quality = Quality,
             AccessControl = AccessControl,
             Proxy = Proxy?.ToProxy(),
+            TeamViewerPathOverride = TeamViewerPathOverride,
+            IsPinned = IsPinned,
+            WakeMacAddress = WakeMacAddress,
+            WakeBroadcastAddress = WakeBroadcastAddress,
+            PreLaunchScript = PreLaunchScript,
+            PostLaunchScript = PostLaunchScript,
             Notes = Notes,
             Tags = Tags,
             LastConnectedUtc = LastConnectedUtc,

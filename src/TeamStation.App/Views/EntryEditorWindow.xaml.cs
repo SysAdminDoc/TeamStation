@@ -80,7 +80,11 @@ public partial class EntryEditorWindow : Window
             return;
         }
 
-        var password = PasswordBox.Password.Trim();
+        // Do not trim — whitespace in saved passwords is a real thing and
+        // silent trim would corrupt stored credentials. The validator rejects
+        // interior whitespace, so a paste with trailing whitespace surfaces a
+        // clear error rather than silently losing characters.
+        var password = PasswordBox.Password;
         if (!string.IsNullOrEmpty(password))
         {
             try
@@ -107,7 +111,8 @@ public partial class EntryEditorWindow : Window
         var proxyHost = ProxyHostBox.Text.Trim();
         var proxyPortText = ProxyPortBox.Text.Trim();
         var proxyUser = ProxyUserBox.Text.Trim();
-        var proxyPassword = ProxyPasswordBox.Password.Trim();
+        // As above: do not trim the proxy password.
+        var proxyPassword = ProxyPasswordBox.Password;
         var hasAnyProxyField =
             !string.IsNullOrEmpty(proxyHost) ||
             !string.IsNullOrEmpty(proxyPortText) ||

@@ -23,6 +23,7 @@ public sealed class TrayManager : IDisposable
     private readonly MainViewModel _viewModel;
     private readonly WinForms.NotifyIcon _icon;
     private readonly WinForms.ContextMenuStrip _menu;
+    private readonly Icon _trayIcon;
     private readonly IntPtr _hIcon;
     private bool _disposed;
 
@@ -31,10 +32,10 @@ public sealed class TrayManager : IDisposable
         _window = window;
         _viewModel = viewModel;
 
-        var icon = CreateIcon(out _hIcon);
+        _trayIcon = CreateIcon(out _hIcon);
         _icon = new WinForms.NotifyIcon
         {
-            Icon = icon,
+            Icon = _trayIcon,
             Text = "TeamStation",
             Visible = true,
         };
@@ -85,7 +86,7 @@ public sealed class TrayManager : IDisposable
             return;
         }
 
-        _menu.Items.Clear();
+        DisposeMenuItems();
         _menu.Items.Add("Show TeamStation", image: null, (_, _) => ShowWindow());
         _menu.Items.Add("Settings", image: null, (_, _) =>
         {
@@ -105,6 +106,19 @@ public sealed class TrayManager : IDisposable
         });
     }
 
+    private void DisposeMenuItems()
+    {
+        // ContextMenuStrip.Items.Clear() drops references but leaves Component
+        // lifetimes dangling; every rebuild would otherwise accumulate
+        // undisposed ToolStripMenuItems for the life of the process.
+        for (var i = _menu.Items.Count - 1; i >= 0; i--)
+        {
+            var item = _menu.Items[i];
+            _menu.Items.RemoveAt(i);
+            item.Dispose();
+        }
+    }
+
     private void AddEntrySection(string title, IReadOnlyList<ConnectionEntry> entries)
     {
         _menu.Items.Add(new WinForms.ToolStripSeparator());
@@ -120,12 +134,13 @@ public sealed class TrayManager : IDisposable
         foreach (var entry in entries.Take(10))
         {
             var item = new WinForms.ToolStripMenuItem(FormatEntry(entry)) { Enabled = _viewModel.IsTeamViewerReady };
+            var entryId = entry.Id; // capture into closure, avoid holding entire ConnectionEntry
             item.Click += (_, _) =>
             {
                 if (!_viewModel.IsTeamViewerReady)
                     return;
 
-                _viewModel.LaunchEntryById(entry.Id);
+                _viewModel.LaunchEntryById(entryId);
             };
             _menu.Items.Add(item);
         }
@@ -146,7 +161,9 @@ public sealed class TrayManager : IDisposable
         try { _viewModel.TrayMenuInvalidated -= OnTrayMenuInvalidated; } catch { /* view model already disposed */ }
         try { _icon.Visible = false; } catch { /* best-effort */ }
         try { _icon.Dispose(); } catch { /* swallow */ }
+        try { DisposeMenuItems(); } catch { /* swallow */ }
         try { _menu.Dispose(); } catch { /* swallow */ }
+        try { _trayIcon.Dispose(); } catch { /* swallow */ }
         if (_hIcon != IntPtr.Zero)
         {
             try { DestroyIcon(_hIcon); } catch { /* swallow */ }
@@ -160,15 +177,19 @@ public sealed class TrayManager : IDisposable
     {
         const int size = 32;
         using var bitmap = new Bitmap(size, size);
-        using var g = Graphics.FromImage(bitmap);
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        g.Clear(Color.FromArgb(0x1E, 0x1E, 0x2E));            // Catppuccin Base
-        using var dot = new SolidBrush(Color.FromArgb(0x89, 0xB4, 0xFA)); // Blue
-        g.FillEllipse(dot, 6, 6, size - 12, size - 12);
+        using (var g = Graphics.FromImage(bitmap))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.Clear(Color.FromArgb(0x1E, 0x1E, 0x2E));            // Catppuccin Base
+            using var dot = new SolidBrush(Color.FromArgb(0x89, 0xB4, 0xFA)); // Blue
+            g.FillEllipse(dot, 6, 6, size - 12, size - 12);
+        }
 
         hIcon = bitmap.GetHicon();
         // Icon.FromHandle creates a managed Icon that shares the native handle;
-        // we release the handle in Dispose via DestroyIcon.
-        return (Icon)Icon.FromHandle(hIcon).Clone();
+        // we release the handle in Dispose via DestroyIcon. Clone so the tray
+        // keeps a stable handle even if the source Icon is GC'd.
+        using var shared = Icon.FromHandle(hIcon);
+        return (Icon)shared.Clone();
     }
 }

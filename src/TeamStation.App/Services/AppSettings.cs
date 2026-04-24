@@ -1,8 +1,10 @@
 using System.IO;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TeamStation.Core.Models;
 
 namespace TeamStation.App.Services;
 
@@ -15,6 +17,8 @@ public sealed class AppSettings
     public string Theme { get; set; } = "Dark";
     public bool HasAcceptedLaunchNotice { get; set; }
     public bool WakeOnLanBeforeLaunch { get; set; }
+    public bool PreferClipboardPasswordLaunch { get; set; }
+    public int HistoryRetentionDays { get; set; } = 90;
     public string? CloudSyncFolder { get; set; }
     public List<string> SavedSearches { get; set; } = new();
     public List<ExternalToolDefinition> ExternalTools { get; set; } =
@@ -24,16 +28,22 @@ public sealed class AppSettings
     ];
 }
 
-public sealed class ExternalToolDefinition
-{
-    public string Name { get; set; } = string.Empty;
-    public string Command { get; set; } = string.Empty;
-    public string Arguments { get; set; } = string.Empty;
-}
-
+/// <summary>
+/// Persists <see cref="AppSettings"/> to a JSON file. Writes are atomic via
+/// write-to-temp + <see cref="File.Move"/> so a crash or power loss never
+/// leaves a truncated file. When a load fails, the previous file is moved
+/// aside as a <c>.broken</c> snapshot and <see cref="LastLoadError"/> is set
+/// so callers can surface the problem to the user instead of silently
+/// replacing configuration with defaults.
+/// </summary>
+[SupportedOSPlatform("windows")]
 public sealed class SettingsService
 {
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
     private readonly string _path;
 
     public SettingsService(string path)
@@ -41,19 +51,29 @@ public sealed class SettingsService
         _path = path;
     }
 
+    /// <summary>Populated after <see cref="Load"/> when the settings file existed but could not be parsed.</summary>
+    public string? LastLoadError { get; private set; }
+
+    public string Path => _path;
+
     public AppSettings Load()
     {
+        LastLoadError = null;
         if (!File.Exists(_path))
             return new AppSettings();
 
         try
         {
-            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_path), Options) ?? new AppSettings();
+            var text = File.ReadAllText(_path);
+            var settings = JsonSerializer.Deserialize<AppSettings>(text, Options) ?? new AppSettings();
             settings.TeamViewerApiToken = Unprotect(settings.TeamViewerApiTokenProtected);
             return settings;
         }
-        catch
+        catch (Exception ex)
         {
+            LastLoadError = $"Settings file at {_path} was unreadable ({ex.GetType().Name}: {ex.Message}). " +
+                            "The bad copy has been set aside; starting with defaults.";
+            TryQuarantineBadFile();
             return new AppSettings();
         }
     }
@@ -62,10 +82,36 @@ public sealed class SettingsService
     {
         ArgumentNullException.ThrowIfNull(settings);
         settings.TeamViewerApiTokenProtected = Protect(settings.TeamViewerApiToken);
-        var dir = Path.GetDirectoryName(_path);
+
+        var dir = System.IO.Path.GetDirectoryName(_path);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
-        File.WriteAllText(_path, JsonSerializer.Serialize(settings, Options));
+
+        var temp = _path + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(temp, JsonSerializer.Serialize(settings, Options));
+            File.Move(temp, _path, overwrite: true);
+        }
+        catch
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); }
+            catch { /* best-effort cleanup; surface the original exception */ }
+            throw;
+        }
+    }
+
+    private void TryQuarantineBadFile()
+    {
+        try
+        {
+            var quarantine = _path + $".broken.{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+            File.Move(_path, quarantine, overwrite: false);
+        }
+        catch
+        {
+            // Leaving the original in place is acceptable; the user will see a fresh attempt next save.
+        }
     }
 
     private static string? Protect(string? value)
@@ -91,6 +137,7 @@ public sealed class SettingsService
         }
         catch
         {
+            // Token was encrypted under a different user/machine — expected on a portable DB move.
             return null;
         }
     }
