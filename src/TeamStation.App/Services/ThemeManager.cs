@@ -17,6 +17,8 @@ public static class ThemeManager
     private const string DefaultThemeId = "Dark";
     private const string PersonalizeRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
     private static string _currentThemeId = "Dark";
+    private static string _requestedThemeId = DefaultThemeId;
+    private static bool _systemPreferenceWatcherRegistered;
 
     public static IReadOnlyList<AppTheme> Themes { get; } =
     [
@@ -145,7 +147,10 @@ public static class ThemeManager
         if (Application.Current is not { } app)
             return;
 
+        RegisterSystemPreferenceWatcher();
+
         var normalizedThemeId = Normalize(themeId);
+        _requestedThemeId = normalizedThemeId;
         _currentThemeId = ResolveThemeId(normalizedThemeId);
         var palette = Palettes[_currentThemeId];
         Set(app, nameof(Palette.Base), palette.Base);
@@ -215,6 +220,30 @@ public static class ThemeManager
 
     private static bool IsSystemTheme(string themeId) =>
         string.Equals(themeId, SystemThemeId, StringComparison.OrdinalIgnoreCase);
+
+    private static void RegisterSystemPreferenceWatcher()
+    {
+        if (_systemPreferenceWatcherRegistered)
+            return;
+
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        _systemPreferenceWatcherRegistered = true;
+    }
+
+    private static void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        if (!IsSystemTheme(_requestedThemeId))
+            return;
+
+        if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.VisualStyle))
+            return;
+
+        var app = Application.Current;
+        if (app is null)
+            return;
+
+        _ = app.Dispatcher.BeginInvoke(() => Apply(_requestedThemeId));
+    }
 
     private static bool IsSystemLightTheme()
     {

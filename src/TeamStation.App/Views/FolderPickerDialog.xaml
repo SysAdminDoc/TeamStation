@@ -73,6 +73,9 @@
                             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsMouseOver}" Value="True">
                                 <Setter TargetName="PickerRow" Property="Background" Value="{DynamicResource Surface1Brush}" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsKeyboardFocusWithin}" Value="True">
+                                <Setter TargetName="PickerRow" Property="BorderBrush" Value="{DynamicResource BlueBrush}" />
+                            </DataTrigger>
                             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsSelected}" Value="True">
                                 <Setter TargetName="PickerRow" Property="Background" Value="{DynamicResource BlueSoftBrush}" />
                                 <Setter TargetName="PickerRow" Property="BorderBrush" Value="{DynamicResource BlueBrush}" />
