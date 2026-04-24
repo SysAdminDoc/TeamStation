@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TeamStation.Core.Io;
 using TeamStation.Core.Models;
 
 namespace TeamStation.App.Services;
@@ -82,23 +83,7 @@ public sealed class SettingsService
     {
         ArgumentNullException.ThrowIfNull(settings);
         settings.TeamViewerApiTokenProtected = Protect(settings.TeamViewerApiToken);
-
-        var dir = System.IO.Path.GetDirectoryName(_path);
-        if (!string.IsNullOrEmpty(dir))
-            Directory.CreateDirectory(dir);
-
-        var temp = _path + $".{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllText(temp, JsonSerializer.Serialize(settings, Options));
-            File.Move(temp, _path, overwrite: true);
-        }
-        catch
-        {
-            try { if (File.Exists(temp)) File.Delete(temp); }
-            catch { /* best-effort cleanup; surface the original exception */ }
-            throw;
-        }
+        AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(settings, Options));
     }
 
     private void TryQuarantineBadFile()

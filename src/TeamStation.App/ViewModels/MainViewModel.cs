@@ -7,6 +7,7 @@ using System.Windows.Media;
 using TeamStation.App.Mvvm;
 using TeamStation.App.Services;
 using TeamStation.App.Views;
+using TeamStation.Core.Io;
 using TeamStation.Core.Models;
 using TeamStation.Core.Serialization;
 using TeamStation.Core.Services;
@@ -650,7 +651,7 @@ public sealed class MainViewModel : ViewModelBase
         try
         {
             var backup = JsonBackup.Build(_folders.GetAll(), _entries.GetAll());
-            AtomicWriteAllText(path, backup);
+            AtomicFile.WriteAllText(path, backup);
             Audit("export", "json-backup", null, $"Wrote backup to {path}.");
             ReportStatus(LogLevel.Success, $"Backup written to {path}.");
         }
@@ -658,27 +659,6 @@ public sealed class MainViewModel : ViewModelBase
         {
             ReportStatus(LogLevel.Error, $"Backup failed: {ex.Message}");
             _dialogs.ShowError(Application.Current?.MainWindow, "Backup failed", ex.ToString());
-        }
-    }
-
-    /// <summary>
-    /// Writes <paramref name="contents"/> to <paramref name="destination"/> via a
-    /// sibling temp file + <see cref="File.Move(string,string,bool)"/> so that
-    /// a crash or disk-full mid-write cannot leave a truncated backup on disk.
-    /// </summary>
-    private static void AtomicWriteAllText(string destination, string contents)
-    {
-        var dir = Path.GetDirectoryName(Path.GetFullPath(destination)) ?? ".";
-        var temp = Path.Combine(dir, $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            File.WriteAllText(temp, contents);
-            File.Move(temp, destination, overwrite: true);
-        }
-        catch
-        {
-            try { if (File.Exists(temp)) File.Delete(temp); } catch { /* swallow */ }
-            throw;
         }
     }
 
