@@ -97,3 +97,6 @@ appsettings.*.Local.json
 TeamStation.db
 teamstation-*.log
 *.backup
+publish/
+publish-test/
+*.publish.local

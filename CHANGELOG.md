@@ -2,6 +2,34 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [0.1.0] - 2026-04-23
+
+**First MVP release.** Every feature promised by the P0 section of `ROADMAP.md` is in. TeamStation now has everything a sysadmin needs to replace the built-in TeamViewer contact list, plus a few things that list never had.
+
+### Highlights
+- **Nested folder tree** with drag-to-reorder, self-subtree drop rejection, folder accent colors (validated `#RRGGBB`), unified Rename / Move / Delete that dispatches by node type.
+- **Runtime inheritance cascade.** Entries can defer their mode, quality, access-control, and password to the nearest ancestor folder. Changing a folder default propagates to every inheriting entry on the next launch — no bulk editing needed.
+- **CVE-2020-13699-hardened launcher.** Numeric-ID regex, password denylist (`\`, `/`, `:`, whitespace, `--`, leading `-`, `\\UNC`, `--play`, `--control`, `--Sendto`), argv-array `Process.Start` only, length-bounded params. The CLI + URI fallback matrix picks the right mechanism per mode (`--mode` only supports `fileTransfer` / `vpn`, so Chat / Video / Presentation route through their URI handlers).
+- **DPAPI-wrapped AES-256-GCM credential storage.** 256-bit random DEK is DPAPI-wrapped under `CurrentUser` scope and stored in the local SQLite database; every password field is AES-256-GCM encrypted with a fresh 96-bit nonce.
+- **Debounced multi-field search/filter.** Matches on name, TeamViewer ID, notes, tags, and folder names. Folders with a matching descendant stay visible and auto-expand.
+- **CSV import** that accepts TeamViewer Management Console, Remote Desktop Manager, mRemoteNG, and hand-rolled spreadsheets via flexible column aliases; missing folders are created, non-numeric rows are skipped with line-referenced reasons surfaced to the log.
+- **JSON backup** round-trips the full graph (folders, entries, proxy settings, all metadata) with tested fidelity.
+- **Embedded log panel** (rolling 500 entries, severity-coloured) and **system tray** (minimize-to-tray, Show / Exit menu).
+- **Portable mode** — drop a `teamstation.portable` marker next to the exe and the database lives beside it instead of under `%LocalAppData%`.
+
+### Verified
+- Clean Release build, 0 warnings / 0 errors across all five projects.
+- Self-contained single-file publish (`win-x64`, ~189 MB) launches cleanly and shuts down without leaks.
+- v1 → v2 schema migration preserves data when upgrading from an older build.
+- CSV round-trip + JSON round-trip both confirmed via harness runs.
+
+### Known open items
+- The two feasibility spikes from `ROADMAP.md` have not yet been run against a real TeamViewer peer. The launcher design already accounts for both plausible outcomes (silent CLI launch or fallback to URI-handler prompting), but a real-world run via [`tools/TvLaunchSpike`](tools/TvLaunchSpike/Program.cs) is recommended before wider deployment.
+
+### Release artifacts
+- `TeamStation.exe` — self-contained single-file build, no .NET install required
+- `TeamStation-v0.1.0-win-x64.zip` — the same exe plus LICENSE, README, CHANGELOG
+
 ## [0.0.8] - 2026-04-23
 
 ### Added

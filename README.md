@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.0.8-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,7 +31,7 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 
 ## Status
 
-`v0.0.8` — CSV import, log panel, and system tray. A flexible CSV importer matches columns by common aliases (`name`/`alias`/`host`, `teamviewer_id`/`id`/`device_id`, `group`/`folder`, `password`, `notes`, `tags`) so exports from TeamViewer's Management Console, Remote Desktop Manager, mRemoteNG, and ad-hoc spreadsheets all work without pre-massaging. Missing folders referenced in the `group` column are created automatically; rows with non-numeric IDs are skipped and reported. A collapsible log panel at the bottom of the window surfaces every status change alongside timestamped save / launch / import events (toggle with the **Log** button). The system tray icon stays visible while the app runs; minimising hides the window to tray; right-click gives **Show TeamStation** and **Exit**. All gating v0.1.0 features are now in place — the remaining blocker is running `TvLaunchSpike` against a real peer. See [CHANGELOG.md](CHANGELOG.md).
+`v0.1.0` — **First MVP release.** TeamStation now has everything a sysadmin needs to replace the built-in TeamViewer contact list: a nested folder tree with drag-to-reorder, entries with name / ID / password / mode / quality / access-control / notes / tags, DPAPI-wrapped AES-256-GCM at rest, one-click launch that walks folder-chain inheritance at launch time, debounced multi-field search, CSV import (TeamViewer Management Console, Remote Desktop Manager, mRemoteNG, and ad-hoc spreadsheet formats all supported via flexible column aliases), JSON backup with round-trip fidelity, an embedded log panel, and a system tray with minimize-to-tray. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Planned feature highlights (v0.1.0)
 
@@ -53,12 +53,21 @@ Full roadmap with P0 / P1 / P2 prioritization: [ROADMAP.md](ROADMAP.md).
 - **Known residual risk:** launching a session passes `--Password` on the TeamViewer command line. That value is visible to any process on the machine that can read the command line of another user-owned process during the brief launch window. This is inherent to the TeamViewer CLI and affects any launcher, including manually-typed commands. TeamStation will default to `--Base64Password` (still inspectable but obscured) and document this transparently.
 - TeamStation never phones home. There is no telemetry, no update ping, no cloud account.
 
-## Build
+## Download
+
+Grab the latest `TeamStation.exe` (or the zipped release bundle) from the [Releases](../../releases) page. Self-contained — no .NET runtime needed separately.
+
+System requirements:
+- Windows 10 1809+ or Windows 11 (x64)
+- TeamViewer 15 Classic or TeamViewer Remote (the full client; **QuickSupport is not enough** — TeamStation needs `TeamViewer.exe` on the `PATH` or at its default install location)
+
+First run creates `%LocalAppData%\TeamStation\teamstation.db` with WAL mode. Passwords are encrypted at rest with AES-256-GCM under a key wrapped by Windows DPAPI (user-scoped). No network traffic, no telemetry, no update pings.
+
+## Build from source
 
 Requires:
 - .NET 9 SDK (`9.0.313` or newer; pinned via [`global.json`](global.json))
 - Windows 10 1809+ or Windows 11
-- TeamViewer 15 Classic or TeamViewer Remote (full client) — only needed at runtime, not at build time
 
 ```powershell
 dotnet restore
@@ -70,13 +79,18 @@ Run the WPF shell:
 dotnet run --project src/TeamStation.App -c Release
 ```
 
+Produce a self-contained single-file executable (matches the shipped release):
+```powershell
+dotnet publish src/TeamStation.App -c Release -r win-x64 --self-contained true `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:DebugType=embedded -o publish/win-x64
+```
+
 Run the launch-feasibility spike (needs a real TeamViewer peer you own):
 ```powershell
 dotnet run --project tools/TvLaunchSpike -c Release -- --id <TV_ID> --password <PW>
 ```
 It walks the CLI and URI-handler test matrix, captures operator observations, and writes `spike-report.md` next to the binary.
-
-Release binaries will be published on the [Releases](../../releases) page once the first working build ships as `v0.1.0`.
 
 ## Why not just use mRemoteNG?
 

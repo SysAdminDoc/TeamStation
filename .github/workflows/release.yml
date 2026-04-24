@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (matches the v-prefixed tag, e.g. 0.1.0)"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark as pre-release?"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Publish Windows x64 self-contained
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore TeamStation.sln
+
+      - name: Build Release
+        run: dotnet build TeamStation.sln --no-restore -c Release
+
+      - name: Publish self-contained single-file (win-x64)
+        run: >
+          dotnet publish src/TeamStation.App/TeamStation.App.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          --no-restore
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=embedded
+          -p:Version=${{ inputs.version }}
+          -p:InformationalVersion=${{ inputs.version }}
+          -o publish/win-x64
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $ver = "${{ inputs.version }}"
+          $zip = "TeamStation-v$ver-win-x64.zip"
+          Compress-Archive -Path publish/win-x64/TeamStation.exe, LICENSE, README.md, CHANGELOG.md -DestinationPath $zip -Force
+          "ARTIFACT=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Create tag (if missing)
+        shell: pwsh
+        run: |
+          $tag = "v${{ inputs.version }}"
+          if (-not (git ls-remote --tags origin $tag)) {
+            git tag $tag
+            git push origin $tag
+          }
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "v${{ inputs.version }}"
+          $prerelease = if ("${{ inputs.prerelease }}" -eq "true") { "--prerelease" } else { "" }
+          # Create the release if it doesn't exist yet; otherwise just upload artifacts.
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag `
+              --title "TeamStation $tag" `
+              --notes-file CHANGELOG.md `
+              $prerelease
+          }
+          gh release upload $tag $env:ARTIFACT publish/win-x64/TeamStation.exe --clobber
