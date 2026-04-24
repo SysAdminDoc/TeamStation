@@ -911,6 +911,8 @@
                 <Grid Grid.Column="11" VerticalAlignment="Center">
                     <TextBox Padding="34,8,38,8"
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=150}"
+                             AutomationProperties.Name="Search connections"
+                             AutomationProperties.HelpText="Filter the connection library by name, TeamViewer ID, notes, or tag."
                              ToolTip="Search name, TeamViewer ID, notes, or tag" />
                     <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
                                FontSize="13"
@@ -1009,7 +1011,18 @@
                                   SelectedItemChanged="Tree_SelectedItemChanged"
                                   MouseDoubleClick="Tree_MouseDoubleClick"
                                   PreviewMouseRightButtonDown="Tree_PreviewMouseRightButtonDown"
+                                  AutomationProperties.Name="Connections tree"
+                                  AutomationProperties.HelpText="Use arrow keys to navigate, Enter to launch, F2 to rename, Delete to remove."
+                                  KeyboardNavigation.TabNavigation="Once"
                                   Padding="4">
+                            <TreeView.InputBindings>
+                                <!-- A11y baseline (v0.3.3): single-key actions on the
+                                     focused tree item, no chord shortcuts. Matches
+                                     Explorer / VS Code conventions. -->
+                                <KeyBinding Key="Enter"  Command="{Binding LaunchCommand}" />
+                                <KeyBinding Key="F2"     Command="{Binding RenameCommand}" />
+                                <KeyBinding Key="Delete" Command="{Binding DeleteCommand}" />
+                            </TreeView.InputBindings>
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type vm:FolderNode}" ItemsSource="{Binding Children}">
                                     <Border x:Name="FolderRow" Style="{StaticResource TreeRowBorderStyle}">
