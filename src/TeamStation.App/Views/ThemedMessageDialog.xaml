@@ -1,0 +1,82 @@
+<Window x:Class="TeamStation.App.Views.ThemedMessageDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TeamStation"
+        Width="560"
+        MinWidth="480"
+        MaxWidth="720"
+        MaxHeight="640"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BaseBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{StaticResource UiFont}"
+        ShowInTaskbar="False">
+    <Border Margin="16"
+            Background="{DynamicResource MantleBrush}"
+            BorderBrush="{DynamicResource PanelBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="24,22">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border x:Name="AccentBar"
+                        Width="3"
+                        Margin="0,2,16,2"
+                        Background="{DynamicResource BlueBrush}"
+                        CornerRadius="2" />
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock x:Name="KindText"
+                               Text="TEAMSTATION"
+                               Style="{StaticResource CaptionText}"
+                               Foreground="{DynamicResource BlueBrush}" />
+                    <TextBlock x:Name="DialogTitleText"
+                               Margin="0,4,0,0"
+                               Style="{StaticResource HeadlineText}" />
+                </StackPanel>
+            </Grid>
+
+            <ScrollViewer Grid.Row="1"
+                          Margin="19,18,0,0"
+                          MaxHeight="360"
+                          VerticalScrollBarVisibility="Auto">
+                <TextBlock x:Name="MessageText"
+                           Foreground="{DynamicResource Subtext1Brush}"
+                           FontSize="13"
+                           LineHeight="20"
+                           TextWrapping="Wrap" />
+            </ScrollViewer>
+
+            <DockPanel Grid.Row="2"
+                       Margin="0,22,0,0"
+                       LastChildFill="False">
+                <Button x:Name="CancelButton"
+                        DockPanel.Dock="Right"
+                        Content="Cancel"
+                        Style="{StaticResource GhostButton}"
+                        Margin="8,0,0,0"
+                        IsCancel="True"
+                        Click="Cancel_Click" />
+                <Button x:Name="ConfirmButton"
+                        DockPanel.Dock="Right"
+                        Content="OK"
+                        Style="{StaticResource PrimaryButton}"
+                        IsDefault="True"
+                        Click="Confirm_Click" />
+            </DockPanel>
+        </Grid>
+    </Border>
+</Window>

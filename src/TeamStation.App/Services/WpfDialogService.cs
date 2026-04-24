@@ -56,11 +56,19 @@ public sealed class WpfDialogService : IDialogService
         return ofd.ShowDialog(owner) == true ? ofd.FileName : null;
     }
 
-    public bool Confirm(Window? owner, string message) =>
-        MessageBox.Show(owner!, message, "TeamStation",
-            MessageBoxButton.OKCancel, MessageBoxImage.Warning,
-            MessageBoxResult.Cancel) == MessageBoxResult.OK;
+    public bool Confirm(
+        Window? owner,
+        string message,
+        string title = "TeamStation",
+        string confirmText = "OK",
+        bool isDestructive = false) =>
+        ThemedMessageDialog.Confirm(
+            owner,
+            title,
+            message,
+            isDestructive ? ThemedMessageKind.Danger : ThemedMessageKind.Warning,
+            confirmText);
 
     public void ShowError(Window? owner, string title, string message) =>
-        MessageBox.Show(owner!, message, title, MessageBoxButton.OK, MessageBoxImage.Error);
+        ThemedMessageDialog.Show(owner, title, message, ThemedMessageKind.Error);
 }

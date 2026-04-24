@@ -15,6 +15,11 @@ public interface IDialogService
     string? ChooseExportPath(Window? owner);
     string? ChooseImportPath(Window? owner);
     string? ChooseImportCsvPath(Window? owner);
-    bool Confirm(Window? owner, string message);
+    bool Confirm(
+        Window? owner,
+        string message,
+        string title = "TeamStation",
+        string confirmText = "OK",
+        bool isDestructive = false);
     void ShowError(Window? owner, string title, string message);
 }

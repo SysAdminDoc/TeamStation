@@ -1003,14 +1003,13 @@ public sealed class MainViewModel : ViewModelBase
             ? "\n\nNested subfolders will also be deleted. Connections inside will become unassigned and move to the top level."
             : string.Empty;
 
-        var choice = MessageBox.Show(
-            Application.Current?.MainWindow!,
-            $"Delete {kind} \"{deletedName}\"?{suffix}",
-            "Delete item",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (choice != MessageBoxResult.Yes) return;
+        if (!_dialogs.Confirm(
+                Application.Current?.MainWindow,
+                $"Delete {kind} \"{deletedName}\"?{suffix}",
+                "Delete item",
+                "Delete",
+                isDestructive: true))
+            return;
 
         switch (Selected)
         {

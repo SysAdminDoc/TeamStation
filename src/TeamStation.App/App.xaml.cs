@@ -26,8 +26,8 @@ public partial class App : Application
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
-        // Global unhandled-exception nets. We try to surface these as a
-        // MessageBox instead of silently dropping into Windows Error Reporting,
+        // Global unhandled-exception nets. We try to surface these in-app
+        // instead of silently dropping into Windows Error Reporting,
         // which for a single-file self-contained WPF app looks like a vanish.
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
@@ -50,11 +50,12 @@ public partial class App : Application
             _ownsSingleInstanceMutex = createdNew;
             if (!createdNew)
             {
-                MessageBox.Show(
-                    "TeamStation is already running. Look for the tray icon near the clock.",
+                ThemeManager.Apply("Dark");
+                ThemedMessageDialog.Show(
+                    null,
                     "TeamStation",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                    "TeamStation is already running. Look for the tray icon near the clock.",
+                    ThemedMessageKind.Info);
                 Shutdown(0);
                 return;
             }
@@ -66,12 +67,12 @@ public partial class App : Application
             ThemeManager.Apply(settings.Theme);
             if (!settings.HasAcceptedLaunchNotice)
             {
-                var accepted = MessageBox.Show(
-                    "TeamStation is a shortcut manager for the official TeamViewer client. It stores credentials locally, launches the unmodified TeamViewer app, and does not inspect or relay sessions.\n\nSaved passwords are encrypted at rest, but TeamViewer still receives credentials during launch. Continue?",
+                var accepted = ThemedMessageDialog.Confirm(
+                    null,
                     "TeamStation first run",
-                    MessageBoxButton.OKCancel,
-                    MessageBoxImage.Information,
-                    MessageBoxResult.Cancel) == MessageBoxResult.OK;
+                    "TeamStation is a shortcut manager for the official TeamViewer client. It stores credentials locally, launches the unmodified TeamViewer app, and does not inspect or relay sessions.\n\nSaved passwords are encrypted at rest, but TeamViewer still receives credentials during launch. Continue?",
+                    ThemedMessageKind.Info,
+                    "Continue");
                 if (!accepted)
                 {
                     Shutdown(0);
@@ -128,9 +129,17 @@ public partial class App : Application
             var dumpPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "teamstation-fatal.log");
             System.IO.File.AppendAllText(dumpPath, $"[{DateTime.Now:O}] {title}\n{body}\n\n");
         }
-        catch { /* best-effort — do not block the MessageBox */ }
-        MessageBox.Show(body, $"TeamStation — {title}",
-            MessageBoxButton.OK, MessageBoxImage.Error);
+        catch { /* best-effort - do not block the user-facing error */ }
+
+        try
+        {
+            ThemedMessageDialog.Show(Application.Current?.MainWindow, $"TeamStation - {title}", body, ThemedMessageKind.Error);
+        }
+        catch
+        {
+            MessageBox.Show(body, $"TeamStation - {title}",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private static string? ResolveTeamViewerPath(AppSettings settings)
