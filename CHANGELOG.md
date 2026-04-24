@@ -2,6 +2,28 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Focused security-hardening patch closing three of the v0.3.0 postflight audit follow-ups. No public API removed; one breaking change to the `ISecretStore` interface (new `DeleteValue` member — only relevant to downstream packagers that implemented the interface themselves).
+
+### Security
+
+- **`CryptoService` now implements `IDisposable`.** The unwrapped 256-bit DEK buffer is allocated pinned (`GC.AllocateArray<byte>(pinned: true)`) so a GC compaction cannot leave stale key material at a previous heap address, and `Dispose()` zeros the buffer via `CryptographicOperations.ZeroMemory`. Subsequent calls to `EncryptString` / `DecryptString` throw `ObjectDisposedException`. `App.OnExit` disposes the process-wide service so a swap-file snapshot captured after shutdown cannot recover the DEK.
+- **`CryptoService.RotateDek` is now two-phase commit.** Rotation stages the new wrapped DEK under a `dek_v1_pending` tombstone, runs the migrator, atomically promotes `dek_v1` via `INSERT OR REPLACE`, then deletes the tombstone. A crash between stage and promote leaves the tombstone in place; startup surfaces the state via `CryptoService.InspectPendingRotation`. The orphan case (`pending == main`, from a post-commit crash) is auto-reconciled silently. The ambiguous case (`pending != main`, from a mid-rotation crash) refuses to auto-recover — the caller must invoke `CryptoService.ForceCommitPendingRotation` or `CryptoService.ForceRollbackPendingRotation` after inspecting the DB row state, because the key store alone can't tell whether rows were already re-encrypted under the pending DEK. Closes the save-then-migrate crash window that postflight audit flagged on v0.3.0.
+- **`ISecretStore` gains `DeleteValue(string key)`.** `Database.DeleteValue` drops the `_meta` row via a single parameterised `DELETE`. Required for the rotation tombstone lifecycle; also available to future hygiene code that needs to drop a stored secret rather than overwrite it with an empty buffer.
+
+### Changed
+
+- **Shared atomic-write helper.** The temp-file + rename + rollback pattern previously duplicated in `SettingsService.Save` and `MainViewModel.Export` is now centralised in `TeamStation.Core.Io.AtomicFile` (`WriteAllText` + `WriteAllBytes`). Both call sites delegate to the helper so behaviour stays in lock-step and the crash tests exercise the single shared code path.
+
+### Tests
+
+- **`CryptoDisposalTests` (6 cases).** Pins: `Dispose()` zeros the DEK buffer in-place (reflection probe on the private `_dek` field), `EncryptString`/`DecryptString` after dispose throw `ObjectDisposedException`, `Dispose` is idempotent, DEK survives multiple GC cycles (confirms pinned allocation keeps the buffer at a stable address), `RotateDek` disposes the temporary old-service on success, and `RotateDek` disposes both services on migrator failure.
+- **`RotationRecoveryTests` (14 cases).** Pins the full tombstone state machine: `InspectPendingRotation` classifies None / PendingOrphan / InterruptedMidRotation correctly, `ReconcilePendingRotation` clears orphans silently and refuses to auto-recover the interrupted state (tombstone preserved so the signal isn't lost), `CreateOrLoad` auto-reconciles orphans and refuses to open on interrupted rotations, `ForceCommitPendingRotation` promotes pending to main, `ForceRollbackPendingRotation` drops pending, and both helpers throw when no pending exists. Rotation happy-path pins: pending is staged before migrator runs, deleted after a successful promote, and deleted after a migrator throw.
+- **`AtomicFileTests` (5 cases).** Pins the shared helper: rename-fails-original-intact (target-is-directory simulation), no `*.tmp` residue across repeated failures, roundtrip still works after a failed save, happy-path creates the target directory if missing, and the `WriteAllBytes` overload honours the same crash-safety contract.
+
+Test count: 330 → 355.
+
 ## [0.3.0] - 2026-04-24
 
 First public release cut. The advanced workflow content from the v0.1.2 internal / v0.2.0 / v0.2.1 waves landed on `main` but never shipped as a tagged GitHub release — v0.3.0 is that release.
