@@ -70,7 +70,7 @@
                 <Button Content="Launch" Style="{StaticResource PrimaryButton}" Command="{Binding LaunchCommand}" />
                 <Button Content="Add entry" Style="{StaticResource ToolbarButton}" Command="{Binding AddEntryCommand}" />
                 <Button Content="Add folder" Style="{StaticResource ToolbarButton}" Command="{Binding AddFolderCommand}" />
-                <Button Content="Edit" Style="{StaticResource ToolbarButton}" Command="{Binding EditEntryCommand}" />
+                <Button Content="Edit" Style="{StaticResource ToolbarButton}" Command="{Binding EditCommand}" />
                 <Button Content="Rename" Style="{StaticResource ToolbarButton}" Command="{Binding RenameCommand}" />
                 <Button Content="Move" Style="{StaticResource ToolbarButton}" Command="{Binding MoveCommand}" />
                 <Button Content="Delete" Style="{StaticResource ToolbarButton}" Command="{Binding DeleteCommand}" />
@@ -117,7 +117,7 @@
                         <MenuItem Header="Add folder" Command="{Binding AddFolderCommand}" />
                         <MenuItem Header="Add subfolder" Command="{Binding AddSubfolderCommand}" />
                         <Separator />
-                        <MenuItem Header="Edit..." Command="{Binding EditEntryCommand}" />
+                        <MenuItem Header="Edit..." Command="{Binding EditCommand}" />
                         <MenuItem Header="Rename..." Command="{Binding RenameCommand}" />
                         <MenuItem Header="Move to..." Command="{Binding MoveCommand}" />
                         <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using TeamStation.App.Services;
 using TeamStation.App.ViewModels;
 
 namespace TeamStation.App;
@@ -18,6 +19,8 @@ public partial class MainWindow : Window
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? "dev";
         VersionBadge.Text = $"v{version}";
+
+        _ = new TreeDragDrop(Tree, viewModel.Reparent);
     }
 
     private void Tree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

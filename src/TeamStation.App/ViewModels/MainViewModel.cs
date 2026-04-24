@@ -15,7 +15,8 @@ public sealed class MainViewModel : ViewModelBase
     private readonly EntryRepository _entries;
     private readonly FolderRepository _folders;
     private readonly TeamViewerLauncher _launcher;
-    private readonly Func<ConnectionEntry, Window?, bool> _editDialog;
+    private readonly Func<ConnectionEntry, Window?, bool> _editEntryDialog;
+    private readonly Func<Folder, Window?, bool> _editFolderDialog;
 
     private TreeNode? _selected;
     private string _status = string.Empty;
@@ -25,13 +26,15 @@ public sealed class MainViewModel : ViewModelBase
         EntryRepository entries,
         FolderRepository folders,
         TeamViewerLauncher launcher,
-        Func<ConnectionEntry, Window?, bool> editDialog,
+        Func<ConnectionEntry, Window?, bool> editEntryDialog,
+        Func<Folder, Window?, bool> editFolderDialog,
         string? tvExePath)
     {
         _entries = entries;
         _folders = folders;
         _launcher = launcher;
-        _editDialog = editDialog;
+        _editEntryDialog = editEntryDialog;
+        _editFolderDialog = editFolderDialog;
         _tvExePath = tvExePath ?? "TeamViewer.exe not found — install TeamViewer before launching";
 
         AddEntryCommand = new RelayCommand(AddEntry);
@@ -40,7 +43,7 @@ public sealed class MainViewModel : ViewModelBase
         RenameCommand = new RelayCommand(Rename, () => Selected is not null);
         MoveCommand = new RelayCommand(Move, () => Selected is not null);
         DeleteCommand = new RelayCommand(Delete, () => Selected is not null);
-        EditEntryCommand = new RelayCommand(EditEntry, () => Selected is EntryNode);
+        EditCommand = new RelayCommand(EditSelected, () => Selected is not null);
         LaunchCommand = new RelayCommand(Launch, () => Selected is EntryNode);
 
         Reload();
@@ -55,7 +58,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetField(ref _selected, value))
             {
-                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditEntryCommand, LaunchCommand })
+                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand })
                     ((RelayCommand)cmd).RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(SelectedIsEntry));
                 OnPropertyChanged(nameof(SelectedIsFolder));
@@ -75,7 +78,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand RenameCommand { get; }
     public System.Windows.Input.ICommand MoveCommand { get; }
     public System.Windows.Input.ICommand DeleteCommand { get; }
-    public System.Windows.Input.ICommand EditEntryCommand { get; }
+    public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
 
     public void Reload()
@@ -158,8 +161,12 @@ public sealed class MainViewModel : ViewModelBase
         {
             Name = "New connection",
             ParentFolderId = parentFolder?.Id,
+            Password = ResolveInheritedPassword(parentFolder),
+            Mode = parentFolder is not null ? FindInheritedMode(parentFolder) ?? ConnectionMode.RemoteControl : ConnectionMode.RemoteControl,
+            Quality = parentFolder is not null ? FindInheritedQuality(parentFolder) ?? ConnectionQuality.AutoSelect : ConnectionQuality.AutoSelect,
+            AccessControl = parentFolder is not null ? FindInheritedAc(parentFolder) ?? AccessControl.Undefined : AccessControl.Undefined,
         };
-        if (_editDialog(draft, Application.Current?.MainWindow))
+        if (_editEntryDialog(draft, Application.Current?.MainWindow))
         {
             _entries.Upsert(draft);
             Reload();
@@ -167,17 +174,83 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
-    private void EditEntry()
+    private void EditSelected()
     {
-        if (Selected is not EntryNode entry) return;
-        if (_editDialog(entry.Model, Application.Current?.MainWindow))
+        switch (Selected)
         {
-            _entries.Upsert(entry.Model);
-            entry.Refresh();
-            Reload();
-            SelectById(entry.Id);
-            Status = $"Saved \"{entry.Name}\".";
+            case EntryNode entry:
+                if (_editEntryDialog(entry.Model, Application.Current?.MainWindow))
+                {
+                    _entries.Upsert(entry.Model);
+                    entry.Refresh();
+                    Reload();
+                    SelectById(entry.Id);
+                    Status = $"Saved \"{entry.Name}\".";
+                }
+                break;
+
+            case FolderNode folder:
+                if (_editFolderDialog(folder.Model, Application.Current?.MainWindow))
+                {
+                    _folders.Upsert(folder.Model);
+                    Reload();
+                    SelectById(folder.Id);
+                    Status = $"Saved folder \"{folder.Name}\".";
+                }
+                break;
         }
+    }
+
+    private static string? ResolveInheritedPassword(FolderNode? start)
+    {
+        for (var cursor = start; cursor is not null; cursor = cursor.Parent)
+            if (!string.IsNullOrEmpty(cursor.Model.DefaultPassword))
+                return cursor.Model.DefaultPassword;
+        return null;
+    }
+
+    private static ConnectionMode? FindInheritedMode(FolderNode start)
+    {
+        for (var cursor = (FolderNode?)start; cursor is not null; cursor = cursor.Parent)
+            if (cursor.Model.DefaultMode is { } m) return m;
+        return null;
+    }
+
+    private static ConnectionQuality? FindInheritedQuality(FolderNode start)
+    {
+        for (var cursor = (FolderNode?)start; cursor is not null; cursor = cursor.Parent)
+            if (cursor.Model.DefaultQuality is { } q) return q;
+        return null;
+    }
+
+    private static AccessControl? FindInheritedAc(FolderNode start)
+    {
+        for (var cursor = (FolderNode?)start; cursor is not null; cursor = cursor.Parent)
+            if (cursor.Model.DefaultAccessControl is { } a) return a;
+        return null;
+    }
+
+    public void Reparent(TreeNode source, FolderNode? newParent)
+    {
+        switch (source)
+        {
+            case FolderNode folder:
+                folder.Model.ParentFolderId = newParent?.Id;
+                _folders.Upsert(folder.Model);
+                break;
+            case EntryNode entry:
+                entry.Model.ParentFolderId = newParent?.Id;
+                _entries.Upsert(entry.Model);
+                break;
+            default:
+                return;
+        }
+        var id = source.Id;
+        Reload();
+        SelectById(id);
+        Status = newParent is null
+            ? $"Moved \"{source.Name}\" to root."
+            : $"Moved \"{source.Name}\" to \"{newParent.Name}\".";
     }
 
     // ---- Folder commands ----

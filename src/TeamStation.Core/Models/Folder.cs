@@ -12,6 +12,5 @@ public sealed class Folder
     public ConnectionMode? DefaultMode { get; set; }
     public ConnectionQuality? DefaultQuality { get; set; }
     public AccessControl? DefaultAccessControl { get; set; }
-    public ProxySettings? DefaultProxy { get; set; }
     public string? DefaultPassword { get; set; }
 }

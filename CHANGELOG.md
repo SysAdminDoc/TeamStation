@@ -2,6 +2,29 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [0.0.5] - 2026-04-23
+
+### Added
+- **Drag-and-drop in the tree.** New `TreeDragDrop` service hooks the TreeView's mouse and drag events.
+  - Drag an entry onto a folder to reparent it; drop on a sibling entry to join that entry's folder; drop on empty space to move it to root.
+  - Drag a folder to reparent it. Own-subtree drops are rejected so a folder can never be moved inside itself or a descendant.
+  - No-op drops (target is already the current parent) are silently ignored instead of triggering a save.
+  - Drop is committed via a single `MainViewModel.Reparent(source, newParent)` entry point, which updates the model, persists through the appropriate repository, reloads the tree, and reselects the moved node.
+- **Folder editor.** New `FolderEditorWindow` with fields for folder name, optional hex accent color (`#RRGGBB`, validated), default password (stored encrypted), and per-folder default mode / quality / access-control.
+- **Inheritance on new-entry creation.** When a new entry is added inside a folder, the draft now pre-fills `Password`, `Mode`, `Quality`, and `AccessControl` from the nearest ancestor folder that carries that default. Entries retain their own values once saved — nothing is overwritten on load.
+- **Unified `EditCommand`.** One command now edits whichever kind of node is selected (folder → folder editor, entry → entry editor). Replaces the prior `EditEntryCommand`.
+
+### Changed
+- Removed `Folder.DefaultProxy` — it was never persisted (no DB columns for it) and exposed a latent data-loss shape. If proxy inheritance becomes a feature, it will be added with an explicit schema migration.
+
+### Verified
+- Clean Release build, 0 warnings / 0 errors across all five projects.
+- Seeded a 3-folder / 3-entry hierarchy (including a nested subfolder and a root-level entry) via `sqlite3`, launched the app, and confirmed the full tree renders without exception.
+
+### Notes
+- Runtime inheritance (where a launched entry *reads* its parent folder's defaults at launch time rather than only at creation) is the v0.0.6 target.
+- `v0.1.0` gating work: search/filter, CSV import, JSON export, tray with recent connections, embedded log panel, and running `TvLaunchSpike` against a real peer.
+
 ## [0.0.4] - 2026-04-23
 
 ### Added

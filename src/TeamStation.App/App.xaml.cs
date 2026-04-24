@@ -25,9 +25,14 @@ public partial class App : Application
                 entries: entries,
                 folders: folders,
                 launcher: launcher,
-                editDialog: (entry, owner) =>
+                editEntryDialog: (entry, owner) =>
                 {
                     var dlg = new EntryEditorWindow(entry) { Owner = owner };
+                    return dlg.ShowDialog() == true;
+                },
+                editFolderDialog: (folder, owner) =>
+                {
+                    var dlg = new FolderEditorWindow(folder) { Owner = owner };
                     return dlg.ShowDialog() == true;
                 },
                 tvExePath: tvExePath);
