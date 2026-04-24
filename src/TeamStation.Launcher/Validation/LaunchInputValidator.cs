@@ -64,21 +64,56 @@ public static partial class LaunchInputValidator
     {
         if (string.IsNullOrWhiteSpace(endpoint))
             throw new LaunchValidationException("Proxy endpoint is required.");
-        var parts = endpoint.Split(':');
-        if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) ||
-            !int.TryParse(parts[1], out var port) || port is < 1 or > 65535)
+
+        // Bracket-form for IPv6 literals: [::1]:8080 / [fe80::1%eth0]:3128.
+        // Non-bracket form for IPv4 + hostnames: 10.0.0.1:8080 / proxy.internal:3128.
+        // A bare IPv6 address (no brackets) is rejected so the port split
+        // stays unambiguous.
+        string host;
+        string portStr;
+        bool isBracketedIpv6 = false;
+        if (endpoint.StartsWith('['))
         {
-            throw new LaunchValidationException("Proxy endpoint must be host:port with a port in 1-65535.");
+            var close = endpoint.IndexOf(']');
+            if (close < 0 || close >= endpoint.Length - 1 || endpoint[close + 1] != ':')
+                throw new LaunchValidationException("Bracketed proxy endpoint must be [host]:port.");
+            host = endpoint[1..close];
+            portStr = endpoint[(close + 2)..];
+            isBracketedIpv6 = true;
+            if (host.Length == 0)
+                throw new LaunchValidationException("Proxy endpoint must have a host.");
+        }
+        else
+        {
+            var lastColon = endpoint.LastIndexOf(':');
+            if (lastColon <= 0 || lastColon >= endpoint.Length - 1)
+                throw new LaunchValidationException("Proxy endpoint must be host:port with a port in 1-65535.");
+            host = endpoint[..lastColon];
+            portStr = endpoint[(lastColon + 1)..];
+            // A non-bracketed host containing ':' is an unquoted IPv6
+            // literal. Refuse so the port split stays deterministic and
+            // the argv-injection guard below isn't undermined by stray
+            // colons smuggled into the host part.
+            if (host.Contains(':'))
+                throw new LaunchValidationException("IPv6 proxy hosts must be wrapped in brackets: [host]:port.");
         }
 
-        // Host must not smuggle argv injection shapes: whitespace (splits
-        // the field into flags), leading dash (argv-flag shape), UNC
-        // prefix, or any of the substrings we already ban in passwords.
-        var host = parts[0];
+        if (string.IsNullOrWhiteSpace(host))
+            throw new LaunchValidationException("Proxy endpoint must have a host.");
+        if (!int.TryParse(portStr, System.Globalization.CultureInfo.InvariantCulture, out var port) || port is < 1 or > 65535)
+            throw new LaunchValidationException("Proxy endpoint must be host:port with a port in 1-65535.");
+
+        // Host argv-injection guards. For IPv6 literals, `:` is part of
+        // the address syntax, so it's the one forbidden character we
+        // allow; every other char in ForbiddenInPassword is still banned.
         if (host.StartsWith('-'))
             throw new LaunchValidationException("Proxy host must not start with '-'.");
-        if (host.IndexOfAny(ForbiddenInPassword) >= 0)
-            throw new LaunchValidationException("Proxy host contains a forbidden character.");
+        foreach (var ch in ForbiddenInPassword)
+        {
+            if (ch == ':' && isBracketedIpv6) continue;
+            if (host.IndexOf(ch) >= 0)
+                throw new LaunchValidationException("Proxy host contains a forbidden character.");
+        }
         foreach (var bad in ForbiddenSubstringsInAny)
         {
             if (host.Contains(bad, StringComparison.OrdinalIgnoreCase))

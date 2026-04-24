@@ -143,17 +143,18 @@ VALUES ($id, NULL, 'oob-mode', '123456789', NULL, 99, 55, -7, NULL, NULL, NULL, 
         var repo = new EntryRepository(db, crypto);
         var loaded = Assert.Single(repo.GetAll());
 
-        // CLI argv build must not fault on a malformed row — even if the
-        // downstream flags carry nonsense. Unknown Mode enum values fall
-        // through to a safe default (no --mode flag) because the switch
-        // has no default case; unknown Quality/AccessControl ints are
-        // emitted verbatim (TeamViewer rejects them at its own layer).
-        // The contract under test is just "does not throw an unhandled
-        // NRE / IndexOutOfRange on startup."
+        // CLI argv build must not fault on a malformed row. Every
+        // out-of-range enum integer is silently skipped in argv output:
+        // Mode falls through the switch's default case, Quality and
+        // AccessControl are gated by Enum.IsDefined. Only --id + the ID
+        // itself make it into the argv — which means the worst a corrupt
+        // DB can do is launch without optional flags, not crash.
         var argv = TeamStation.Launcher.CliArgvBuilder.Build(loaded);
         Assert.Contains("--id", argv);
         Assert.Contains("123456789", argv);
-        Assert.DoesNotContain("--mode", argv); // mode=99 -> switch default falls through
+        Assert.DoesNotContain("--mode", argv);    // mode=99  -> switch default falls through
+        Assert.DoesNotContain("--quality", argv); // quality=55 -> Enum.IsDefined false -> dropped
+        Assert.DoesNotContain("--ac", argv);      // ac=-7 -> Enum.IsDefined false -> dropped
 
         // URI build: the scheme mapper IS strict — an unknown mode raises
         // a defined ArgumentOutOfRangeException, which callers route to

@@ -8,7 +8,12 @@ First public release cut. The advanced workflow content from the v0.1.2 internal
 
 Iteration 1 of the v0.3.0 cycle adds a hardening-and-coverage pass focused on security regression vectors, crypto edge cases, schema migrations, and randomized validator fuzz.
 
-### Security
+### Security — iteration 3
+
+- **IPv6 proxy endpoints are a first-class input.** `ValidateProxyEndpoint` used to split on `:` and reject any IPv6 literal (`[::1]:8080` became four parts). Rewritten as a bracket-aware parser: `[host]:port` for IPv6 (loopback, full, link-local with scope ID, IPv4-mapped), `host:port` for IPv4 and hostnames. Bare IPv6 without brackets is refused so the port split stays deterministic. Host argv-injection guards stay intact — the forbidden-character check skips only the `:` inside bracketed IPv6 literals, where it is syntactic.
+- **`CliArgvBuilder` range-checks Quality and AccessControl.** An out-of-range int sourced from a malformed DB row used to be emitted verbatim as `--quality 55` or `--ac -7`. `Enum.IsDefined` gate now drops unknown values silently, matching the safe-default behaviour the `Mode` switch already provided.
+
+### Security — iteration 1
 
 - **Device-ID validation is now ASCII-only.** `LaunchInputValidator.IdPattern` matched `\d{8,12}` which, by default in .NET, accepts every Unicode decimal digit category character — Arabic-Indic, full-width, Bengali, and others. A device ID written in those scripts would pass the validator even though the TeamViewer CLI only accepts ASCII decimal IDs, giving homograph-style obfuscation headroom. Pattern tightened to `[0-9]{8,12}`.
 - **Proxy-endpoint validator now rejects argv-injection shapes in the host.** `ValidateProxyEndpoint` previously only checked that the port parsed in range, so hosts like `--ProxyIP 1.2.3.4` (embedded flag + space) or `\\attacker\share` were accepted. Host part is now subject to the same forbidden-character and forbidden-substring rules as passwords plus the leading-dash guard.
@@ -21,6 +26,8 @@ Iteration 1 of the v0.3.0 cycle adds a hardening-and-coverage pass focused on se
 - **Schema migration with malformed rows.** Synthetic v1 database whose rows carry out-of-range enum integers and trailing-whitespace IDs; v1 → v3 migration rescues every recoverable row without a silent data drop.
 - **Crypto rotation.** `CryptoRotationTests` exercises happy path (store rewrap + new ciphertext works + old ciphertext fails with tag mismatch), migrator-throws rollback (store untouched, original data still decrypts), guard paths (empty store, master-password envelope), and two-rotations-in-sequence produce three distinct wraps.
 - **Atomic-write crash simulation.** `AtomicWriteCrashTests` forces `SettingsService.Save`'s rename step to fail (target path made a directory), then asserts original is untouched, no `*.tmp` sidecar residue, and that a subsequent save still lands cleanly after the obstacle is removed.
+- **IPv6 proxy endpoints.** `LaunchInputValidatorTests` gains positive coverage for IPv6 loopback, full IPv6, link-local with scope ID (`[fe80::1%eth0]`), and IPv4-mapped IPv6 (`[::ffff:127.0.0.1]`). Eight malformed bracketed shapes (forbidden chars / substrings inside `[…]`, missing `:port`, empty host) and bare-unbracketed IPv6 are rejected.
+- **`ValidateProxyUsername` length boundary.** Pinned at exactly `MaxProxyUserLength` (128) chars plus rejection at 129 and 256.
 
 ### Added — Feature
 

@@ -75,19 +75,83 @@ public class LaunchInputValidatorTests
     [Theory]
     [InlineData("10.0.0.1:8080")]
     [InlineData("proxy.internal:3128")]
-    [InlineData("[::1]:8080")]  // IPv6 literal; this one is a known-limitation case, rejected today
-    public void ValidateProxyEndpoint_accepts_or_rejects_consistent_with_implementation(string endpoint)
+    [InlineData("[::1]:8080")]                              // IPv6 loopback
+    [InlineData("[2001:db8::1]:3128")]                      // full IPv6
+    [InlineData("[fe80::1]:80")]                            // IPv6 link-local
+    public void ValidateProxyEndpoint_accepts_valid_endpoints(string endpoint)
     {
-        // Current implementation splits on ':' so IPv6 fails; test pins the contract.
-        if (endpoint.Contains('[') || endpoint.Count(c => c == ':') > 1)
-        {
-            Assert.Throws<LaunchValidationException>(
-                () => LaunchInputValidator.ValidateProxyEndpoint(endpoint));
-        }
-        else
-        {
-            LaunchInputValidator.ValidateProxyEndpoint(endpoint);
-        }
+        LaunchInputValidator.ValidateProxyEndpoint(endpoint);
+    }
+
+    [Theory]
+    [InlineData("::1:8080")]                                // bare IPv6, no brackets
+    [InlineData("[::1]")]                                   // missing :port
+    [InlineData("[::1]8080")]                               // missing colon between ] and port
+    [InlineData("[]:8080")]                                 // empty host inside brackets
+    [InlineData("[::1]:-1")]                                // negative port
+    [InlineData("[::1]:0")]                                 // port zero
+    [InlineData("[::1]:99999")]                             // port overflow
+    [InlineData("[-malicious]:8080")]                       // leading-dash host inside brackets
+    [InlineData("[host\"name]:8080")]                       // double quote inside brackets
+    [InlineData("[host'name]:8080")]                        // single quote inside brackets
+    [InlineData("[host name]:8080")]                        // whitespace inside brackets
+    [InlineData("[host\\name]:8080")]                       // backslash inside brackets
+    [InlineData("[host/name]:8080")]                        // forward slash inside brackets
+    [InlineData("[host\0name]:8080")]                       // null byte inside brackets
+    [InlineData("[host--play]:8080")]                       // forbidden substring inside brackets
+    [InlineData("[\\\\unc]:8080")]                          // UNC prefix inside brackets
+    public void ValidateProxyEndpoint_rejects_malformed_ipv6(string endpoint)
+    {
+        Assert.Throws<LaunchValidationException>(
+            () => LaunchInputValidator.ValidateProxyEndpoint(endpoint));
+    }
+
+    /// <summary>
+    /// Link-local addresses with scope IDs (<c>%eth0</c>, <c>%4</c>) are
+    /// accepted — the character set inside the bracket is narrow enough
+    /// that the percent sign itself is not a smuggler. Pinned here so a
+    /// future tightening of the charset doesn't silently break real
+    /// sysadmin setups using link-local proxies.
+    /// </summary>
+    [Theory]
+    [InlineData("[fe80::1%eth0]:3128")]
+    [InlineData("[fe80::1%4]:3128")]
+    public void ValidateProxyEndpoint_accepts_ipv6_with_scope_id(string endpoint)
+    {
+        LaunchInputValidator.ValidateProxyEndpoint(endpoint);
+    }
+
+    /// <summary>
+    /// IPv4-mapped IPv6 notation is permitted. Downstream code must not
+    /// treat "bracketed implies pure IPv6" as a security boundary; this
+    /// test pins that contract so a future assumption fails loudly here
+    /// instead of subtly in the launcher.
+    /// </summary>
+    [Theory]
+    [InlineData("[::ffff:127.0.0.1]:8080")]
+    [InlineData("[::ffff:192.168.1.1]:443")]
+    public void ValidateProxyEndpoint_accepts_ipv4_mapped_ipv6(string endpoint)
+    {
+        LaunchInputValidator.ValidateProxyEndpoint(endpoint);
+    }
+
+    [Theory]
+    [InlineData(128)]  // exactly max
+    [InlineData(64)]
+    [InlineData(1)]
+    public void ValidateProxyUsername_accepts_lengths_up_to_max(int length)
+    {
+        var name = new string('u', length);
+        LaunchInputValidator.ValidateProxyUsername(name);
+    }
+
+    [Theory]
+    [InlineData(129)]
+    [InlineData(256)]
+    public void ValidateProxyUsername_rejects_lengths_above_max(int length)
+    {
+        var name = new string('u', length);
+        Assert.Throws<LaunchValidationException>(() => LaunchInputValidator.ValidateProxyUsername(name));
     }
 
     [Theory]

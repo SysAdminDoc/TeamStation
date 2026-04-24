@@ -56,13 +56,18 @@ public static class CliArgvBuilder
                     $"Mode {entry.Mode} is not supported by the TeamViewer CLI; use UriSchemeBuilder instead.");
         }
 
-        if (entry.Quality is { } q && q != ConnectionQuality.AutoSelect)
+        // Enum.IsDefined guards against malformed DB rows that carry an
+        // integer outside the enum range (e.g. a v1 row with `quality=55`
+        // forcibly cast through the CLR). Emitting the raw int would let
+        // TeamViewer reject at its own layer, but the guard belongs here:
+        // it keeps the argv clean and the log panel noise-free.
+        if (entry.Quality is { } q && q != ConnectionQuality.AutoSelect && Enum.IsDefined(q))
         {
             argv.Add("--quality");
             argv.Add(((int)q).ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
-        if (entry.AccessControl is { } ac && ac != AccessControl.Undefined)
+        if (entry.AccessControl is { } ac && ac != AccessControl.Undefined && Enum.IsDefined(ac))
         {
             argv.Add("--ac");
             argv.Add(((int)ac).ToString(System.Globalization.CultureInfo.InvariantCulture));
