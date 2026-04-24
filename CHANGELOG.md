@@ -4,6 +4,27 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-04-24
+
+Security + accessibility patch on top of the v0.3.2 visual overhaul. Two contained changes ship in this release; the System.String credential-leak refactor (P1 from v0.3.0 postflight) remains deferred to v0.3.4 because its blast radius — DecryptString, EntryRepository, FolderRepository, TeamViewerLauncher, every launch/edit UI binding — wants a release cycle of its own with explicit migration notes for downstream consumers of the credential-read surface.
+
+### Security
+
+- **Per-database DPAPI entropy salt for the DEK wrap.** Every `ProtectedData.Protect` / `ProtectedData.Unprotect` call in `CryptoService` now binds the wrap to a 32-byte random salt held in the same `_meta` table as the DEK itself (key `dpapi_entropy_v1`). Without that salt no DPAPI unwrap succeeds — the trust boundary moves from "same Windows user" to "same Windows user AND has read this database file". Defends against opportunistic malware that scrapes DPAPI blobs in bulk without ever opening our DB. `RotateDek` participates in the same hardening, and a one-shot legacy fallback transparently re-wraps existing v0.3.0 / v0.3.1 / v0.3.2 (null-entropy) DEKs under the new salt on first launch — no user action required.
+- **CVE-2026-23572 (TeamViewer auth bypass, CVSS 7.2) operator note.** The April 2026 TeamViewer security bulletin covers a confirmation-bypass in TeamViewer Full / Host below 15.74.5. TeamStation orchestrates the installed client and does not ship the protocol implementation, so the patch lives upstream — but anyone running TeamStation against a vulnerable client should update the host installation. Landscape research log: `docs/research/iter-2-sources.md`.
+
+### Added
+
+- **Keyboard navigation on the connection tree (A11y baseline).** The folder TreeView now exposes Enter / F2 / Delete as single-key actions on the focused item — Launch, Rename, Delete respectively. Matches Explorer + VS Code conventions. Per the project "no keyboard shortcuts" rule there are NO chord (Ctrl/Alt/Shift) bindings; arrow-key + Home / End navigation continues to work via the WPF default handler. The tree carries `KeyboardNavigation.TabNavigation="Once"` so Tab steps over the entire tree as a single stop instead of trapping keyboard users on every visible TreeViewItem.
+- **AutomationProperties.Name + HelpText** on the connection tree and the search box so screen readers announce them with intent rather than as anonymous controls.
+
+### Tests
+
+- **`CryptoEntropyTests` (9 cases).** Pins the DPAPI entropy hardening: salt seeded on first run, salt persisted across `CreateOrLoad` calls, raw `ProtectedData.Unprotect` succeeds with the persisted salt and fails with null entropy / wrong entropy (proves the wrap is in fact entropy-bound), legacy null-entropy wraps load and are silently re-wrapped under the new salt, second load takes the fast path (no further re-wrap), `RotateDek` preserves entropy across rotation, `RotateDek` creates entropy on a legacy install, the `IKeyStore`-only legacy stub keeps working with null entropy (graceful no-op), and a master-password carry-over from a legacy DPAPI install brings the existing DEK forward.
+- **`MainWindowKeyboardNavTests` (5 cases).** Pins the A11y baseline structurally (XAML parsed as XML, no WPF runtime needed): three single-key bindings on the tree, exact key set is `{Enter, F2, Delete}`, no `Modifiers` attribute on any of them (regression guard against the project's "no keyboard shortcuts" rule), each key maps to its expected command (Enter→Launch, F2→Rename, Delete→Delete), tree has an `AutomationProperties.Name`, search box has an `AutomationProperties.Name`, and `KeyboardNavigation.TabNavigation="Once"` is in place to avoid the tab-trap.
+
+Test count: 364 → 378.
+
 ## [0.3.2] - 2026-04-24
 
 UI overhaul. Reshapes the workspace around the mRemoteNG / Visual Studio sysadmin-tool layout users expect from a TeamViewer connection manager: classic top menubar, compact icon toolbar, slim quick-connect strip, 2-pane split with a categorised property-grid inspector, dockable activity log, and a single-line status bar. No view-model or behaviour changes — the entire pass is visual + accessibility.

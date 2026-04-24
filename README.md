@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.3.2-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.3-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,6 +31,8 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 > **Prerequisite:** The full TeamViewer client must be installed on the launching machine (`TeamViewer.exe` on the `PATH` or at its default install location). TeamStation does not bundle or replace TeamViewer.
 
 ## Status
+
+`v0.3.3` — **Security + accessibility patch.** Per-database DPAPI entropy salt for the DEK wrap — every `ProtectedData.Protect` / `Unprotect` call now binds to a 32-byte salt held in `_meta`, moving the trust boundary from "same Windows user" to "same Windows user AND has read this database file"; legacy v0.3.0/0.3.1/0.3.2 wraps are silently re-wrapped under the new salt on first launch. Keyboard navigation on the connection tree: Enter (Launch), F2 (Rename), Delete (Delete) on the focused item — single-key only, no chord shortcuts. `AutomationProperties.Name` on the tree and search box for screen readers. Test count 364 → 378, build clean at 0 warnings / 0 errors. See [CHANGELOG.md](CHANGELOG.md).
 
 `v0.3.2` — **UI overhaul.** Reshapes the workspace around the mRemoteNG / sysadmin-tool layout: classic top menubar (File / Edit / View / Connection / Tools), compact icon toolbar with semantic groups, slim quick-connect strip, 2-pane split with a categorised property-grid inspector, dockable activity log, and a single-line status bar. Custom WPF templates ship a thin auto-hide scrollbar, flat rounded CheckBox, focus-ring-on-keyboard buttons, pill-radius chips, and Segoe Fluent Icons glyphs throughout. Six dialogs (Entry editor, Folder editor, Settings, Master password, Folder picker, Input) align on the same typography scale, corner radii, and category structure. No view-model or behaviour changes — purely visual and accessibility. See [CHANGELOG.md](CHANGELOG.md).
 

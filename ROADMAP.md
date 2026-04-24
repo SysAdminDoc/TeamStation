@@ -10,16 +10,19 @@ Prioritization:
 
 ---
 
-## Current main progress after v0.3.0
+## Current main progress through v0.3.3
 
-v0.3.0 ships the largest adoption blockers from P1/P2 plus a focused security hardening pass:
+v0.3.0 → v0.3.3 ships the largest adoption blockers from P1/P2 plus a sustained security + UX hardening cadence:
 
-- App settings, first-run trust notice, portable-mode master password, and configurable TeamViewer.exe path.
+- App settings, first-run trust notice, portable-mode master password (Argon2id), and configurable TeamViewer.exe path.
 - Quick connect, saved searches, per-entry profile names, pinned entries, and pinned/recent tray launch menu.
 - TeamViewer local history import plus optional read-only Web API group/device pull into a synthetic `TV Cloud` folder.
 - Wake-on-LAN, folder/entry launch scripts, external tools, and inherited TeamViewer path / wake broadcast / scripts.
 - Session history, CSV session export, persistent audit log storage, and optional encrypted DB mirror to a cloud folder.
 - Optional Authenticode signing in the release workflow when signing certificate secrets are configured.
+- Credential-handling story: pinned + zeroed DEK buffer (v0.3.1), two-phase-commit DEK rotation (v0.3.1), per-database DPAPI entropy salt (v0.3.3), shared atomic-write helper (v0.3.1).
+- mRemoteNG-style workbench layout — top menubar, semantic toolbar, two-pane split with property-grid inspector, dockable activity log, single-line status bar (v0.3.2).
+- A11y baseline on the connection tree: Enter / F2 / Delete single-key actions, `KeyboardNavigation.TabNavigation="Once"` to avoid the tab-trap, `AutomationProperties.Name` on the tree and search box (v0.3.3).
 
 Still open before a formal 1.0 release: real-peer TeamViewer launch validation, Web API pagination/rate-limit hardening, online-state polling, conflict-aware cloud sync, installer packaging, and UX testing on real support workflows.
 
@@ -156,7 +159,7 @@ The adversarial security pass that closed out the v0.3.0 factory run flagged thr
 - [x] **P1 — DEK memory lifecycle.** Closed in v0.3.1. `CryptoService` implements `IDisposable`; the DEK buffer is allocated pinned (`GC.AllocateArray<byte>(pinned: true)`) and zeroed via `CryptographicOperations.ZeroMemory` on dispose. `App.OnExit` disposes the process-wide service. Subsequent `EncryptString`/`DecryptString` calls throw `ObjectDisposedException`. Covered by `CryptoDisposalTests` (6 cases).
 - [ ] **P1 — Decrypted plaintext leaks via `System.String`.** `DecryptString` hands back a `string`, which is CLR-interned/pooled and cannot be zeroed. Every password ever decrypted persists in the managed heap until process exit. `AppSettings.TeamViewerApiToken` has the same shape. Redesign the credential-read API to return `byte[]` (or `ImmutableArray<byte>`) and let callers zero after use. Visible blast radius — touches `CryptoService`, `EntryRepository`, `FolderRepository`, `TeamViewerLauncher`, and every launch/edit UI binding. Deferred from v0.3.1 because the refactor spans the whole credential-read surface and wants its own release cycle.
 - [x] **P1 — `CryptoService.RotateDek` has a crash-window between save-new-wrap and migrator-complete.** Closed in v0.3.1. Rotation is now two-phase commit: stage under `dek_v1_pending`, run migrator, atomic `INSERT OR REPLACE` promote of `dek_v1`, delete tombstone. `CryptoService.InspectPendingRotation` classifies state (`None` / `PendingOrphan` / `InterruptedMidRotation`); `ReconcilePendingRotation` auto-clears orphans and refuses to auto-recover the ambiguous mid-rotation state — recovery UX calls `ForceCommitPendingRotation` or `ForceRollbackPendingRotation` after inspecting row state. Covered by `RotationRecoveryTests` (14 cases).
-- [ ] **P2 — DPAPI wrap adds no `optionalEntropy`.** Any same-user process can call `ProtectedData.Unprotect` on `dek_v1` without any additional secret. Mitigate by hashing a per-database salt into the entropy parameter; the salt lives in `_meta` alongside the wrap and is public. This changes the DPAPI trust boundary from "same-user" to "same-user plus has-read-our-db-file" — useful against opportunistic malware that scrapes DPAPI blobs in bulk.
+- [x] **P1 — DPAPI wrap adds no `optionalEntropy`.** Closed in v0.3.3. A 32-byte per-database salt now lives in `_meta` under key `dpapi_entropy_v1`; every `ProtectedData.Protect` / `ProtectedData.Unprotect` call in `CryptoService` (including `RotateDek` and the master-password DEK carry-over) binds to it. Trust boundary moves from "same-user" to "same-user plus has-read-our-db-file". Existing v0.3.0 / v0.3.1 / v0.3.2 wraps are silently re-wrapped under the new salt on first launch via a one-shot legacy fallback — no user action. `IKeyStore`-only test stubs gracefully no-op (preserve null entropy). Covered by `CryptoEntropyTests` (9 cases). Promoted from P2 → P1 because the iter-1 research scored 4.67 and the fix surface stayed contained.
 
 ### Competitor gap matrix (iteration 2, 2026-04-24)
 
@@ -182,5 +185,25 @@ One-time scan of the three most-cited OSS / freemium alternatives sysadmins comp
 
 - Open-source, MIT. No freemium gate on credential storage.
 - TeamViewer-only focus means the URI matrix, CVE-2020-13699 hardening, and launch heuristics are tighter than any multi-protocol competitor that supports TeamViewer as one of twenty.
-- DPAPI-wrapped AES-GCM + Argon2id portable-mode KEK, audit log, and now DEK rotation — a full credential-handling story without a subscription.
+- DPAPI-wrapped AES-GCM + Argon2id portable-mode KEK, audit log, DEK rotation, and per-database DPAPI entropy salt — a full credential-handling story without a subscription.
 - Runtime inheritance resolver with a nullable-enum storage model: "inherit from folder" is a first-class value, not a magic-string sentinel.
+
+---
+
+## v0.3.3 — security + a11y patch (shipped 2026-04-24)
+
+- [x] **P1 — Per-database DPAPI entropy salt for the DEK wrap.** See the postflight follow-ups section above. Closed in v0.3.3 with `CryptoEntropyTests` (9 cases) and a one-shot legacy fallback so v0.3.0 / v0.3.1 / v0.3.2 installs auto-upgrade on first launch.
+- [x] **P1 — Keyboard navigation on the connection tree (A11y baseline).** Single-key Enter / F2 / Delete on the focused tree item. No chord shortcuts (project rule). `KeyboardNavigation.TabNavigation="Once"` so the tree is a single tab stop. `AutomationProperties.Name` + `HelpText` on the tree and the search box. Pinned by `MainWindowKeyboardNavTests` (5 cases) parsing `MainWindow.xaml` as XML.
+- [ ] **P1 — `System.String` credential-leak refactor.** Carried forward from v0.3.0 postflight to v0.3.4. The refactor still wants its own release cycle because the blast radius (DecryptString return type, EntryRepository, FolderRepository, TeamViewerLauncher, every launch/edit UI binding) is the entire credential-read surface.
+
+## v0.3.4 backlog (next patch — credential-read API + iter-2 research follow-ups)
+
+### Iter-2 landscape research findings (delta scan, 2026-04-24)
+
+A 24-source delta scan over the iter-1 baseline surfaced the following items that were not present at v0.3.2 cut. See `docs/research/iter-2-sources.md` for the full source inventory.
+
+- [ ] **P0 — Operator note: CVE-2026-23572 (TeamViewer auth bypass, CVSS 7.2).** Affects TeamViewer Full / Host below 15.74.5 — bypasses "Allow after confirmation" access controls. TeamStation orchestrates the installed client and does not ship the protocol implementation, so the patch lives upstream. Update README "Prerequisite" block to recommend ≥ 15.74.5 explicitly. Documented in CHANGELOG v0.3.3 release notes; expand in the README on the next docs pass.
+- [ ] **P2 — Surface installed TeamViewer version + CVE-state in the status bar.** Read the version out of `HKLM\SOFTWARE\TeamViewer\Version` (or the Wow6432 mirror) and surface a "TeamViewer 15.71.5 — update available" pill when the detected version is below the latest known-vulnerable build. Operator-side remediation guide; no auto-update.
+- [ ] **P2 — `.NET 10.0.7` OOB CVE chain (CVE-2026-26130 / 26127 / 40372).** When TeamStation moves off `.NET 9` (currently TFM `net9.0-windows10.0.19041.0`) the migration target is a patched `.NET 10.0.7+` runtime, not stock `.NET 10.0.6`. Track the upgrade path in the `.NET 10` migration ticket when it lands.
+- [ ] **P2 — Native AOT compatibility audit.** UWP `.NET 9` Native AOT shipped in March 2026; investigate whether any DPAPI / SQLite / fo-dicom paths break under AOT. WPF itself is AOT-incompatible today, but smaller binaries + faster startup is worth a feasibility scan when WPF lifts the restriction.
+- [ ] **P3 — RustDesk + Windows App federation feasibility note.** Microsoft's "Remote Desktop client EOL → Windows App" move (Sep 2026) creates migration friction for many sysadmins who currently use the legacy client alongside TeamViewer. Adding a non-default RustDesk launcher backend would let TeamStation be a single pane of glass for the migration period — but it violates the "TeamViewer-only" charter. Tagged CHARTER-REVIEW; do NOT silently drop. User decision.
