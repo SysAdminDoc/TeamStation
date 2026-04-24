@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\TeamStation.Core\TeamStation.Core.csproj" />
     <ProjectReference Include="..\TeamStation.Launcher\TeamStation.Launcher.csproj" />
+    <ProjectReference Include="..\TeamStation.Data\TeamStation.Data.csproj" />
   </ItemGroup>
 
 </Project>

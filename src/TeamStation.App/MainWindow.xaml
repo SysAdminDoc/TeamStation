@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:TeamStation.App"
+        xmlns:vm="clr-namespace:TeamStation.App.ViewModels"
         mc:Ignorable="d"
         Title="TeamStation"
         Height="720" Width="1200"
@@ -12,9 +12,27 @@
         Foreground="{StaticResource TextBrush}"
         FontFamily="Segoe UI Variable Text, Segoe UI"
         FontSize="13"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        d:DataContext="{d:DesignInstance Type=vm:MainViewModel}">
+    <Window.Resources>
+        <Style TargetType="Button" x:Key="ToolbarButton">
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="MinWidth" Value="96" />
+        </Style>
+        <Style TargetType="Button" x:Key="PrimaryButton" BasedOn="{StaticResource ToolbarButton}">
+            <Setter Property="Background" Value="{StaticResource BlueBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource Crust}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -35,60 +53,59 @@
                 </StackPanel>
                 <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
                            Foreground="{StaticResource Subtext0Brush}"
-                           Text="Connection manager for TeamViewer" />
+                           Text="{Binding TvExePath}"
+                           ToolTip="{Binding TvExePath}" />
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1">
+        <Border Grid.Row="1" Background="{StaticResource MantleBrush}" Padding="16,10" BorderThickness="0,1,0,0" BorderBrush="{StaticResource CrustBrush}">
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Launch" Style="{StaticResource PrimaryButton}" Command="{Binding LaunchCommand}" />
+                <Button Content="Add" Style="{StaticResource ToolbarButton}" Command="{Binding AddCommand}" />
+                <Button Content="Edit" Style="{StaticResource ToolbarButton}" Command="{Binding EditCommand}" />
+                <Button Content="Delete" Style="{StaticResource ToolbarButton}" Command="{Binding DeleteCommand}" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="16,12,16,12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="200" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{StaticResource MantleBrush}">
-                <StackPanel Margin="16">
-                    <TextBlock Text="Folders" FontWeight="SemiBold"
-                               Foreground="{StaticResource Subtext1Brush}" />
-                    <TextBlock Margin="0,12,0,0"
-                               Foreground="{StaticResource Subtext0Brush}"
-                               TextWrapping="Wrap"
-                               Text="Tree view lands in v0.1.0. Spike harness first." />
-                </StackPanel>
+            <Border Background="{StaticResource MantleBrush}" CornerRadius="6">
+                <ListView x:Name="EntryList"
+                          ItemsSource="{Binding Entries}"
+                          SelectedItem="{Binding Selected, Mode=TwoWay}"
+                          Background="Transparent"
+                          Foreground="{StaticResource TextBrush}"
+                          BorderThickness="0"
+                          HorizontalContentAlignment="Stretch"
+                          MouseDoubleClick="EntryList_MouseDoubleClick">
+                    <ListView.View>
+                        <GridView>
+                            <GridView.ColumnHeaderContainerStyle>
+                                <Style TargetType="GridViewColumnHeader">
+                                    <Setter Property="Background" Value="{StaticResource CrustBrush}" />
+                                    <Setter Property="Foreground" Value="{StaticResource Subtext1Brush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                    <Setter Property="Padding" Value="10,8" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Left" />
+                                </Style>
+                            </GridView.ColumnHeaderContainerStyle>
+                            <GridViewColumn Header="Name" Width="280" DisplayMemberBinding="{Binding Name}" />
+                            <GridViewColumn Header="TeamViewer ID" Width="160" DisplayMemberBinding="{Binding TeamViewerId}" />
+                            <GridViewColumn Header="Mode" Width="160" DisplayMemberBinding="{Binding Mode}" />
+                            <GridViewColumn Header="Last connected" Width="200" DisplayMemberBinding="{Binding LastConnectedDisplay}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
             </Border>
-
-            <GridSplitter Grid.Column="1" Width="4" Background="{StaticResource CrustBrush}"
-                          HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext" />
-
-            <Grid Grid.Column="2" Margin="24">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Text="Welcome" FontSize="22" FontWeight="Light"
-                           Foreground="{StaticResource TextBrush}" />
-                <TextBlock Grid.Row="1" Margin="0,8,0,0"
-                           Foreground="{StaticResource Subtext0Brush}" TextWrapping="Wrap"
-                           Text="TeamStation is a connection manager for TeamViewer on Windows. This build is the v0.0.2 scaffold — models, validators, CLI/URI builders, and the feasibility spike tool are in place. See ROADMAP.md for what lands next." />
-
-                <Border Grid.Row="2" Margin="0,24,0,0" Padding="16"
-                        Background="{StaticResource Surface0Brush}" CornerRadius="8">
-                    <StackPanel>
-                        <TextBlock Text="TeamViewer detection"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource MauveBrush}" />
-                        <TextBlock x:Name="TvStatus" Margin="0,6,0,0" TextWrapping="Wrap"
-                                   Foreground="{StaticResource Subtext1Brush}" />
-                    </StackPanel>
-                </Border>
-            </Grid>
         </Grid>
 
-        <Border Grid.Row="2" Background="{StaticResource CrustBrush}" Padding="16,6">
+        <Border Grid.Row="3" Background="{StaticResource CrustBrush}" Padding="16,6">
             <TextBlock Foreground="{StaticResource Subtext0Brush}" FontSize="11"
-                       Text="Scaffold build — no persistent data yet" />
+                       Text="{Binding Status}" />
         </Border>
     </Grid>
 </Window>

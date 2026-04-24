@@ -1,23 +1,26 @@
 using System.Reflection;
 using System.Windows;
-using TeamStation.Launcher;
+using System.Windows.Input;
+using TeamStation.App.ViewModels;
 
 namespace TeamStation.App;
 
 public partial class MainWindow : Window
 {
-    public MainWindow()
+    public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
+        DataContext = viewModel;
 
         var version = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? "dev";
         VersionBadge.Text = $"v{version}";
+    }
 
-        var exe = TeamViewerPathResolver.Resolve();
-        TvStatus.Text = exe is null
-            ? "TeamViewer.exe not found. Install the full TeamViewer client before shipping v0.1.0 behavior."
-            : $"Found: {exe}";
+    private void EntryList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && vm.LaunchCommand.CanExecute(null))
+            vm.LaunchCommand.Execute(null);
     }
 }

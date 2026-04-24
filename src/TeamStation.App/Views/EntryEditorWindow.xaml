@@ -1,0 +1,117 @@
+<Window x:Class="TeamStation.App.Views.EntryEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        xmlns:models="clr-namespace:TeamStation.Core.Models;assembly=TeamStation.Core"
+        Title="Edit connection"
+        Width="520" Height="640"
+        MinWidth="480" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{StaticResource BaseBrush}"
+        Foreground="{StaticResource TextBrush}"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
+        FontSize="13">
+    <Window.Resources>
+        <Style TargetType="TextBlock" x:Key="FieldLabel">
+            <Setter Property="Foreground" Value="{StaticResource Subtext1Brush}" />
+            <Setter Property="Margin" Value="0,12,0,4" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
+            <Setter Property="SelectionBrush" Value="{StaticResource BlueBrush}" />
+        </Style>
+        <Style TargetType="PasswordBox">
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="Padding" Value="8,6" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="MinWidth" Value="96" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="Friendly name" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="NameBox" />
+
+                <TextBlock Text="TeamViewer ID" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="IdBox" />
+                <TextBlock Foreground="{StaticResource Subtext0Brush}" FontSize="11"
+                           Margin="0,4,0,0"
+                           Text="Numeric peer ID, 8-12 digits." />
+
+                <TextBlock Text="Password" Style="{StaticResource FieldLabel}" />
+                <PasswordBox x:Name="PasswordBox" />
+
+                <TextBlock Text="Connection mode" Style="{StaticResource FieldLabel}" />
+                <ComboBox x:Name="ModeBox">
+                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.RemoteControl}" Content="Remote Control" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.FileTransfer}" Content="File Transfer" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Vpn}" Content="VPN" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Chat}" Content="Chat (URI handler)" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.VideoCall}" Content="Video call (URI handler)" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionMode.Presentation}" Content="Presentation (URI handler)" />
+                </ComboBox>
+
+                <TextBlock Text="Quality" Style="{StaticResource FieldLabel}" />
+                <ComboBox x:Name="QualityBox">
+                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.AutoSelect}" Content="Auto" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeQuality}" Content="Optimize quality" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeSpeed}" Content="Optimize speed" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.CustomSettings}" Content="Custom" />
+                    <ComboBoxItem Tag="{x:Static models:ConnectionQuality.Undefined}" Content="Undefined" />
+                </ComboBox>
+
+                <TextBlock Text="Access control" Style="{StaticResource FieldLabel}" />
+                <ComboBox x:Name="AcBox">
+                    <ComboBoxItem Tag="{x:Static models:AccessControl.Undefined}" Content="Undefined (use TeamViewer default)" />
+                    <ComboBoxItem Tag="{x:Static models:AccessControl.FullAccess}" Content="Full access" />
+                    <ComboBoxItem Tag="{x:Static models:AccessControl.ConfirmAll}" Content="Confirm all" />
+                    <ComboBoxItem Tag="{x:Static models:AccessControl.ViewAndShow}" Content="View and show" />
+                    <ComboBoxItem Tag="{x:Static models:AccessControl.CustomSettings}" Content="Custom settings" />
+                </ComboBox>
+
+                <TextBlock Text="Notes" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="NotesBox" AcceptsReturn="True" TextWrapping="Wrap" Height="88"
+                         VerticalScrollBarVisibility="Auto" />
+
+                <TextBlock Text="Tags (comma-separated)" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="TagsBox" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button x:Name="CancelButton" Content="Cancel" Click="CancelButton_Click" IsCancel="True" />
+            <Button x:Name="SaveButton" Content="Save" Click="SaveButton_Click" IsDefault="True"
+                    Background="{StaticResource BlueBrush}" Foreground="{StaticResource Crust}" FontWeight="SemiBold" />
+        </StackPanel>
+    </Grid>
+</Window>
