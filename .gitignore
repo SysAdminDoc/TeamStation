@@ -100,3 +100,4 @@ teamstation-*.log
 publish/
 publish-test/
 *.publish.local
+.factory/

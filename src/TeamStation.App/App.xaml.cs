@@ -22,6 +22,7 @@ public partial class App : Application
     private Mutex? _singleInstanceMutex;
     private bool _ownsSingleInstanceMutex;
     private TrayManager? _tray;
+    private CryptoService? _crypto;
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
@@ -80,7 +81,8 @@ public partial class App : Application
             }
 
             var db = new Database(dbPath);
-            var crypto = CreateCrypto(db);
+            _crypto = CreateCrypto(db);
+            var crypto = _crypto;
             var entries = new EntryRepository(db, crypto);
             var folders = new FolderRepository(db, crypto);
             var sessions = new SessionRepository(db);
@@ -151,6 +153,11 @@ public partial class App : Application
             try { _singleInstanceMutex?.ReleaseMutex(); } catch { /* swallow during exit */ }
         }
         try { _singleInstanceMutex?.Dispose(); } catch { /* swallow during exit */ }
+        // Zero the DEK last so any swap file snapshot captured during a
+        // normal exit cannot recover the unwrapped key. Repositories dropped
+        // their reference when the view model went out of scope; the DEK
+        // buffer is pinned and owned exclusively by CryptoService.
+        try { _crypto?.Dispose(); } catch { /* swallow during exit */ }
         base.OnExit(e);
     }
 }

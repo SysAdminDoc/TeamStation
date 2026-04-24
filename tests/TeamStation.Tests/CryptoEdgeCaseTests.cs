@@ -22,6 +22,7 @@ public class CryptoEdgeCaseTests
         public void Save(byte[] wrapped) => SaveValue("dek_v1", wrapped);
         public byte[]? LoadValue(string key) => _values.TryGetValue(key, out var v) ? v : null;
         public void SaveValue(string key, byte[] value) => _values[key] = value;
+        public void DeleteValue(string key) => _values.Remove(key);
     }
 
     [Fact]

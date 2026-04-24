@@ -331,4 +331,13 @@ CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
         cmd.Parameters.AddWithValue("$v", value);
         cmd.ExecuteNonQuery();
     }
+
+    public void DeleteValue(string key)
+    {
+        using var c = OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "DELETE FROM _meta WHERE key = $key;";
+        cmd.Parameters.AddWithValue("$key", key);
+        cmd.ExecuteNonQuery();
+    }
 }

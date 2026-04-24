@@ -17,9 +17,21 @@ namespace TeamStation.Data.Security;
 /// use Argon2id (wire format tag <c>argon2id_v1</c>); legacy PBKDF2-SHA256
 /// wraps (<c>pbkdf2_v1</c>) are still readable for upgrade, and are
 /// re-wrapped with Argon2id opportunistically on next unlock.
+///
+/// <para>
+/// The in-memory DEK buffer is allocated pinned
+/// (<see cref="GC.AllocateArray{T}(int,bool)"/>) so a GC compaction cannot
+/// leave stale key material at the previous heap address. Instances are
+/// <see cref="IDisposable"/>; <see cref="Dispose"/> zeros the buffer via
+/// <see cref="CryptographicOperations.ZeroMemory(Span{byte})"/> and any
+/// subsequent operation throws <see cref="ObjectDisposedException"/>. The
+/// owning object graph (normally <c>App</c>) is responsible for disposal at
+/// process exit so a heap snapshot taken after shutdown cannot recover the
+/// DEK.
+/// </para>
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class CryptoService
+public sealed class CryptoService : IDisposable
 {
     private const int NonceSize = 12;
     private const int TagSize = 16;
@@ -30,6 +42,7 @@ public sealed class CryptoService
     private const int Argon2MemoryKiB = 64 * 1024; // 64 MiB
     private const int Argon2Parallelism = 2;
     private const string DpapiDekKey = "dek_v1";
+    private const string DpapiDekPendingKey = "dek_v1_pending";
     private const string MasterWrappedDekKey = "dek_master_v1";
     private const string MasterSaltKey = "dek_master_salt_v1";
     private const string MasterKdfTag = "dek_master_kdf_v1";
@@ -37,10 +50,39 @@ public sealed class CryptoService
     private const string KdfIdArgon2id = "argon2id_v1";
 
     private readonly byte[] _dek;
+    private bool _disposed;
 
-    private CryptoService(byte[] dek)
+    private CryptoService(byte[] pinnedDek)
     {
-        _dek = dek;
+        _dek = pinnedDek;
+    }
+
+    /// <summary>
+    /// Allocates a pinned buffer of <paramref name="size"/> bytes so a GC
+    /// compaction cannot relocate the key material and leave a copy at the
+    /// old heap address. Pinned allocations are a controlled-cost feature
+    /// available since .NET 5 (<see cref="GC.AllocateArray{T}(int,bool)"/>).
+    /// </summary>
+    private static byte[] AllocatePinned(int size)
+    {
+        var buffer = GC.AllocateArray<byte>(size, pinned: true);
+        return buffer;
+    }
+
+    /// <summary>
+    /// Copies <paramref name="source"/> into a fresh pinned buffer of the
+    /// same length and zeroes the original. Callers that received their DEK
+    /// from <see cref="ProtectedData.Unprotect(byte[],byte[]?,DataProtectionScope)"/>
+    /// or <see cref="RandomNumberGenerator.GetBytes(int)"/> (both of which
+    /// allocate unpinned arrays) must pin before handing ownership to a
+    /// <see cref="CryptoService"/> instance.
+    /// </summary>
+    private static byte[] IntoPinned(byte[] source)
+    {
+        var pinned = AllocatePinned(source.Length);
+        Buffer.BlockCopy(source, 0, pinned, 0, source.Length);
+        CryptographicOperations.ZeroMemory(source);
+        return pinned;
     }
 
     public static CryptoService CreateOrLoad(IKeyStore keyStore)
@@ -52,6 +94,16 @@ public sealed class CryptoService
     {
         ArgumentNullException.ThrowIfNull(keyStore);
         ArgumentNullException.ThrowIfNull(options);
+
+        // Before any unlock path touches the store we reconcile any tombstone
+        // left behind by a previous rotation. The ambiguous "interrupted
+        // mid-rotation" state surfaces as an InvalidOperationException here
+        // rather than silently auto-rolling-back — rolling back would destroy
+        // rows that the migrator already re-encrypted under the staged DEK,
+        // and committing would destroy rows that had not yet been migrated.
+        // The correct answer requires human judgment (or a caller-driven
+        // recovery UX), not a default.
+        ReconcilePendingRotation(keyStore);
 
         if (options.UseMasterPassword)
             return CreateOrLoadWithMasterPassword(keyStore, options.MasterPasswordValue);
@@ -71,13 +123,112 @@ public sealed class CryptoService
                 throw new CryptographicException("Stored DEK has unexpected length.");
         }
 
-        return new CryptoService(dek);
+        return new CryptoService(IntoPinned(dek));
     }
 
     public static bool HasMasterPassword(ISecretStore keyStore)
     {
         ArgumentNullException.ThrowIfNull(keyStore);
         return keyStore.LoadValue(MasterWrappedDekKey) is not null;
+    }
+
+    /// <summary>
+    /// Returns the current rotation state recorded in <paramref name="keyStore"/>.
+    /// Useful for startup UX that wants to surface a "rotation was interrupted"
+    /// recovery dialog before <see cref="CreateOrLoad(IKeyStore)"/> throws.
+    /// </summary>
+    public static RotationState InspectPendingRotation(IKeyStore keyStore)
+    {
+        ArgumentNullException.ThrowIfNull(keyStore);
+        if (keyStore is not ISecretStore secret)
+            return RotationState.None;
+
+        var pending = secret.LoadValue(DpapiDekPendingKey);
+        if (pending is null || pending.Length == 0)
+            return RotationState.None;
+
+        var main = secret.LoadValue(DpapiDekKey);
+        if (main is null)
+        {
+            // Pending exists but no main DEK — the pre-migrator stage landed
+            // on a store that has never held a primary wrap. Treat as orphan
+            // so reconciliation drops the stray row; the caller's next
+            // CreateOrLoad will then seed a fresh DEK.
+            return RotationState.PendingOrphan;
+        }
+
+        return CryptographicOperations.FixedTimeEquals(pending, main)
+            ? RotationState.PendingOrphan
+            : RotationState.InterruptedMidRotation;
+    }
+
+    /// <summary>
+    /// Clears a <see cref="RotationState.PendingOrphan"/> tombstone silently.
+    /// When the state is <see cref="RotationState.InterruptedMidRotation"/>
+    /// this method throws — the caller must either call
+    /// <see cref="ForceRollbackPendingRotation"/> (keep old main, drop pending;
+    /// rows re-encrypted by the interrupted migrator become unrecoverable) or
+    /// <see cref="ForceCommitPendingRotation"/> (promote pending to main;
+    /// rows not yet re-encrypted by the interrupted migrator become
+    /// unrecoverable) after checking the DB row state.
+    /// </summary>
+    public static void ReconcilePendingRotation(IKeyStore keyStore)
+    {
+        ArgumentNullException.ThrowIfNull(keyStore);
+        if (keyStore is not ISecretStore secret)
+            return;
+
+        var state = InspectPendingRotation(keyStore);
+        switch (state)
+        {
+            case RotationState.None:
+                return;
+            case RotationState.PendingOrphan:
+                secret.DeleteValue(DpapiDekPendingKey);
+                return;
+            case RotationState.InterruptedMidRotation:
+                throw new InvalidOperationException(
+                    "A DEK rotation was interrupted before completion. The database may contain rows "
+                  + "encrypted under the new DEK and rows encrypted under the old DEK. Run a manual "
+                  + "recovery by calling CryptoService.ForceCommitPendingRotation (if rows were "
+                  + "migrated) or CryptoService.ForceRollbackPendingRotation (if they were not) "
+                  + "after inspecting the backing store.");
+            default:
+                throw new InvalidOperationException($"Unknown rotation state: {state}");
+        }
+    }
+
+    /// <summary>
+    /// Promotes the pending wrap to the main slot and deletes the pending
+    /// tombstone. The caller guarantees, externally, that the row migration
+    /// under the pending DEK completed before the crash.
+    /// </summary>
+    public static void ForceCommitPendingRotation(IKeyStore keyStore)
+    {
+        ArgumentNullException.ThrowIfNull(keyStore);
+        if (keyStore is not ISecretStore secret)
+            throw new InvalidOperationException("Pending-rotation recovery requires an ISecretStore implementation.");
+
+        var pending = secret.LoadValue(DpapiDekPendingKey)
+            ?? throw new InvalidOperationException("No pending rotation to commit.");
+        secret.SaveValue(DpapiDekKey, pending);
+        secret.DeleteValue(DpapiDekPendingKey);
+    }
+
+    /// <summary>
+    /// Deletes the pending tombstone without touching the main slot. The
+    /// caller guarantees, externally, that the row migration under the
+    /// pending DEK did NOT touch any persisted ciphertext before the crash.
+    /// </summary>
+    public static void ForceRollbackPendingRotation(IKeyStore keyStore)
+    {
+        ArgumentNullException.ThrowIfNull(keyStore);
+        if (keyStore is not ISecretStore secret)
+            throw new InvalidOperationException("Pending-rotation recovery requires an ISecretStore implementation.");
+
+        if (secret.LoadValue(DpapiDekPendingKey) is null)
+            throw new InvalidOperationException("No pending rotation to roll back.");
+        secret.DeleteValue(DpapiDekPendingKey);
     }
 
     private static CryptoService CreateOrLoadWithMasterPassword(IKeyStore keyStore, string? masterPassword)
@@ -120,7 +271,7 @@ public sealed class CryptoService
         if (dek.Length != KeySize)
             throw new CryptographicException("Stored DEK has unexpected length.");
 
-        return new CryptoService(dek);
+        return new CryptoService(IntoPinned(dek));
     }
 
     private static string ReadKdfTag(ISecretStore secretStore)
@@ -240,85 +391,133 @@ public sealed class CryptoService
     }
 
     /// <summary>
-    /// Generates a fresh 256-bit DEK and drives the caller-supplied
-    /// <paramref name="migrator"/> so every field currently encrypted under
-    /// the old DEK can be decrypted and re-encrypted under the new one.
-    /// The wrapped DEK in <paramref name="keyStore"/> is only replaced if
-    /// the migrator returns cleanly — any exception rolls back to the old
-    /// DEK so no row ends up orphaned in an indeterminate state.
+    /// Two-phase-commit DEK rotation: stages the new wrapped DEK under the
+    /// <c>dek_v1_pending</c> tombstone, runs <paramref name="migrator"/>, then
+    /// atomically promotes the pending slot to <c>dek_v1</c> and deletes the
+    /// tombstone. The previous "save new; run migrator; leave on failure"
+    /// window (where a crash between migrator completion and the key-store
+    /// save would have left rows re-encrypted under a DEK that no longer
+    /// existed in the store) is gone — the tombstone is the crash-recovery
+    /// marker.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Recovery semantics on startup (<see cref="CreateOrLoad(IKeyStore)"/>
+    /// calls <see cref="ReconcilePendingRotation"/> first):
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><b>No pending.</b> Normal startup.</item>
+    ///   <item><b>Pending exists and equals main.</b> Orphan from a post-commit
+    ///     crash (step 3 succeeded, step 4 didn't). Auto-reconciled: the
+    ///     tombstone is deleted and startup continues.</item>
+    ///   <item><b>Pending exists and differs from main.</b> The rotation was
+    ///     interrupted between staging and commit. Auto-recovery is unsafe —
+    ///     the caller must call <see cref="ForceCommitPendingRotation"/> or
+    ///     <see cref="ForceRollbackPendingRotation"/> after inspecting the
+    ///     DB state to decide which ciphertexts survived.</item>
+    /// </list>
+    /// <para>
     /// Rotation is currently DPAPI-only. Master-password envelopes are not
     /// supported here — that path requires re-prompting for the master
     /// password and deriving a fresh Argon2id salt, which is a separate
     /// UX flow.
+    /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Raised when <paramref name="keyStore"/> has no wrapped DEK yet (nothing
-    /// to rotate from), or when the store holds a master-password envelope.
+    /// to rotate from), when the store holds a master-password envelope, or
+    /// when a previous rotation's interrupted-mid-rotation tombstone has not
+    /// yet been reconciled.
     /// </exception>
     public static CryptoService RotateDek(IKeyStore keyStore, Action<CryptoService, CryptoService> migrator)
     {
         ArgumentNullException.ThrowIfNull(keyStore);
         ArgumentNullException.ThrowIfNull(migrator);
 
-        if (keyStore is ISecretStore secret && secret.LoadValue(MasterWrappedDekKey) is not null)
+        if (keyStore is not ISecretStore secret)
+            throw new InvalidOperationException("DEK rotation requires an ISecretStore implementation.");
+        if (secret.LoadValue(MasterWrappedDekKey) is not null)
             throw new InvalidOperationException(
                 "DEK rotation is not supported while the database is unlocked with a master password. "
               + "Re-lock with DPAPI or implement the master-password rotation flow first.");
 
-        var oldWrapped = keyStore.Load()
+        // An existing tombstone blocks a new rotation. The user has to
+        // resolve the prior state explicitly — stacking rotations would
+        // compound the ambiguity.
+        ReconcilePendingRotation(keyStore);
+
+        var oldWrapped = secret.LoadValue(DpapiDekKey)
             ?? throw new InvalidOperationException("No DEK is stored; nothing to rotate from.");
-        var oldDek = ProtectedData.Unprotect(oldWrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
-        if (oldDek.Length != KeySize)
+        var oldDekUnpinned = ProtectedData.Unprotect(oldWrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+        if (oldDekUnpinned.Length != KeySize)
             throw new CryptographicException("Stored DEK has unexpected length.");
 
-        var newDek = RandomNumberGenerator.GetBytes(KeySize);
-        var oldSvc = new CryptoService(oldDek);
-        var newSvc = new CryptoService(newDek);
-        var newWrapped = ProtectedData.Protect(newDek, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+        var newDekUnpinned = RandomNumberGenerator.GetBytes(KeySize);
+        var newWrapped = ProtectedData.Protect(newDekUnpinned, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
 
-        // Ordering matters: stage the new wrap into the store BEFORE the
-        // migrator runs. The inverse ordering (migrate first, save second)
-        // leaves the DB in an indeterminate state if the final save step
-        // fails — rows already re-encrypted under the new DEK but the
-        // store still serving the old DEK means every password column
-        // becomes unrecoverable garbage.
-        //
-        // With this ordering, the two failure modes are:
-        //   1. Save fails: nothing downstream ran, no data touched.
-        //   2. Save succeeds but migrator throws: restore the old wrap
-        //      below so both the store and the (unchanged) DB rows fall
-        //      back to the old DEK consistently.
-        keyStore.Save(newWrapped);
+        // Hand the pinned buffers to the services so the caller sees the
+        // same memory-hygiene guarantees on temporary rotation services as
+        // on the long-lived process-wide one.
+        var oldSvc = new CryptoService(IntoPinned(oldDekUnpinned));
+        var newSvc = new CryptoService(IntoPinned(newDekUnpinned));
+
+        // Phase tracking drives the catch-block cleanup decision. Transitions:
+        //   0 → 1 pending staged
+        //   1 → 2 migrator returned
+        //   2 → 3 main promoted (atomic INSERT OR REPLACE)
+        //   3 → 4 pending deleted (best-effort)
+        // The cleanup strategy in the catch block depends on which phase
+        // boundary threw — the comment inside the handler enumerates each.
+        var phase = 0;
         try
         {
+            secret.SaveValue(DpapiDekPendingKey, newWrapped);
+            phase = 1;
+
             migrator(oldSvc, newSvc);
+            phase = 2;
+
+            secret.SaveValue(DpapiDekKey, newWrapped);
+            phase = 3;
+
+            try { secret.DeleteValue(DpapiDekPendingKey); }
+            catch { /* startup will tidy the orphan */ }
+            phase = 4;
         }
         catch
         {
-            // Restore the previous wrap so the old ciphertexts keep
-            // decrypting. A subsequent Save-failure here is the one
-            // pathological case we cannot paper over — it is surfaced as
-            // the original migrator exception so the caller can react.
-            try { keyStore.Save(oldWrapped); }
-            catch { /* surface original */ }
+            // phase == 0: the phase-1 save itself threw before anything
+            //     landed on disk. Nothing to clean; just dispose and rethrow.
+            // phase == 1: migrator threw. Pending is staged; main untouched.
+            //     Rows may be in an indeterminate state if the migrator
+            //     wasn't transactional, but that's the caller's problem —
+            //     we just drop the pending tombstone so the store returns
+            //     to a clean single-slot layout (matching v0.3.0 semantics
+            //     minus the misleading "restore old wrap" swap).
+            // phase == 2: the phase-3 promote save threw. Rows are re-
+            //     encrypted under newDek, main is still oldWrapped, pending
+            //     is newWrapped. Leave the tombstone in place so startup
+            //     surfaces InterruptedMidRotation and the user chooses
+            //     ForceCommit (preferred — pending wrap matches row
+            //     encryption) or ForceRollback.
+            if (phase == 1)
+            {
+                try { secret.DeleteValue(DpapiDekPendingKey); }
+                catch { /* leave tombstone; startup will surface */ }
+            }
+            oldSvc.Dispose();
+            newSvc.Dispose();
             throw;
         }
-        finally
-        {
-            // The old DEK is no longer needed for anything — oldSvc is
-            // local and not returned. Zero the managed buffer so a heap
-            // snapshot or crash dump taken after rotation does not leak
-            // the previous key.
-            CryptographicOperations.ZeroMemory(oldDek);
-        }
 
+        oldSvc.Dispose();
         return newSvc;
     }
 
     public byte[]? EncryptString(string? plaintext)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         if (plaintext is null) return null;
         var plain = Encoding.UTF8.GetBytes(plaintext);
         var nonce = RandomNumberGenerator.GetBytes(NonceSize);
@@ -337,6 +536,8 @@ public sealed class CryptoService
 
     public string? DecryptString(byte[]? ciphertext)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         if (ciphertext is null) return null;
         if (ciphertext.Length < NonceSize + TagSize)
             throw new CryptographicException("Ciphertext too short.");
@@ -353,6 +554,42 @@ public sealed class CryptoService
         aes.Decrypt(nonce, cipher, tag, plain);
         return Encoding.UTF8.GetString(plain);
     }
+
+    /// <summary>
+    /// Zeros the in-memory DEK so a post-dispose heap snapshot cannot recover
+    /// the key. Subsequent calls to <see cref="EncryptString"/> or
+    /// <see cref="DecryptString"/> throw <see cref="ObjectDisposedException"/>.
+    /// Idempotent.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        CryptographicOperations.ZeroMemory(_dek);
+        _disposed = true;
+    }
+}
+
+/// <summary>
+/// State of the in-flight-rotation marker recorded in the key store.
+/// See <see cref="CryptoService.InspectPendingRotation"/> for the classification.
+/// </summary>
+public enum RotationState
+{
+    /// <summary>No pending-rotation tombstone present.</summary>
+    None = 0,
+    /// <summary>
+    /// A pending wrap exists and is byte-equal to the main wrap. This is the
+    /// post-commit orphan state; <see cref="CryptoService.ReconcilePendingRotation"/>
+    /// clears it silently on next startup.
+    /// </summary>
+    PendingOrphan = 1,
+    /// <summary>
+    /// A pending wrap exists and differs from the main wrap. A prior rotation
+    /// was interrupted; auto-recovery is unsafe because the database row
+    /// state (re-encrypted or not) cannot be inferred from the key store
+    /// alone. The caller must choose rollback or commit after inspection.
+    /// </summary>
+    InterruptedMidRotation = 2,
 }
 
 public interface IKeyStore
@@ -365,6 +602,7 @@ public interface ISecretStore : IKeyStore
 {
     byte[]? LoadValue(string key);
     void SaveValue(string key, byte[] value);
+    void DeleteValue(string key);
 }
 
 public sealed record CryptoUnlockOptions(bool UseMasterPassword, string? MasterPasswordValue)
