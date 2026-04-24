@@ -39,6 +39,10 @@ public partial class FolderEditorWindow : Window
         SelectNullableEnum(ModeBox, _folder.DefaultMode);
         SelectNullableEnum(QualityBox, _folder.DefaultQuality);
         SelectNullableEnum(AcBox, _folder.DefaultAccessControl);
+        DefaultPathBox.Text = _folder.DefaultTeamViewerPath ?? string.Empty;
+        DefaultWakeBroadcastBox.Text = _folder.DefaultWakeBroadcastAddress ?? string.Empty;
+        PreLaunchScriptBox.Text = _folder.PreLaunchScript ?? string.Empty;
+        PostLaunchScriptBox.Text = _folder.PostLaunchScript ?? string.Empty;
         UpdateAccentPreview();
     }
 
@@ -83,6 +87,10 @@ public partial class FolderEditorWindow : Window
         _folder.DefaultMode = GetNullableEnum<ConnectionMode>(ModeBox);
         _folder.DefaultQuality = GetNullableEnum<ConnectionQuality>(QualityBox);
         _folder.DefaultAccessControl = GetNullableEnum<AccessControl>(AcBox);
+        _folder.DefaultTeamViewerPath = string.IsNullOrWhiteSpace(DefaultPathBox.Text) ? null : DefaultPathBox.Text.Trim();
+        _folder.DefaultWakeBroadcastAddress = string.IsNullOrWhiteSpace(DefaultWakeBroadcastBox.Text) ? null : DefaultWakeBroadcastBox.Text.Trim();
+        _folder.PreLaunchScript = string.IsNullOrWhiteSpace(PreLaunchScriptBox.Text) ? null : PreLaunchScriptBox.Text.Trim();
+        _folder.PostLaunchScript = string.IsNullOrWhiteSpace(PostLaunchScriptBox.Text) ? null : PostLaunchScriptBox.Text.Trim();
 
         DialogResult = true;
         Close();

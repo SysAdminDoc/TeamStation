@@ -75,6 +75,12 @@
                             </StackPanel>
                         </Grid>
 
+                        <TextBlock Margin="0,18,0,0" Text="Launch profile" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="ProfileBox" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="Use profiles when the same TeamViewer ID needs separate behaviors such as Control, File Transfer, or Chat."
+                                   Style="{StaticResource BodyMutedText}" />
+
                         <TextBlock Margin="0,18,0,0" Text="Password" Style="{StaticResource FieldLabelText}" />
                         <PasswordBox x:Name="PasswordBox" />
                         <TextBlock Margin="0,6,0,0"
@@ -136,6 +142,30 @@
                         <TextBlock Margin="0,8,0,0"
                                    Text="Chat, video call, and presentation use TeamViewer URI handlers. Remote control, file transfer, and VPN launch through TeamViewer.exe."
                                    Style="{StaticResource BodyMutedText}" />
+
+                        <TextBlock Margin="0,18,0,0" Text="TeamViewer.exe override" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="PathOverrideBox" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="Optional. Use when this entry must launch a specific TeamViewer Host, Portable, or Full client path."
+                                   Style="{StaticResource BodyMutedText}" />
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Wake-on-LAN MAC" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="WakeMacBox" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Wake broadcast address" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="WakeBroadcastBox" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </Border>
 
@@ -206,6 +236,23 @@
                         <TextBlock Margin="0,18,0,0" Text="Tags" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="TagsBox" />
                         <TextBlock Margin="0,6,0,0" Text="Comma-separated. Example: billing, warehouse, reception." Style="{StaticResource BodyMutedText}" />
+
+                        <TextBlock Margin="0,18,0,0" Text="Pre-launch script" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="PreLaunchScriptBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="90"
+                                 VerticalScrollBarVisibility="Auto"
+                                 VerticalContentAlignment="Top" />
+
+                        <TextBlock Margin="0,18,0,0" Text="Post-launch script" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="PostLaunchScriptBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="90"
+                                 VerticalScrollBarVisibility="Auto"
+                                 VerticalContentAlignment="Top" />
+                        <TextBlock Margin="0,6,0,0" Text="PowerShell commands. Variables: %ID%, %NAME%, %PASSWORD%, %TAG:key%, ${ENV_VAR}." Style="{StaticResource BodyMutedText}" />
                     </StackPanel>
                 </Border>
             </StackPanel>

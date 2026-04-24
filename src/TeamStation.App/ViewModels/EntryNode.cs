@@ -25,7 +25,10 @@ public sealed class EntryNode : TreeNode
     }
 
     public string TeamViewerId => Model.TeamViewerId;
+    public string ProfileName => string.IsNullOrWhiteSpace(Model.ProfileName) ? "Default" : Model.ProfileName;
     public ConnectionMode? Mode => Model.Mode;
+    public bool IsPinned => Model.IsPinned;
+    public string PinDisplay => IsPinned ? "Pinned" : "Not pinned";
     public string RouteBadge => DisplayText.RouteBadge(Model.Mode);
     public string RouteDisplay => DisplayText.RouteDescription(Model.Mode);
     public string ModeDisplay => DisplayText.ModeLabel(Model.Mode);
@@ -53,12 +56,20 @@ public sealed class EntryNode : TreeNode
 
     public string LastConnectedDisplay =>
         Model.LastConnectedUtc is null ? "Never launched" : Model.LastConnectedUtc.Value.LocalDateTime.ToString("g");
+    public string WakeDisplay => string.IsNullOrWhiteSpace(Model.WakeMacAddress)
+        ? "No Wake-on-LAN"
+        : string.IsNullOrWhiteSpace(Model.WakeBroadcastAddress)
+            ? Model.WakeMacAddress
+            : $"{Model.WakeMacAddress} via {Model.WakeBroadcastAddress}";
 
     public void Refresh()
     {
         OnPropertyChanged(nameof(Name));
         OnPropertyChanged(nameof(TeamViewerId));
+        OnPropertyChanged(nameof(ProfileName));
         OnPropertyChanged(nameof(Mode));
+        OnPropertyChanged(nameof(IsPinned));
+        OnPropertyChanged(nameof(PinDisplay));
         OnPropertyChanged(nameof(RouteBadge));
         OnPropertyChanged(nameof(RouteDisplay));
         OnPropertyChanged(nameof(ModeDisplay));
@@ -78,5 +89,6 @@ public sealed class EntryNode : TreeNode
         OnPropertyChanged(nameof(HasLastConnected));
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(LastConnectedDisplay));
+        OnPropertyChanged(nameof(WakeDisplay));
     }
 }

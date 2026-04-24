@@ -31,6 +31,8 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 
 ## Status
 
+`main` after `v0.1.1` — Product pass on top of the hardened MVP. Adds app settings, first-run trust notice, portable master-password unlock, quick connect, pinned/recent tray launching, TeamViewer history import, optional TeamViewer Web API pull, Wake-on-LAN, per-entry/per-folder launch scripts, external tools, saved searches, session history export, audit log storage, optional encrypted DB mirroring to a cloud folder, and optional Authenticode signing in the release workflow. The xUnit suite now has 118 tests. See [CHANGELOG.md](CHANGELOG.md).
+
 `v0.1.1` — Hardening pass on top of the MVP. Fixed the folder-picker bug that blocked moving a folder to a sibling, broadened CSV header matching so "Friendly Name" / "TV ID" / "Remote Control ID" columns work, made JSON import tolerant of hand-edited backups (null arrays, camelCase keys, dangling parent references), atomic export writes, a single-instance guard, numeric sort on legacy `Version*` directories, tray-menu cleanup, log auto-scroll, and a 109-test xUnit suite wired into the solution. See [CHANGELOG.md](CHANGELOG.md).
 
 `v0.1.0` — **First MVP release.** TeamStation now has everything a sysadmin needs to replace the built-in TeamViewer contact list: a nested folder tree with drag-to-reorder, entries with name / ID / password / mode / quality / access-control / notes / tags, DPAPI-wrapped AES-256-GCM at rest, one-click launch that walks folder-chain inheritance at launch time, debounced multi-field search, CSV import (TeamViewer Management Console, Remote Desktop Manager, mRemoteNG, and ad-hoc spreadsheet formats all supported via flexible column aliases), JSON backup with round-trip fidelity, an embedded log panel, and a system tray with minimize-to-tray. See [CHANGELOG.md](CHANGELOG.md).
@@ -40,13 +42,19 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 - Nested folder tree with drag-to-reorder, self-subtree-drop rejection, and per-folder accent colors
 - Per-entry fields: friendly name, TeamViewer ID, password, connection mode (Remote Control / File Transfer / Chat / VPN / Video Call / Presentation), quality, access control, proxy, notes, tags
 - Runtime **inheritance cascade** — mode / quality / access control / password can be set to "(inherit from folder)" and resolved at launch time
+- Per-connection profile names, pinned entries, TeamViewer.exe overrides, Wake-on-LAN, and launch scripts
 - CVE-2020-13699-hardened launcher — numeric-ID regex, password denylist, argv-array `Process.Start` only
-- DPAPI-wrapped AES-256-GCM credential storage in local SQLite (WAL, FKs)
+- DPAPI-wrapped AES-256-GCM credential storage in local SQLite (WAL, FKs); portable mode uses a master-password-wrapped DEK
 - Debounced multi-field search; folders with matching descendants stay visible and auto-expand
+- Saved searches, quick connect, and pinned/recent tray launching
 - Flexible **CSV import** (TeamViewer Management Console, Remote Desktop Manager, mRemoteNG, ad-hoc spreadsheets) with column aliases that tolerate spaces / underscores / hyphens / case
+- TeamViewer local history import and optional read-only TeamViewer Web API group/device pull
 - **JSON backup** round-trip, atomic on-disk writes, hand-edit tolerant (null arrays, camelCase keys, orphan-safe)
+- External tools with `%ID%`, `%NAME%`, `%PASSWORD%`, `%TAG:key%`, and `${ENV_VAR}` expansion
+- Session history with CSV export and persistent audit-log storage
+- Optional encrypted database mirror to a user-selected cloud sync folder
 - Embedded 500-entry log panel with auto-scroll, severity-coloured
-- System tray with minimize-to-tray, Show / Exit menu
+- System tray with minimize-to-tray, pinned connections, recent connections, Show, Settings, and Exit
 - Single-instance enforcement so two launches don't race on one SQLite file
 - Portable mode via a marker file next to the exe
 - Dark-first UI (Catppuccin Mocha)
@@ -55,8 +63,10 @@ Roadmap / backlog: [ROADMAP.md](ROADMAP.md).
 
 ## Security model
 
-- Passwords are encrypted at rest with **AES-256-GCM**. The data-encryption key is wrapped by **Windows DPAPI** bound to the current user account, so the database is only decryptable by you on this machine. Optional master password on top.
-- The database file can be placed in a synced folder (OneDrive, Syncthing, etc.) — DPAPI binding means another user account won't be able to decrypt it.
+- Passwords are encrypted at rest with **AES-256-GCM**. In normal mode, the data-encryption key is wrapped by **Windows DPAPI** bound to the current user account, so the database is only decryptable by you on this machine.
+- Portable mode uses a master password instead of DPAPI. The master password derives an AES-GCM wrapping key with PBKDF2-SHA256 and a per-database salt, so the database can move between machines while still staying encrypted at rest.
+- The optional TeamViewer Web API token is stored in the settings file as a DPAPI-protected value for the current Windows user.
+- A cloud mirror folder can receive an encrypted copy of the SQLite database after changes. It is a mirror/backup mechanism, not a multi-writer merge engine.
 - **Known residual risk:** launching a session passes `--Password` on the TeamViewer command line. That value is visible to any process on the machine that can read the command line of another user-owned process during the brief launch window. This is inherent to the TeamViewer CLI and affects any launcher, including manually-typed commands. TeamStation will default to `--Base64Password` (still inspectable but obscured) and document this transparently.
 - TeamStation never phones home. There is no telemetry, no update ping, no cloud account.
 
@@ -103,7 +113,7 @@ Run the test suite:
 ```powershell
 dotnet test -c Release
 ```
-109 tests cover crypto, inheritance, CSV/JSON parsing, the CLI/URI builders, and end-to-end SQLite repo operations against a temp DB.
+118 tests cover crypto, portable master-password unlock, inheritance, TeamViewer history import, CSV/JSON parsing, the CLI/URI builders, session/audit storage, and end-to-end SQLite repo operations against a temp DB.
 
 ## Why not just use mRemoteNG?
 

@@ -39,12 +39,20 @@ public sealed class FolderNode : TreeNode
         Model.DefaultMode is not null ||
         Model.DefaultQuality is not null ||
         Model.DefaultAccessControl is not null ||
-        !string.IsNullOrWhiteSpace(Model.DefaultPassword);
+        !string.IsNullOrWhiteSpace(Model.DefaultPassword) ||
+        !string.IsNullOrWhiteSpace(Model.DefaultTeamViewerPath) ||
+        !string.IsNullOrWhiteSpace(Model.DefaultWakeBroadcastAddress) ||
+        !string.IsNullOrWhiteSpace(Model.PreLaunchScript) ||
+        !string.IsNullOrWhiteSpace(Model.PostLaunchScript);
     public bool HasDefaultPassword => !string.IsNullOrWhiteSpace(Model.DefaultPassword);
+    public bool HasDefaultPath => !string.IsNullOrWhiteSpace(Model.DefaultTeamViewerPath);
+    public bool HasScripts => !string.IsNullOrWhiteSpace(Model.PreLaunchScript) || !string.IsNullOrWhiteSpace(Model.PostLaunchScript);
     public string DefaultModeDisplay => DisplayText.ModeLabel(Model.DefaultMode, "Entry decides");
     public string DefaultQualityDisplay => DisplayText.QualityLabel(Model.DefaultQuality, "Entry decides");
     public string DefaultAccessControlDisplay => DisplayText.AccessLabel(Model.DefaultAccessControl, "Entry decides");
     public string PasswordPolicyDisplay => HasDefaultPassword ? "Default password available" : "No default password";
+    public string DefaultPathDisplay => HasDefaultPath ? Model.DefaultTeamViewerPath! : "Auto-detected TeamViewer.exe";
+    public string ScriptPolicyDisplay => HasScripts ? "Launch scripts configured" : "No launch scripts";
     public string DefaultsSummary => HasDefaults
         ? $"{DefaultModeDisplay} • {DefaultQualityDisplay} • {DefaultAccessControlDisplay}"
         : "No folder defaults configured";
@@ -103,10 +111,14 @@ public sealed class FolderNode : TreeNode
         OnPropertyChanged(nameof(AccentColorDisplay));
         OnPropertyChanged(nameof(HasDefaults));
         OnPropertyChanged(nameof(HasDefaultPassword));
+        OnPropertyChanged(nameof(HasDefaultPath));
+        OnPropertyChanged(nameof(HasScripts));
         OnPropertyChanged(nameof(DefaultModeDisplay));
         OnPropertyChanged(nameof(DefaultQualityDisplay));
         OnPropertyChanged(nameof(DefaultAccessControlDisplay));
         OnPropertyChanged(nameof(PasswordPolicyDisplay));
+        OnPropertyChanged(nameof(DefaultPathDisplay));
+        OnPropertyChanged(nameof(ScriptPolicyDisplay));
         OnPropertyChanged(nameof(DefaultsSummary));
         OnPropertyChanged(nameof(ParentSummary));
     }

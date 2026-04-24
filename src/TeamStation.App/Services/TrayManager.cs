@@ -1,6 +1,8 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows;
+using TeamStation.App.ViewModels;
+using TeamStation.Core.Models;
 using WinForms = System.Windows.Forms;
 
 namespace TeamStation.App.Services;
@@ -18,14 +20,16 @@ namespace TeamStation.App.Services;
 public sealed class TrayManager : IDisposable
 {
     private readonly Window _window;
+    private readonly MainViewModel _viewModel;
     private readonly WinForms.NotifyIcon _icon;
     private readonly WinForms.ContextMenuStrip _menu;
     private readonly IntPtr _hIcon;
     private bool _disposed;
 
-    public TrayManager(Window window)
+    public TrayManager(Window window, MainViewModel viewModel)
     {
         _window = window;
+        _viewModel = viewModel;
 
         var icon = CreateIcon(out _hIcon);
         _icon = new WinForms.NotifyIcon
@@ -36,15 +40,7 @@ public sealed class TrayManager : IDisposable
         };
 
         _menu = new WinForms.ContextMenuStrip();
-        _menu.Items.Add("Show TeamStation", image: null, (_, _) => ShowWindow());
-        _menu.Items.Add(new WinForms.ToolStripSeparator());
-        _menu.Items.Add("Exit", image: null, (_, _) =>
-        {
-            // Detach StateChanged before shutdown so we don't trip the
-            // hide-to-tray logic during the normal exit path.
-            _window.StateChanged -= OnWindowStateChanged;
-            Application.Current.Shutdown();
-        });
+        _menu.Opening += (_, _) => RebuildMenu();
         _icon.ContextMenuStrip = _menu;
 
         _icon.MouseClick += (_, e) =>
@@ -53,6 +49,8 @@ public sealed class TrayManager : IDisposable
         };
 
         _window.StateChanged += OnWindowStateChanged;
+        _viewModel.TrayMenuInvalidated += OnTrayMenuInvalidated;
+        RebuildMenu();
     }
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
@@ -73,12 +71,79 @@ public sealed class TrayManager : IDisposable
         _window.Topmost = false;
     }
 
+    private void OnTrayMenuInvalidated(object? sender, EventArgs e) => RebuildMenu();
+
+    private void RebuildMenu()
+    {
+        if (_disposed)
+            return;
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(RebuildMenu);
+            return;
+        }
+
+        _menu.Items.Clear();
+        _menu.Items.Add("Show TeamStation", image: null, (_, _) => ShowWindow());
+        _menu.Items.Add("Settings", image: null, (_, _) =>
+        {
+            ShowWindow();
+            if (_viewModel.OpenSettingsCommand.CanExecute(null))
+                _viewModel.OpenSettingsCommand.Execute(null);
+        });
+
+        AddEntrySection("Pinned", _viewModel.GetPinnedEntries());
+        AddEntrySection("Recent", _viewModel.GetRecentEntries(limit: 8));
+
+        _menu.Items.Add(new WinForms.ToolStripSeparator());
+        _menu.Items.Add("Exit", image: null, (_, _) =>
+        {
+            _window.StateChanged -= OnWindowStateChanged;
+            Application.Current?.Shutdown();
+        });
+    }
+
+    private void AddEntrySection(string title, IReadOnlyList<ConnectionEntry> entries)
+    {
+        _menu.Items.Add(new WinForms.ToolStripSeparator());
+        var header = new WinForms.ToolStripMenuItem(title) { Enabled = false };
+        _menu.Items.Add(header);
+
+        if (entries.Count == 0)
+        {
+            _menu.Items.Add(new WinForms.ToolStripMenuItem("None") { Enabled = false });
+            return;
+        }
+
+        foreach (var entry in entries.Take(10))
+        {
+            var item = new WinForms.ToolStripMenuItem(FormatEntry(entry)) { Enabled = _viewModel.IsTeamViewerReady };
+            item.Click += (_, _) =>
+            {
+                if (!_viewModel.IsTeamViewerReady)
+                    return;
+
+                _viewModel.LaunchEntryById(entry.Id);
+            };
+            _menu.Items.Add(item);
+        }
+    }
+
+    private static string FormatEntry(ConnectionEntry entry)
+    {
+        var text = $"{entry.Name} ({entry.TeamViewerId})".Replace("&", "&&", StringComparison.Ordinal);
+        return text.Length <= 64 ? text : string.Concat(text.AsSpan(0, 61), "...");
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
 
         try { _window.StateChanged -= OnWindowStateChanged; } catch { /* window already disposed */ }
+        try { _viewModel.TrayMenuInvalidated -= OnTrayMenuInvalidated; } catch { /* view model already disposed */ }
         try { _icon.Visible = false; } catch { /* best-effort */ }
         try { _icon.Dispose(); } catch { /* swallow */ }
         try { _menu.Dispose(); } catch { /* swallow */ }

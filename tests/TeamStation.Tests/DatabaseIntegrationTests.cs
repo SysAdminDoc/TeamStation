@@ -15,6 +15,8 @@ public class DatabaseIntegrationTests : IDisposable
     private readonly CryptoService _crypto;
     private readonly EntryRepository _entries;
     private readonly FolderRepository _folders;
+    private readonly SessionRepository _sessions;
+    private readonly AuditLogRepository _audit;
 
     public DatabaseIntegrationTests()
     {
@@ -23,6 +25,8 @@ public class DatabaseIntegrationTests : IDisposable
         _crypto = CryptoService.CreateOrLoad(_db);
         _entries = new EntryRepository(_db, _crypto);
         _folders = new FolderRepository(_db, _crypto);
+        _sessions = new SessionRepository(_db);
+        _audit = new AuditLogRepository(_db);
     }
 
     public void Dispose()
@@ -141,6 +145,54 @@ public class DatabaseIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void Version_3_entry_fields_round_trip()
+    {
+        var e = new ConnectionEntry
+        {
+            Name = "Pinned", TeamViewerId = "123456789",
+            ProfileName = "After hours",
+            TeamViewerPathOverride = @"C:\Tools\TeamViewer.exe",
+            IsPinned = true,
+            WakeMacAddress = "AA-BB-CC-DD-EE-FF",
+            WakeBroadcastAddress = "192.168.4.255",
+            PreLaunchScript = "Write-Output before",
+            PostLaunchScript = "Write-Output after",
+        };
+
+        _entries.Upsert(e);
+
+        var loaded = Assert.Single(_entries.GetAll());
+        Assert.Equal("After hours", loaded.ProfileName);
+        Assert.Equal(@"C:\Tools\TeamViewer.exe", loaded.TeamViewerPathOverride);
+        Assert.True(loaded.IsPinned);
+        Assert.Equal("AA-BB-CC-DD-EE-FF", loaded.WakeMacAddress);
+        Assert.Equal("192.168.4.255", loaded.WakeBroadcastAddress);
+        Assert.Equal("Write-Output before", loaded.PreLaunchScript);
+        Assert.Equal("Write-Output after", loaded.PostLaunchScript);
+    }
+
+    [Fact]
+    public void Version_3_folder_fields_round_trip()
+    {
+        var f = new Folder
+        {
+            Name = "Site scripts",
+            DefaultTeamViewerPath = @"D:\Apps\TeamViewer.exe",
+            DefaultWakeBroadcastAddress = "10.0.0.255",
+            PreLaunchScript = "Write-Output folder-before",
+            PostLaunchScript = "Write-Output folder-after",
+        };
+
+        _folders.Upsert(f);
+
+        var loaded = Assert.Single(_folders.GetAll());
+        Assert.Equal(@"D:\Apps\TeamViewer.exe", loaded.DefaultTeamViewerPath);
+        Assert.Equal("10.0.0.255", loaded.DefaultWakeBroadcastAddress);
+        Assert.Equal("Write-Output folder-before", loaded.PreLaunchScript);
+        Assert.Equal("Write-Output folder-after", loaded.PostLaunchScript);
+    }
+
+    [Fact]
     public void TouchLastConnected_updates_only_the_target_row()
     {
         var a = new ConnectionEntry { Name = "A", TeamViewerId = "111111111" };
@@ -156,5 +208,67 @@ public class DatabaseIntegrationTests : IDisposable
         var untouched = all.First(e => e.Id == b.Id);
         Assert.NotNull(touched.LastConnectedUtc);
         Assert.Null(untouched.LastConnectedUtc);
+    }
+
+    [Fact]
+    public void Session_history_records_completion_and_exports_csv()
+    {
+        var started = DateTimeOffset.UtcNow.AddMinutes(-7);
+        var session = new SessionRecord
+        {
+            EntryName = "Office, Desk",
+            TeamViewerId = "123456789",
+            ProfileName = "Default",
+            Mode = ConnectionMode.RemoteControl,
+            Route = "URI",
+            StartedUtc = started,
+            Outcome = "Started",
+        };
+
+        _sessions.Upsert(session);
+        _sessions.Complete(session.Id, started.AddMinutes(7), "Exited 0");
+
+        var loaded = Assert.Single(_sessions.GetRecent());
+        Assert.Equal("Exited 0", loaded.Outcome);
+        Assert.Equal(7, loaded.Duration?.TotalMinutes);
+
+        var csvPath = Path.Combine(Path.GetTempPath(), $"ts-sessions-{Guid.NewGuid():N}.csv");
+        try
+        {
+            _sessions.ExportCsv(csvPath);
+            var text = File.ReadAllText(csvPath);
+            Assert.Contains("\"Office, Desk\"", text);
+            Assert.Contains("Exited 0", text);
+        }
+        finally
+        {
+            try { if (File.Exists(csvPath)) File.Delete(csvPath); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public void Audit_log_returns_recent_events_newest_first()
+    {
+        var target = Guid.NewGuid();
+        _audit.Append(new AuditEvent
+        {
+            OccurredUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            Action = "create",
+            TargetType = "connection",
+            TargetId = target,
+            Summary = "Created connection.",
+        });
+        _audit.Append(new AuditEvent
+        {
+            OccurredUtc = DateTimeOffset.UtcNow,
+            Action = "launch",
+            TargetType = "connection",
+            TargetId = target,
+            Summary = "Launched connection.",
+        });
+
+        var recent = _audit.GetRecent();
+        Assert.Equal(["launch", "create"], recent.Select(e => e.Action).ToArray());
+        Assert.All(recent, e => Assert.Equal(target, e.TargetId));
     }
 }

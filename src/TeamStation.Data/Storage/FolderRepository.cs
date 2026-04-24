@@ -23,7 +23,8 @@ public sealed class FolderRepository
         using var cmd = c.CreateCommand();
         cmd.CommandText = @"
 SELECT id, parent_folder_id, name, accent_color, sort_order,
-       default_mode, default_quality, default_access, default_password_enc
+       default_mode, default_quality, default_access, default_password_enc,
+       default_tv_path, default_wake_broadcast, pre_launch_script, post_launch_script
 FROM folders
 ORDER BY sort_order, name COLLATE NOCASE;";
         using var reader = cmd.ExecuteReader();
@@ -39,8 +40,10 @@ ORDER BY sort_order, name COLLATE NOCASE;";
         using var cmd = c.CreateCommand();
         cmd.CommandText = @"
 INSERT INTO folders(id, parent_folder_id, name, accent_color, sort_order,
-                    default_mode, default_quality, default_access, default_password_enc)
-VALUES ($id, $parent, $name, $accent, $sort, $mode, $q, $ac, $pw)
+                    default_mode, default_quality, default_access, default_password_enc,
+                    default_tv_path, default_wake_broadcast, pre_launch_script, post_launch_script)
+VALUES ($id, $parent, $name, $accent, $sort, $mode, $q, $ac, $pw,
+        $tv_path, $wake_broadcast, $pre_script, $post_script)
 ON CONFLICT(id) DO UPDATE SET
     parent_folder_id     = excluded.parent_folder_id,
     name                 = excluded.name,
@@ -49,7 +52,11 @@ ON CONFLICT(id) DO UPDATE SET
     default_mode         = excluded.default_mode,
     default_quality      = excluded.default_quality,
     default_access       = excluded.default_access,
-    default_password_enc = excluded.default_password_enc;";
+    default_password_enc = excluded.default_password_enc,
+    default_tv_path      = excluded.default_tv_path,
+    default_wake_broadcast = excluded.default_wake_broadcast,
+    pre_launch_script    = excluded.pre_launch_script,
+    post_launch_script   = excluded.post_launch_script;";
         cmd.Parameters.AddWithValue("$id", folder.Id.ToString("D"));
         cmd.Parameters.AddWithValue("$parent", (object?)folder.ParentFolderId?.ToString("D") ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$name", folder.Name);
@@ -59,6 +66,10 @@ ON CONFLICT(id) DO UPDATE SET
         cmd.Parameters.AddWithValue("$q", (object?)folder.DefaultQuality is null ? DBNull.Value : (int)folder.DefaultQuality);
         cmd.Parameters.AddWithValue("$ac", (object?)folder.DefaultAccessControl is null ? DBNull.Value : (int)folder.DefaultAccessControl);
         cmd.Parameters.AddWithValue("$pw", (object?)_crypto.EncryptString(folder.DefaultPassword) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$tv_path", (object?)folder.DefaultTeamViewerPath ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$wake_broadcast", (object?)folder.DefaultWakeBroadcastAddress ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$pre_script", (object?)folder.PreLaunchScript ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$post_script", (object?)folder.PostLaunchScript ?? DBNull.Value);
         cmd.ExecuteNonQuery();
     }
 
@@ -84,6 +95,10 @@ ON CONFLICT(id) DO UPDATE SET
             DefaultQuality = r.IsDBNull(6) ? null : (ConnectionQuality)r.GetInt32(6),
             DefaultAccessControl = r.IsDBNull(7) ? null : (AccessControl)r.GetInt32(7),
             DefaultPassword = r.IsDBNull(8) ? null : _crypto.DecryptString((byte[])r["default_password_enc"]),
+            DefaultTeamViewerPath = r.IsDBNull(9) ? null : r.GetString(9),
+            DefaultWakeBroadcastAddress = r.IsDBNull(10) ? null : r.GetString(10),
+            PreLaunchScript = r.IsDBNull(11) ? null : r.GetString(11),
+            PostLaunchScript = r.IsDBNull(12) ? null : r.GetString(12),
         };
     }
 }

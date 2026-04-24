@@ -10,6 +10,21 @@ Prioritization:
 
 ---
 
+## Current main progress after v0.1.1
+
+The next product pass has landed the largest adoption blockers from P1/P2:
+
+- App settings, first-run trust notice, portable-mode master password, and configurable TeamViewer.exe path.
+- Quick connect, saved searches, per-entry profile names, pinned entries, and pinned/recent tray launch menu.
+- TeamViewer local history import plus optional read-only Web API group/device pull into a synthetic `TV Cloud` folder.
+- Wake-on-LAN, folder/entry launch scripts, external tools, and inherited TeamViewer path / wake broadcast / scripts.
+- Session history, CSV session export, persistent audit log storage, and optional encrypted DB mirror to a cloud folder.
+- Optional Authenticode signing in the release workflow when signing certificate secrets are configured.
+
+Still open before a formal 1.0 release: real-peer TeamViewer launch validation, Web API pagination/rate-limit hardening, online-state polling, conflict-aware cloud sync, installer packaging, and UX testing on real support workflows.
+
+---
+
 ## v0.1.0 — P0
 
 ### Launch + security core
@@ -20,7 +35,7 @@ Prioritization:
 - **Per-entry launch profiles.** Same peer ID can carry multiple profiles — e.g. `Control`, `File Transfer`, `Chat` on the same row. Each profile carries its own mode/quality/access-control. TeamViewer's built-in contact list cannot do this cleanly; it's the #1 reason to switch.
 - **Folder-level inheritance.** Credentials, mode, quality, proxy, and access-control cascade from parent folders; entries override per-field. Copied from mRemoteNG, the single biggest power-user feature. Scales past 200 entries without duplication.
 - **TeamViewer.exe auto-discovery.** Probe order: `HKLM\Software\TeamViewer` → `HKCU\Software\TeamViewer` → `InstallationDirectory` value → `%ProgramFiles%\TeamViewer\TeamViewer.exe` → `%ProgramFiles(x86)%\TeamViewer\TeamViewer.exe` → legacy `...\Version*\TeamViewer.exe`. Manual per-entry override so TV Host, Portable, and Full can coexist.
-- **Master password on top of DPAPI.** Argon2id-KDF wraps a key-encryption key which wraps the AES-GCM DEK. DPAPI alone dies if a profile is restored to another box; the master password is the recovery path.
+- **Master password on top of DPAPI / portable mode.** Current implementation uses PBKDF2-SHA256 with a per-database salt to wrap the AES-GCM DEK for portable mode. Argon2id remains a future hardening option if the project accepts the extra dependency. DPAPI alone dies if a profile is restored to another box; the master password is the recovery path.
 
 ### Organization + UX
 - **Tree view with folders + drag-reorder.** Entries, folders, nested folders. Right-click: new, rename, duplicate, move, delete.

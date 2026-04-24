@@ -13,4 +13,8 @@ public sealed class Folder
     public ConnectionQuality? DefaultQuality { get; set; }
     public AccessControl? DefaultAccessControl { get; set; }
     public string? DefaultPassword { get; set; }
+    public string? DefaultTeamViewerPath { get; set; }
+    public string? DefaultWakeBroadcastAddress { get; set; }
+    public string? PreLaunchScript { get; set; }
+    public string? PostLaunchScript { get; set; }
 }

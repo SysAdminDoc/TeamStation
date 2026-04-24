@@ -72,6 +72,9 @@
                                 Style="{StaticResource PrimaryButton}"
                                 Margin="0,0,8,8"
                                 Command="{Binding DataContext.LaunchCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="{Binding DataContext.SelectedPinText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Margin="0,0,8,8"
+                                Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                         <Button Content="Edit"
                                 Margin="0,0,8,8"
                                 Command="{Binding DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
@@ -95,6 +98,12 @@
                     <Border Style="{StaticResource ChipBorderStyle}">
                         <TextBlock Text="{Binding PasswordStateDisplay}" Foreground="{StaticResource Subtext1Brush}" />
                     </Border>
+                    <Border Style="{StaticResource ChipBorderStyle}">
+                        <TextBlock Text="{Binding ProfileName}" Foreground="{StaticResource Subtext1Brush}" />
+                    </Border>
+                    <Border Style="{StaticResource ChipBorderStyle}" Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding PinDisplay}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" />
+                    </Border>
                     <Border Style="{StaticResource ChipBorderStyle}" Visibility="{Binding HasLastConnected, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="{Binding LastConnectedDisplay}" Foreground="{StaticResource Subtext1Brush}" />
                     </Border>
@@ -111,6 +120,9 @@
                         <StackPanel>
                             <TextBlock Text="Launch profile" Style="{StaticResource SectionTitleText}" />
                             <TextBlock Text="How this connection behaves when TeamStation opens TeamViewer." Style="{StaticResource BodyMutedText}" Margin="0,6,0,16" />
+
+                            <TextBlock Text="Profile" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding ProfileName}" Style="{StaticResource InspectorValueText}" />
 
                             <TextBlock Text="Mode" Style="{StaticResource InspectorLabelText}" />
                             <TextBlock Text="{Binding ModeDisplay}" Style="{StaticResource InspectorValueText}" />
@@ -137,6 +149,9 @@
                             <TextBlock Text="Proxy" Style="{StaticResource InspectorLabelText}" />
                             <TextBlock Text="{Binding ProxyDisplay}" Style="{StaticResource InspectorValueText}" />
 
+                            <TextBlock Text="Wake-on-LAN" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding WakeDisplay}" Style="{StaticResource InspectorValueText}" />
+
                             <TextBlock Text="Created" Style="{StaticResource InspectorLabelText}" />
                             <TextBlock Text="{Binding CreatedDisplay}" Style="{StaticResource InspectorValueText}" />
 
@@ -150,6 +165,30 @@
                     <StackPanel>
                         <TextBlock Text="Notes" Style="{StaticResource SectionTitleText}" />
                         <TextBlock Text="{Binding NotesDisplay}" Style="{StaticResource SectionSubtitleText}" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SubPanelCard}"
+                        Margin="0,18,0,0"
+                        Visibility="{Binding DataContext.HasExternalTools, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <TextBlock Text="External tools" Style="{StaticResource SectionTitleText}" />
+                        <ItemsControl Margin="0,12,0,0"
+                                      ItemsSource="{Binding DataContext.ExternalTools, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding Name}"
+                                            Margin="0,0,8,8"
+                                            Command="{Binding DataContext.RunExternalToolCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
 
@@ -242,7 +281,16 @@
                             <TextBlock Text="{Binding DefaultAccessControlDisplay}" Style="{StaticResource InspectorValueText}" />
 
                             <TextBlock Text="Password policy" Style="{StaticResource InspectorLabelText}" />
-                            <TextBlock Text="{Binding PasswordPolicyDisplay}" Style="{StaticResource InspectorValueText}" Margin="0,0,0,0" />
+                            <TextBlock Text="{Binding PasswordPolicyDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="TeamViewer path" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding DefaultPathDisplay}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Wake broadcast" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding Model.DefaultWakeBroadcastAddress, TargetNullValue='No default broadcast'}" Style="{StaticResource InspectorValueText}" />
+
+                            <TextBlock Text="Scripts" Style="{StaticResource InspectorLabelText}" />
+                            <TextBlock Text="{Binding ScriptPolicyDisplay}" Style="{StaticResource InspectorValueText}" Margin="0,0,0,0" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -289,7 +337,7 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="360" />
+                    <ColumnDefinition Width="420" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
@@ -354,6 +402,7 @@
                     <TextBlock Text="Workspace actions" Style="{StaticResource CaptionText}" />
                     <WrapPanel Margin="0,12,0,0">
                         <Button Content="Launch" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" Command="{Binding LaunchCommand}" />
+                        <Button Content="{Binding SelectedPinText}" Margin="0,0,8,8" Command="{Binding TogglePinCommand}" />
                         <Button Content="New connection" Margin="0,0,8,8" Command="{Binding AddEntryCommand}" />
                         <Button Content="New folder" Margin="0,0,8,8" Command="{Binding AddFolderCommand}" />
                         <Button Content="Edit" Margin="0,0,8,8" Command="{Binding EditCommand}" />
@@ -363,9 +412,45 @@
                         <Button Content="Restore JSON" Margin="0,0,8,8" Command="{Binding ImportCommand}" />
                         <Button Content="Import CSV" Margin="0,0,8,8" Command="{Binding ImportCsvCommand}"
                                 ToolTip="Import a header-based CSV. TeamStation auto-detects common aliases such as name, TeamViewer ID, folder, password, notes, and tags." />
+                        <Button Content="Import TV history" Margin="0,0,8,8" Command="{Binding ImportTeamViewerHistoryCommand}" />
+                        <Button Content="Sync TV cloud" Margin="0,0,8,8" Command="{Binding SyncTeamViewerCloudCommand}" />
                         <Button Content="Back up" Margin="0,0,8,8" Command="{Binding ExportCommand}" />
-                        <Button Content="{Binding ActivityButtonText}" Margin="0,0,0,8" Command="{Binding ToggleLogCommand}" />
+                        <Button Content="Export sessions" Margin="0,0,8,8" Command="{Binding ExportSessionsCommand}" />
+                        <Button Content="Settings" Margin="0,0,8,8" Command="{Binding OpenSettingsCommand}" />
+                        <Button Content="{Binding ActivityButtonText}" Margin="0,0,8,8" Command="{Binding ToggleLogCommand}" />
                     </WrapPanel>
+
+                    <Border Margin="0,14,0,0" Style="{StaticResource SubPanelCard}" Padding="14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.2*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Quick ID" Style="{StaticResource CaptionText}" />
+                                <TextBox Margin="0,6,0,0" Text="{Binding QuickTeamViewerId, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Name" Style="{StaticResource CaptionText}" />
+                                <TextBox Margin="0,6,0,0" Text="{Binding QuickName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="Password" Style="{StaticResource CaptionText}" />
+                                <PasswordBox Margin="0,6,0,0"
+                                             behaviors:PasswordBoxBinding.BoundPassword="{Binding QuickPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="6" VerticalAlignment="Bottom">
+                                <CheckBox Content="Save" IsChecked="{Binding QuickSaveConnection}" Margin="0,0,0,8" />
+                                <Button Content="Quick connect" Style="{StaticResource PrimaryButton}" Command="{Binding QuickConnectCommand}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Margin="18,0,0,0">
@@ -398,6 +483,24 @@
                                 Command="{Binding ClearSearchCommand}" />
                     </Grid>
                     <TextBlock Margin="0,8,0,0" Text="{Binding SearchHintText}" Style="{StaticResource BodyMutedText}" />
+                    <Button Margin="0,12,0,0" Content="Save search" Command="{Binding SaveSearchCommand}" />
+                    <ItemsControl Margin="0,12,0,0"
+                                  ItemsSource="{Binding SavedSearches}"
+                                  Visibility="{Binding HasSavedSearches, Converter={StaticResource BoolToVis}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Content="{Binding}"
+                                        Margin="0,0,8,8"
+                                        Command="{Binding DataContext.ApplySavedSearchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Grid>
         </Border>
@@ -514,8 +617,15 @@
                                                 </StackPanel>
 
                                                 <StackPanel Grid.Column="2" Margin="12,0,0,0" HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding PinDisplay}"
+                                                               Foreground="{StaticResource BlueBrush}"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               TextAlignment="Right"
+                                                               Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}}" />
                                                     <TextBlock Text="{Binding LastConnectedDisplay}"
                                                                Style="{StaticResource BodyMutedText}"
+                                                               Margin="0,4,0,0"
                                                                TextAlignment="Right" />
                                                     <TextBlock Text="{Binding PasswordStateDisplay}" Style="{StaticResource CaptionText}" Margin="0,6,0,0" TextAlignment="Right" />
                                                 </StackPanel>
@@ -537,6 +647,7 @@
                                 <TreeView.ContextMenu>
                                     <ContextMenu DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                                         <MenuItem Header="Launch connection" Command="{Binding LaunchCommand}" FontWeight="SemiBold" />
+                                        <MenuItem Header="{Binding SelectedPinText}" Command="{Binding TogglePinCommand}" />
                                         <Separator />
                                         <MenuItem Header="New connection" Command="{Binding AddEntryCommand}" />
                                         <MenuItem Header="New folder" Command="{Binding AddFolderCommand}" />

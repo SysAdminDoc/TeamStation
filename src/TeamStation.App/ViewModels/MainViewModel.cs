@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.Versioning;
 using System.Windows;
 using System.Windows.Media;
 using TeamStation.App.Mvvm;
+using TeamStation.App.Services;
 using TeamStation.App.Views;
 using TeamStation.Core.Models;
 using TeamStation.Core.Serialization;
@@ -18,7 +20,12 @@ public sealed class MainViewModel : ViewModelBase
 {
     private readonly EntryRepository _entries;
     private readonly FolderRepository _folders;
+    private readonly SessionRepository _sessions;
+    private readonly AuditLogRepository _auditLog;
     private readonly TeamViewerLauncher _launcher;
+    private readonly AppSettings _settings;
+    private readonly SettingsService _settingsService;
+    private readonly TeamViewerCloudSyncService _cloudSync = new();
     private readonly Func<ConnectionEntry, Window?, bool> _editEntryDialog;
     private readonly Func<Folder, Window?, bool> _editFolderDialog;
     private readonly Func<Window?, string?> _chooseExportPath;
@@ -36,13 +43,17 @@ public sealed class MainViewModel : ViewModelBase
     private readonly string _startupVersion;
     private readonly string? _startupDbPath;
     private readonly object _logLock = new();
-    private readonly bool _isTeamViewerReady;
+    private bool _isTeamViewerReady;
     private Brush _statusBrush = Brushes.Transparent;
     private string _statusTag = "Ready";
     private int _folderCount;
     private int _entryCount;
     private int _visibleFolderCount;
     private int _visibleEntryCount;
+    private string _quickName = string.Empty;
+    private string _quickTeamViewerId = string.Empty;
+    private string _quickPassword = string.Empty;
+    private bool _quickSaveConnection;
 
     public MainViewModel(
         EntryRepository entries,
@@ -54,13 +65,21 @@ public sealed class MainViewModel : ViewModelBase
         Func<Window?, string?> chooseImportPath,
         Func<Window?, string?> chooseImportCsvPath,
         Func<Window?, string, bool> confirmDialog,
+        AppSettings settings,
+        SettingsService settingsService,
+        SessionRepository sessions,
+        AuditLogRepository auditLog,
         string? tvExePath,
         string? startupVersion = null,
         string? startupDbPath = null)
     {
         _entries = entries;
         _folders = folders;
+        _sessions = sessions;
+        _auditLog = auditLog;
         _launcher = launcher;
+        _settings = settings;
+        _settingsService = settingsService;
         _editEntryDialog = editEntryDialog;
         _editFolderDialog = editFolderDialog;
         _chooseExportPath = chooseExportPath;
@@ -83,6 +102,15 @@ public sealed class MainViewModel : ViewModelBase
         ExportCommand = new RelayCommand(Export);
         ImportCommand = new RelayCommand(Import);
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
+        QuickConnectCommand = new RelayCommand(QuickConnect, () => IsTeamViewerReady && !string.IsNullOrWhiteSpace(QuickTeamViewerId));
+        TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
+        OpenSettingsCommand = new RelayCommand(OpenSettings);
+        ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
+        SyncTeamViewerCloudCommand = new RelayCommand(() => _ = SyncTeamViewerCloudAsync());
+        ExportSessionsCommand = new RelayCommand(ExportSessions);
+        SaveSearchCommand = new RelayCommand(SaveSearch, () => HasSearchText);
+        ApplySavedSearchCommand = new RelayCommand(ApplySavedSearch, parameter => parameter is string { Length: > 0 });
+        RunExternalToolCommand = new RelayCommand(RunExternalTool, parameter => Selected is EntryNode && parameter is ExternalToolDefinition);
         ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
         ClearLogCommand = new RelayCommand(ClearLog, () => Log.Count > 0);
         ToggleLogCommand = new RelayCommand(() => IsLogVisible = !IsLogVisible);
@@ -101,6 +129,8 @@ public sealed class MainViewModel : ViewModelBase
             : $"TeamViewer.exe: {tvExePath}");
     }
 
+    public event EventHandler? TrayMenuInvalidated;
+
     public ObservableCollection<TreeNode> RootNodes { get; } = new();
 
     public TreeNode? Selected
@@ -110,12 +140,13 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetField(ref _selected, value))
             {
-                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand })
+                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand, TogglePinCommand, RunExternalToolCommand })
                     ((RelayCommand)cmd).RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(SelectedIsEntry));
                 OnPropertyChanged(nameof(SelectedIsFolder));
                 OnPropertyChanged(nameof(HasSelection));
                 OnPropertyChanged(nameof(ShowSelectionPlaceholder));
+                OnPropertyChanged(nameof(SelectedPinText));
             }
         }
     }
@@ -124,11 +155,24 @@ public sealed class MainViewModel : ViewModelBase
     public bool SelectedIsFolder => Selected is FolderNode;
     public bool HasSelection => Selected is not null;
     public bool ShowSelectionPlaceholder => Selected is null;
+    public string SelectedPinText => Selected is EntryNode { Model.IsPinned: true } ? "Unpin" : "Pin";
 
     public string Status { get => _status; private set => SetField(ref _status, value); }
     public string StatusTag { get => _statusTag; private set => SetField(ref _statusTag, value); }
     public Brush StatusBrush { get => _statusBrush; private set => SetField(ref _statusBrush, value); }
-    public bool IsTeamViewerReady => _isTeamViewerReady;
+    public bool IsTeamViewerReady
+    {
+        get => _isTeamViewerReady;
+        private set
+        {
+            if (SetField(ref _isTeamViewerReady, value))
+            {
+                OnPropertyChanged(nameof(TeamViewerStatusText));
+                ((RelayCommand)LaunchCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)QuickConnectCommand).RaiseCanExecuteChanged();
+            }
+        }
+    }
     public string TeamViewerStatusText => _isTeamViewerReady ? "TeamViewer ready" : "Install TeamViewer";
     public string DatabasePathDisplay => _startupDbPath ?? "Database path unavailable";
     public string DatabaseLocationDisplay => _startupDbPath is null
@@ -152,6 +196,38 @@ public sealed class MainViewModel : ViewModelBase
         ? "No activity yet."
         : $"Showing the latest {Log.Count} event{(Log.Count == 1 ? string.Empty : "s")}.";
     public string ActivityButtonText => IsLogVisible ? "Hide activity" : "Show activity";
+    public IReadOnlyList<ExternalToolDefinition> ExternalTools => _settings.ExternalTools;
+    public bool HasExternalTools => ExternalTools.Count > 0;
+    public IReadOnlyList<string> SavedSearches => _settings.SavedSearches;
+    public bool HasSavedSearches => SavedSearches.Count > 0;
+
+    public string QuickName
+    {
+        get => _quickName;
+        set => SetField(ref _quickName, value ?? string.Empty);
+    }
+
+    public string QuickTeamViewerId
+    {
+        get => _quickTeamViewerId;
+        set
+        {
+            if (SetField(ref _quickTeamViewerId, value ?? string.Empty))
+                ((RelayCommand)QuickConnectCommand).RaiseCanExecuteChanged();
+        }
+    }
+
+    public string QuickPassword
+    {
+        get => _quickPassword;
+        set => SetField(ref _quickPassword, value ?? string.Empty);
+    }
+
+    public bool QuickSaveConnection
+    {
+        get => _quickSaveConnection;
+        set => SetField(ref _quickSaveConnection, value);
+    }
 
     private void AppendLog(LogLevel level, string message)
     {
@@ -167,6 +243,36 @@ public sealed class MainViewModel : ViewModelBase
         ApplyStatusTone(level);
         AppendLog(level, message);
     }
+
+    private void Audit(string action, string targetType, Guid? targetId, string summary, string? detail = null)
+    {
+        _auditLog.Append(new AuditEvent
+        {
+            Action = action,
+            TargetType = targetType,
+            TargetId = targetId,
+            Summary = summary,
+            Detail = detail,
+        });
+    }
+
+    private void MirrorDatabase()
+    {
+        try
+        {
+            CloudMirrorService.MirrorDatabase(_startupDbPath, _settings.CloudSyncFolder);
+        }
+        catch (Exception ex)
+        {
+            AppendLog(LogLevel.Warning, $"Cloud mirror skipped: {ex.Message}");
+        }
+    }
+
+    private void NotifyRecentsChanged()
+    {
+        TrayMenuInvalidated?.Invoke(this, EventArgs.Empty);
+    }
+
     public string TvExePath { get => _tvExePath; private set => SetField(ref _tvExePath, value); }
 
     public System.Windows.Input.ICommand AddEntryCommand { get; }
@@ -180,6 +286,15 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand ExportCommand { get; }
     public System.Windows.Input.ICommand ImportCommand { get; }
     public System.Windows.Input.ICommand ImportCsvCommand { get; }
+    public System.Windows.Input.ICommand QuickConnectCommand { get; }
+    public System.Windows.Input.ICommand TogglePinCommand { get; }
+    public System.Windows.Input.ICommand OpenSettingsCommand { get; }
+    public System.Windows.Input.ICommand ImportTeamViewerHistoryCommand { get; }
+    public System.Windows.Input.ICommand SyncTeamViewerCloudCommand { get; }
+    public System.Windows.Input.ICommand ExportSessionsCommand { get; }
+    public System.Windows.Input.ICommand SaveSearchCommand { get; }
+    public System.Windows.Input.ICommand ApplySavedSearchCommand { get; }
+    public System.Windows.Input.ICommand RunExternalToolCommand { get; }
     public System.Windows.Input.ICommand ClearSearchCommand { get; }
     public System.Windows.Input.ICommand ClearLogCommand { get; }
     public System.Windows.Input.ICommand ToggleLogCommand { get; }
@@ -314,6 +429,8 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowNoSearchResultsState));
         OnPropertyChanged(nameof(TreeSummary));
         OnPropertyChanged(nameof(SearchHintText));
+        OnPropertyChanged(nameof(HasSavedSearches));
+        ((RelayCommand)SaveSearchCommand).RaiseCanExecuteChanged();
     }
 
     private void ApplyStatusTone(LogLevel level)
@@ -354,6 +471,7 @@ public sealed class MainViewModel : ViewModelBase
         var draft = new ConnectionEntry
         {
             Name = "New connection",
+            ProfileName = "Default",
             ParentFolderId = parentFolder?.Id,
             Password = null,
             Mode = parentFolder is null ? ConnectionMode.RemoteControl : null,
@@ -365,8 +483,39 @@ public sealed class MainViewModel : ViewModelBase
             _entries.Upsert(draft);
             Reload();
             SelectById(draft.Id);
+            Audit("create", "connection", draft.Id, $"Created connection \"{draft.Name}\".");
+            MirrorDatabase();
             ReportStatus(LogLevel.Success, $"Created connection \"{draft.Name}\".");
         }
+    }
+
+    private void QuickConnect()
+    {
+        var id = QuickTeamViewerId.Trim();
+        var entry = new ConnectionEntry
+        {
+            Name = string.IsNullOrWhiteSpace(QuickName) ? $"Quick {id}" : QuickName.Trim(),
+            TeamViewerId = id,
+            ProfileName = "Quick connect",
+            Password = string.IsNullOrWhiteSpace(QuickPassword) ? null : QuickPassword.Trim(),
+            Mode = ConnectionMode.RemoteControl,
+            Quality = ConnectionQuality.AutoSelect,
+            AccessControl = AccessControl.Undefined,
+        };
+
+        if (QuickSaveConnection)
+        {
+            _entries.Upsert(entry);
+            Reload();
+            SelectById(entry.Id);
+            Audit("create", "connection", entry.Id, $"Saved quick connection \"{entry.Name}\".");
+            MirrorDatabase();
+        }
+
+        LaunchEntry(entry, persistLastConnected: QuickSaveConnection);
+        QuickPassword = string.Empty;
+        if (!QuickSaveConnection)
+            QuickName = string.Empty;
     }
 
     private void EditSelected()
@@ -380,6 +529,8 @@ public sealed class MainViewModel : ViewModelBase
                     entry.Refresh();
                     Reload();
                     SelectById(entry.Id);
+                    Audit("edit", "connection", entry.Id, $"Saved connection \"{entry.Name}\".");
+                    MirrorDatabase();
                     ReportStatus(LogLevel.Success, $"Saved \"{entry.Name}\".");
                 }
                 break;
@@ -390,6 +541,8 @@ public sealed class MainViewModel : ViewModelBase
                     _folders.Upsert(folder.Model);
                     Reload();
                     SelectById(folder.Id);
+                    Audit("edit", "folder", folder.Id, $"Saved folder \"{folder.Name}\".");
+                    MirrorDatabase();
                     ReportStatus(LogLevel.Success, $"Saved folder \"{folder.Name}\".");
                 }
                 break;
@@ -495,6 +648,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             var backup = JsonBackup.Build(_folders.GetAll(), _entries.GetAll());
             AtomicWriteAllText(path, backup);
+            Audit("export", "json-backup", null, $"Wrote backup to {path}.");
             ReportStatus(LogLevel.Success, $"Backup written to {path}.");
         }
         catch (Exception ex)
@@ -560,6 +714,8 @@ public sealed class MainViewModel : ViewModelBase
             foreach (var f in folders) _folders.Upsert(f);
             foreach (var e in entries) _entries.Upsert(e);
             Reload();
+            Audit("import", "json-backup", null, $"Restored {folders.Count} folders and {entries.Count} connections from {path}.");
+            MirrorDatabase();
             ReportStatus(LogLevel.Success, $"Restored {DisplayText.Count(folders.Count, "folder")} and {DisplayText.Count(entries.Count, "connection")}.");
         }
         catch (Exception ex)
@@ -576,6 +732,141 @@ public sealed class MainViewModel : ViewModelBase
         ((RelayCommand)ClearLogCommand).RaiseCanExecuteChanged();
         Status = "Activity cleared.";
         ApplyStatusTone(LogLevel.Info);
+    }
+
+    private void OpenSettings()
+    {
+        var dialog = new SettingsWindow(_settings) { Owner = Application.Current?.MainWindow };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        _settingsService.Save(_settings);
+        TvExePath = !string.IsNullOrWhiteSpace(_settings.TeamViewerPathOverride)
+            ? _settings.TeamViewerPathOverride
+            : TeamViewerPathResolver.Resolve() ?? "TeamViewer.exe not found - install TeamViewer before launching";
+        IsTeamViewerReady = File.Exists(TvExePath);
+        OnPropertyChanged(nameof(ExternalTools));
+        OnPropertyChanged(nameof(HasExternalTools));
+        OnPropertyChanged(nameof(SavedSearches));
+        OnPropertyChanged(nameof(HasSavedSearches));
+        Audit("settings", "application", null, "Updated settings.");
+        ReportStatus(LogLevel.Success, "Settings saved.");
+    }
+
+    private void ImportTeamViewerHistory()
+    {
+        var paths = TeamViewerHistoryImport.DefaultPaths();
+        var entries = TeamViewerHistoryImport.ParseFiles(paths, _entries.GetAll());
+        if (entries.Count == 0)
+        {
+            ReportStatus(LogLevel.Warning, "No new TeamViewer history entries were found.");
+            return;
+        }
+
+        foreach (var entry in entries)
+            _entries.Upsert(entry);
+
+        Reload();
+        Audit("import", "teamviewer-history", null, $"Imported {DisplayText.Count(entries.Count, "connection")} from TeamViewer history.");
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success, $"Imported {DisplayText.Count(entries.Count, "connection")} from TeamViewer history.");
+    }
+
+    private async Task SyncTeamViewerCloudAsync()
+    {
+        try
+        {
+            var result = await _cloudSync.PullAsync(_settings.TeamViewerApiToken ?? string.Empty);
+            var existingByTvId = _entries.GetAll().ToDictionary(e => e.TeamViewerId, e => e, StringComparer.Ordinal);
+
+            foreach (var folder in result.Folders)
+                _folders.Upsert(folder);
+
+            var imported = 0;
+            foreach (var entry in result.Entries)
+            {
+                if (entry.TeamViewerId.Length is < 8 or > 12)
+                    continue;
+
+                if (existingByTvId.TryGetValue(entry.TeamViewerId, out var existing))
+                {
+                    _entries.Upsert(MergeCloudEntry(entry, existing));
+                }
+                else
+                {
+                    _entries.Upsert(entry);
+                }
+                imported++;
+            }
+
+            Reload();
+            Audit("sync", "teamviewer-cloud", null, $"Synced {DisplayText.Count(imported, "connection")} from TeamViewer cloud.");
+            MirrorDatabase();
+            ReportStatus(LogLevel.Success, $"Synced {DisplayText.Count(imported, "connection")} from TeamViewer cloud.");
+        }
+        catch (Exception ex)
+        {
+            ReportStatus(LogLevel.Error, $"TeamViewer cloud sync failed: {ex.Message}");
+            MessageBox.Show(Application.Current?.MainWindow!, ex.Message, "TeamViewer cloud sync failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ExportSessions()
+    {
+        if (string.IsNullOrWhiteSpace(_startupDbPath))
+        {
+            ReportStatus(LogLevel.Error, "Session export path is unavailable.");
+            return;
+        }
+
+        var path = Path.Combine(Path.GetDirectoryName(_startupDbPath) ?? ".", $"teamstation-sessions-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+        _sessions.ExportCsv(path);
+        Audit("export", "sessions", null, $"Exported session history to {path}.");
+        ReportStatus(LogLevel.Success, $"Session history exported to {path}.");
+    }
+
+    private void SaveSearch()
+    {
+        var value = SearchText.Trim();
+        if (value.Length == 0)
+            return;
+
+        if (!_settings.SavedSearches.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+            _settings.SavedSearches.Add(value);
+            _settingsService.Save(_settings);
+            OnPropertyChanged(nameof(SavedSearches));
+            OnPropertyChanged(nameof(HasSavedSearches));
+            Audit("create", "saved-search", null, $"Saved search \"{value}\".");
+        }
+
+        ReportStatus(LogLevel.Success, $"Saved search \"{value}\".");
+    }
+
+    private void ApplySavedSearch(object? parameter)
+    {
+        if (parameter is not string search || string.IsNullOrWhiteSpace(search))
+            return;
+
+        SearchText = search;
+        ReportStatus(LogLevel.Info, $"Applied saved search \"{search}\".");
+    }
+
+    private void RunExternalTool(object? parameter)
+    {
+        if (Selected is not EntryNode entry || parameter is not ExternalToolDefinition tool)
+            return;
+
+        try
+        {
+            ExternalToolRunner.Run(tool, InheritanceResolver.Resolve(entry.Model, _foldersById));
+            Audit("run", "external-tool", entry.Id, $"Ran {tool.Name} for \"{entry.Name}\".");
+            ReportStatus(LogLevel.Success, $"Ran {tool.Name} for \"{entry.Name}\".");
+        }
+        catch (Exception ex)
+        {
+            ReportStatus(LogLevel.Error, $"External tool failed: {ex.Message}");
+        }
     }
 
     private void ImportCsvFile()
@@ -625,6 +916,8 @@ public sealed class MainViewModel : ViewModelBase
                 AppendLog(LogLevel.Warning, $"CSV line {line} skipped: {reason}");
 
             Reload();
+            Audit("import", "csv", null, $"Imported {result.Entries.Count} connections from {path}.");
+            MirrorDatabase();
             ReportStatus(LogLevel.Success,
                 $"Imported {DisplayText.Count(result.Entries.Count, "connection")} and {DisplayText.Count(result.Folders.Count, "new folder")}" +
                 $"{(result.Skipped.Count > 0 ? $"; {result.Skipped.Count} skipped" : string.Empty)}.");
@@ -670,6 +963,8 @@ public sealed class MainViewModel : ViewModelBase
         var id = source.Id;
         Reload();
         SelectById(id);
+        Audit("move", "tree-node", id, $"Moved \"{source.Name}\".");
+        MirrorDatabase();
         ReportStatus(LogLevel.Info, newParent is null
             ? $"Moved \"{source.Name}\" to root."
             : $"Moved \"{source.Name}\" to \"{newParent.Name}\".");
@@ -685,6 +980,8 @@ public sealed class MainViewModel : ViewModelBase
         _folders.Upsert(folder);
         Reload();
         SelectById(folder.Id);
+        Audit("create", "folder", folder.Id, $"Created folder \"{folder.Name}\".");
+        MirrorDatabase();
         ReportStatus(LogLevel.Success, $"Created folder \"{folder.Name}\".");
     }
 
@@ -698,6 +995,8 @@ public sealed class MainViewModel : ViewModelBase
         parent.IsExpanded = true;
         Reload();
         SelectById(folder.Id);
+        Audit("create", "folder", folder.Id, $"Created folder \"{folder.Name}\" inside \"{parent.Name}\".");
+        MirrorDatabase();
         ReportStatus(LogLevel.Success, $"Created folder \"{folder.Name}\" inside \"{parent.Name}\".");
     }
 
@@ -710,6 +1009,7 @@ public sealed class MainViewModel : ViewModelBase
         var newName = InputDialog.Prompt(Application.Current?.MainWindow, "Rename", "New name:", oldName);
         if (newName is null) return;
 
+        var renamedId = Selected.Id;
         switch (Selected)
         {
             case FolderNode f:
@@ -722,7 +1022,9 @@ public sealed class MainViewModel : ViewModelBase
                 break;
         }
         Reload();
-        SelectById(Selected.Id);
+        SelectById(renamedId);
+        Audit("rename", "tree-node", renamedId, $"Renamed \"{oldName}\" to \"{newName}\".");
+        MirrorDatabase();
         ReportStatus(LogLevel.Success, $"Renamed \"{oldName}\" to \"{newName}\".");
     }
 
@@ -751,6 +1053,8 @@ public sealed class MainViewModel : ViewModelBase
         var movedName = Selected.Name;
         Reload();
         SelectById(movedId);
+        Audit("move", "tree-node", movedId, $"Moved \"{movedName}\".");
+        MirrorDatabase();
         ReportStatus(LogLevel.Success, newParent is null
             ? $"Moved \"{movedName}\" to the top level."
             : $"Moved \"{movedName}\" to \"{FindById(RootNodes, newParent.Value)?.Name ?? "selected folder"}\".");
@@ -759,6 +1063,7 @@ public sealed class MainViewModel : ViewModelBase
     private void Delete()
     {
         if (Selected is null) return;
+        var deletedId = Selected.Id;
         var deletedName = Selected.Name;
         var kind = Selected is FolderNode ? "folder" : "entry";
         var suffix = Selected is FolderNode f && (f.Children.Count > 0)
@@ -784,24 +1089,106 @@ public sealed class MainViewModel : ViewModelBase
                 break;
         }
         Reload();
+        Audit("delete", kind, deletedId, $"Deleted {kind} \"{deletedName}\".");
+        MirrorDatabase();
         ReportStatus(LogLevel.Warning, $"Deleted {kind} \"{deletedName}\".");
     }
 
     private void Launch()
     {
         if (Selected is not EntryNode entry) return;
+        LaunchEntry(entry.Model, persistLastConnected: true);
+    }
+
+    public void LaunchEntryById(Guid id)
+    {
+        var entry = _entries.Get(id);
+        if (entry is null)
+        {
+            ReportStatus(LogLevel.Warning, "The selected connection no longer exists.");
+            return;
+        }
+
+        LaunchEntry(entry, persistLastConnected: true);
+    }
+
+    public IReadOnlyList<ConnectionEntry> GetPinnedEntries() =>
+        _entries.GetAll().Where(e => e.IsPinned).OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+    public IReadOnlyList<ConnectionEntry> GetRecentEntries(int limit = 10) =>
+        _entries.GetAll()
+            .Where(e => e.LastConnectedUtc is not null)
+            .OrderByDescending(e => e.LastConnectedUtc)
+            .Take(limit)
+            .ToList();
+
+    private void TogglePin()
+    {
+        if (Selected is not EntryNode entry)
+            return;
+
+        entry.Model.IsPinned = !entry.Model.IsPinned;
+        _entries.Upsert(entry.Model);
+        entry.Refresh();
+        OnPropertyChanged(nameof(SelectedPinText));
+        NotifyRecentsChanged();
+        Audit(entry.Model.IsPinned ? "pin" : "unpin", "connection", entry.Id,
+            $"{(entry.Model.IsPinned ? "Pinned" : "Unpinned")} \"{entry.Name}\".");
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success, entry.Model.IsPinned ? $"Pinned \"{entry.Name}\"." : $"Unpinned \"{entry.Name}\".");
+    }
+
+    private void LaunchEntry(ConnectionEntry source, bool persistLastConnected)
+    {
         // Resolve folder-chain inheritance at launch time so folder default
         // changes propagate to every entry that defers to them.
-        var effective = InheritanceResolver.Resolve(entry.Model, _foldersById);
+        var effective = InheritanceResolver.Resolve(source, _foldersById);
+        if (_settings.WakeOnLanBeforeLaunch && !string.IsNullOrWhiteSpace(effective.WakeMacAddress))
+        {
+            if (WakeOnLanService.TrySend(effective.WakeMacAddress, effective.WakeBroadcastAddress, out var wakeMessage))
+                AppendLog(LogLevel.Info, wakeMessage);
+            else
+                AppendLog(LogLevel.Warning, wakeMessage);
+        }
+
+        if (!string.IsNullOrWhiteSpace(effective.PreLaunchScript))
+            ExternalToolRunner.RunScript(effective.PreLaunchScript, effective);
+
         var outcome = _launcher.Launch(effective);
         if (outcome.Success)
         {
-            _entries.TouchLastConnected(entry.Id, DateTimeOffset.UtcNow);
-            entry.Model.LastConnectedUtc = DateTimeOffset.UtcNow;
-            entry.Refresh();
+            var started = DateTimeOffset.UtcNow;
+            var session = new SessionRecord
+            {
+                EntryId = persistLastConnected ? source.Id : null,
+                EntryName = source.Name,
+                TeamViewerId = source.TeamViewerId,
+                ProfileName = source.ProfileName,
+                Mode = effective.Mode,
+                Route = outcome.Uri is not null ? "URI" : "CLI",
+                ProcessId = outcome.ProcessId,
+                StartedUtc = started,
+                Outcome = "Started",
+            };
+            _sessions.Upsert(session);
+
+            if (persistLastConnected)
+            {
+                _entries.TouchLastConnected(source.Id, started);
+                if (Selected is EntryNode selected && selected.Id == source.Id)
+                {
+                    selected.Model.LastConnectedUtc = started;
+                    selected.Refresh();
+                }
+                NotifyRecentsChanged();
+            }
+
+            Audit("launch", "connection", persistLastConnected ? source.Id : null, $"Launched \"{source.Name}\".");
+            TrackSessionExit(session, effective);
+            MirrorDatabase();
             ReportStatus(LogLevel.Success, outcome.Uri is not null
-                ? $"Launched \"{entry.Name}\" via URI handler."
-                : $"Launched \"{entry.Name}\" (pid {outcome.ProcessId?.ToString() ?? "?"}).");
+                ? $"Launched \"{source.Name}\" via URI handler."
+                : $"Launched \"{source.Name}\" (pid {outcome.ProcessId?.ToString() ?? "?"}).");
         }
         else
         {
@@ -815,6 +1202,35 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private void TrackSessionExit(SessionRecord session, ConnectionEntry entry)
+    {
+        if (session.ProcessId is not { } pid)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.PostLaunchScript))
+                ExternalToolRunner.RunScript(entry.PostLaunchScript, entry);
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                using var process = Process.GetProcessById(pid);
+                process.WaitForExit();
+                _sessions.Complete(session.Id, DateTimeOffset.UtcNow, $"Exited {process.ExitCode}");
+            }
+            catch
+            {
+                _sessions.Complete(session.Id, DateTimeOffset.UtcNow, "Process unavailable");
+            }
+            finally
+            {
+                if (!string.IsNullOrWhiteSpace(entry.PostLaunchScript))
+                    ExternalToolRunner.RunScript(entry.PostLaunchScript, entry);
+            }
+        });
+    }
+
     // ---- Helpers ----
 
     private void SelectById(Guid id)
@@ -824,6 +1240,45 @@ public sealed class MainViewModel : ViewModelBase
         ExpandToRoot(node);
         node.IsSelected = true;
         Selected = node;
+    }
+
+    private static ConnectionEntry MergeCloudEntry(ConnectionEntry incoming, ConnectionEntry existing)
+    {
+        var tags = existing.Tags
+            .Concat(incoming.Tags)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return new ConnectionEntry
+        {
+            Id = existing.Id,
+            ParentFolderId = incoming.ParentFolderId,
+            Name = ShouldAcceptCloudName(existing) ? incoming.Name : existing.Name,
+            TeamViewerId = existing.TeamViewerId,
+            ProfileName = existing.ProfileName,
+            Password = existing.Password,
+            Mode = existing.Mode,
+            Quality = existing.Quality,
+            AccessControl = existing.AccessControl,
+            Proxy = existing.Proxy,
+            TeamViewerPathOverride = existing.TeamViewerPathOverride,
+            IsPinned = existing.IsPinned,
+            WakeMacAddress = existing.WakeMacAddress,
+            WakeBroadcastAddress = existing.WakeBroadcastAddress,
+            PreLaunchScript = existing.PreLaunchScript,
+            PostLaunchScript = existing.PostLaunchScript,
+            Notes = string.IsNullOrWhiteSpace(existing.Notes) ? incoming.Notes : existing.Notes,
+            Tags = tags,
+            LastConnectedUtc = existing.LastConnectedUtc,
+            CreatedUtc = existing.CreatedUtc,
+            ModifiedUtc = existing.ModifiedUtc,
+        };
+    }
+
+    private static bool ShouldAcceptCloudName(ConnectionEntry existing)
+    {
+        return string.IsNullOrWhiteSpace(existing.Name) ||
+               string.Equals(existing.Name, $"TeamViewer {existing.TeamViewerId}", StringComparison.OrdinalIgnoreCase);
     }
 
     private static TreeNode? FindById(IEnumerable<TreeNode> nodes, Guid id)

@@ -70,6 +70,35 @@ public class InheritanceResolverTests
     }
 
     [Fact]
+    public void Resolve_pulls_launch_path_wake_broadcast_and_scripts_from_folder()
+    {
+        var folder = new Folder
+        {
+            Name = "F",
+            DefaultTeamViewerPath = @"C:\TeamViewer\TeamViewer.exe",
+            DefaultWakeBroadcastAddress = "192.168.1.255",
+            PreLaunchScript = "Write-Output pre",
+            PostLaunchScript = "Write-Output post",
+        };
+        var entry = new ConnectionEntry
+        {
+            Name = "E",
+            TeamViewerId = "123456789",
+            ParentFolderId = folder.Id,
+            WakeMacAddress = "00:11:22:33:44:55",
+        };
+
+        var resolved = InheritanceResolver.Resolve(entry, new Dictionary<Guid, Folder> { [folder.Id] = folder });
+
+        Assert.Equal(@"C:\TeamViewer\TeamViewer.exe", resolved.TeamViewerPathOverride);
+        Assert.Equal("192.168.1.255", resolved.WakeBroadcastAddress);
+        Assert.Equal("Write-Output pre", resolved.PreLaunchScript);
+        Assert.Equal("Write-Output post", resolved.PostLaunchScript);
+        Assert.Null(entry.TeamViewerPathOverride);
+        Assert.Null(entry.WakeBroadcastAddress);
+    }
+
+    [Fact]
     public void Resolve_does_not_mutate_source_entry()
     {
         var folder = new Folder { Name = "F", DefaultPassword = "from-folder" };

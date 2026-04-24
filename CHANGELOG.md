@@ -2,6 +2,30 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- App settings window for TeamViewer.exe override, TeamViewer Web API token, Wake-on-LAN, cloud mirror folder, saved searches, and external tools.
+- TeamViewer Web API token is stored as a DPAPI-protected settings value rather than plain text.
+- First-run trust notice that states TeamStation launches the official unmodified TeamViewer client and stores credentials locally.
+- Portable-mode master-password unlock. Portable databases use a PBKDF2-SHA256-derived AES-GCM wrapper for the data-encryption key instead of user/machine-bound DPAPI.
+- Quick connect bar with optional save, saved-search chips, per-entry profile names, pin/unpin, and a dynamic tray menu with pinned and recent connections.
+- TeamViewer local history import from `%AppData%\TeamViewer\Connections*.txt`.
+- Optional TeamViewer Web API group/device pull into a synthetic `TV Cloud` folder.
+- Wake-on-LAN pre-launch support plus inherited TeamViewer.exe path, wake broadcast, pre-launch script, and post-launch script defaults.
+- External tools with `%ID%`, `%NAME%`, `%PASSWORD%`, `%PROFILE%`, `%TAG:key%`, and `${ENV_VAR}` expansion.
+- Session history table, CSV session export, and persistent audit-log table.
+- Optional encrypted SQLite database mirror to a selected cloud sync folder after changes.
+- Optional Authenticode signing in the release workflow when certificate secrets are configured.
+
+### Changed
+- SQLite schema moved to v3 for connection profiles, pins, launch overrides, Wake-on-LAN, scripts, session history, and audit log storage.
+- The system tray now rebuilds its menu from live app state and can launch pinned/recent connections directly.
+- The quick-connect password field now uses a `PasswordBox` rather than visible text.
+
+### Tests
+- Expanded the xUnit suite from 109 to 118 tests, covering portable master-password unlock, v3 persistence, TeamViewer history import, session CSV export, audit-log ordering, and inherited launch-path/script fields.
+
 ## [0.1.1] - 2026-04-23
 
 Principal-engineer hardening pass on the MVP surface. Every change sits behind a test where practical.

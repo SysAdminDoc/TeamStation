@@ -148,6 +148,28 @@
                             <ComboBoxItem Tag="{x:Static models:AccessControl.ViewAndShow}" Content="View and show" />
                             <ComboBoxItem Tag="{x:Static models:AccessControl.CustomSettings}" Content="Custom settings" />
                         </ComboBox>
+
+                        <TextBlock Margin="0,18,0,0" Text="Default TeamViewer.exe path" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="DefaultPathBox" />
+
+                        <TextBlock Margin="0,18,0,0" Text="Default Wake-on-LAN broadcast address" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="DefaultWakeBroadcastBox" />
+
+                        <TextBlock Margin="0,18,0,0" Text="Inherited pre-launch script" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="PreLaunchScriptBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="90"
+                                 VerticalScrollBarVisibility="Auto"
+                                 VerticalContentAlignment="Top" />
+
+                        <TextBlock Margin="0,18,0,0" Text="Inherited post-launch script" Style="{StaticResource FieldLabelText}" />
+                        <TextBox x:Name="PostLaunchScriptBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="90"
+                                 VerticalScrollBarVisibility="Auto"
+                                 VerticalContentAlignment="Top" />
                     </StackPanel>
                 </Border>
 

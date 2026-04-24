@@ -6,6 +6,7 @@ public sealed class ConnectionEntry
     public Guid? ParentFolderId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string TeamViewerId { get; set; } = string.Empty;
+    public string ProfileName { get; set; } = "Default";
     public string? Password { get; set; }
 
     /// <summary>
@@ -20,6 +21,12 @@ public sealed class ConnectionEntry
     /// <summary>Access control. <c>null</c> means "inherit from parent folder chain".</summary>
     public AccessControl? AccessControl { get; set; }
     public ProxySettings? Proxy { get; set; }
+    public string? TeamViewerPathOverride { get; set; }
+    public bool IsPinned { get; set; }
+    public string? WakeMacAddress { get; set; }
+    public string? WakeBroadcastAddress { get; set; }
+    public string? PreLaunchScript { get; set; }
+    public string? PostLaunchScript { get; set; }
     public string? Notes { get; set; }
     public List<string> Tags { get; set; } = new();
     public DateTimeOffset? LastConnectedUtc { get; set; }

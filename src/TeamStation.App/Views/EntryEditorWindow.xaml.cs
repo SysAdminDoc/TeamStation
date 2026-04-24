@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using TeamStation.Core.Models;
@@ -33,12 +34,18 @@ public partial class EntryEditorWindow : Window
     {
         NameBox.Text = _entry.Name;
         IdBox.Text = _entry.TeamViewerId;
+        ProfileBox.Text = _entry.ProfileName;
         PasswordBox.Password = _entry.Password ?? string.Empty;
         SelectNullableEnum(ModeBox, _entry.Mode);
         SelectNullableEnum(QualityBox, _entry.Quality);
         SelectNullableEnum(AcBox, _entry.AccessControl);
         NotesBox.Text = _entry.Notes ?? string.Empty;
         TagsBox.Text = string.Join(", ", _entry.Tags);
+        PathOverrideBox.Text = _entry.TeamViewerPathOverride ?? string.Empty;
+        WakeMacBox.Text = _entry.WakeMacAddress ?? string.Empty;
+        WakeBroadcastBox.Text = _entry.WakeBroadcastAddress ?? string.Empty;
+        PreLaunchScriptBox.Text = _entry.PreLaunchScript ?? string.Empty;
+        PostLaunchScriptBox.Text = _entry.PostLaunchScript ?? string.Empty;
 
         if (_entry.Proxy is { } proxy)
         {
@@ -86,6 +93,14 @@ public partial class EntryEditorWindow : Window
                 PasswordBox.Focus();
                 return;
             }
+        }
+
+        var pathOverride = PathOverrideBox.Text.Trim();
+        if (!string.IsNullOrEmpty(pathOverride) && !File.Exists(pathOverride))
+        {
+            ShowValidation("TeamViewer.exe override path does not exist.");
+            PathOverrideBox.Focus();
+            return;
         }
 
         ProxySettings? proxy = null;
@@ -139,11 +154,17 @@ public partial class EntryEditorWindow : Window
 
         _entry.Name = name;
         _entry.TeamViewerId = id;
+        _entry.ProfileName = string.IsNullOrWhiteSpace(ProfileBox.Text) ? "Default" : ProfileBox.Text.Trim();
         _entry.Password = string.IsNullOrEmpty(password) ? null : password;
         _entry.Mode = GetNullableEnum<ConnectionMode>(ModeBox);
         _entry.Quality = GetNullableEnum<ConnectionQuality>(QualityBox);
         _entry.AccessControl = GetNullableEnum<AccessControl>(AcBox);
         _entry.Proxy = proxy;
+        _entry.TeamViewerPathOverride = string.IsNullOrWhiteSpace(PathOverrideBox.Text) ? null : PathOverrideBox.Text.Trim();
+        _entry.WakeMacAddress = string.IsNullOrWhiteSpace(WakeMacBox.Text) ? null : WakeMacBox.Text.Trim();
+        _entry.WakeBroadcastAddress = string.IsNullOrWhiteSpace(WakeBroadcastBox.Text) ? null : WakeBroadcastBox.Text.Trim();
+        _entry.PreLaunchScript = string.IsNullOrWhiteSpace(PreLaunchScriptBox.Text) ? null : PreLaunchScriptBox.Text.Trim();
+        _entry.PostLaunchScript = string.IsNullOrWhiteSpace(PostLaunchScriptBox.Text) ? null : PostLaunchScriptBox.Text.Trim();
         _entry.Notes = string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim();
         _entry.Tags = TagsBox.Text
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

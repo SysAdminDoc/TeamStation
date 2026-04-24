@@ -14,6 +14,7 @@ public static class StoragePaths
 {
     public const string DatabaseFileName = "teamstation.db";
     public const string PortableMarkerFileName = "teamstation.portable";
+    public const string SettingsFileName = "teamstation.settings.json";
 
     public static string ResolveDatabasePath(string? overridePath = null)
     {
@@ -29,6 +30,19 @@ public static class StoragePaths
         var dir = Path.Combine(root, "TeamStation");
         Directory.CreateDirectory(dir);
         return Path.Combine(dir, DatabaseFileName);
+    }
+
+    public static string ResolveSettingsPath()
+    {
+        if (IsPortable(out var exeDir))
+            return Path.Combine(exeDir, SettingsFileName);
+
+        var root = Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData,
+            Environment.SpecialFolderOption.Create);
+        var dir = Path.Combine(root, "TeamStation");
+        Directory.CreateDirectory(dir);
+        return Path.Combine(dir, SettingsFileName);
     }
 
     public static bool IsPortable(out string exeDirectory)

@@ -8,11 +8,14 @@ public class CryptoServiceTests
     // An in-memory IKeyStore so tests don't touch SQLite or DPAPI beyond
     // what CryptoService itself invokes. The stored blob IS the real DPAPI
     // output — we just don't persist it anywhere.
-    private sealed class MemoryKeyStore : IKeyStore
+    private sealed class MemoryKeyStore : ISecretStore
     {
-        private byte[]? _wrapped;
-        public byte[]? Load() => _wrapped;
-        public void Save(byte[] wrapped) => _wrapped = wrapped;
+        private readonly Dictionary<string, byte[]> _values = new(StringComparer.Ordinal);
+
+        public byte[]? Load() => LoadValue("dek_v1");
+        public void Save(byte[] wrapped) => SaveValue("dek_v1", wrapped);
+        public byte[]? LoadValue(string key) => _values.TryGetValue(key, out var value) ? value : null;
+        public void SaveValue(string key, byte[] value) => _values[key] = value;
     }
 
     [Fact]
@@ -92,5 +95,28 @@ public class CryptoServiceTests
             var ct = svc.EncryptString(pt);
             Assert.Equal(pt, svc.DecryptString(ct));
         }
+    }
+
+    [Fact]
+    public void Master_password_mode_reuses_the_same_DEK()
+    {
+        var store = new MemoryKeyStore();
+        var a = CryptoService.CreateOrLoad(store, CryptoUnlockOptions.WithMasterPassword("correct horse battery staple"));
+        Assert.True(CryptoService.HasMasterPassword(store));
+
+        var b = CryptoService.CreateOrLoad(store, CryptoUnlockOptions.WithMasterPassword("correct horse battery staple"));
+        var ct = a.EncryptString("portable secret");
+
+        Assert.Equal("portable secret", b.DecryptString(ct));
+    }
+
+    [Fact]
+    public void Master_password_mode_rejects_the_wrong_password()
+    {
+        var store = new MemoryKeyStore();
+        _ = CryptoService.CreateOrLoad(store, CryptoUnlockOptions.WithMasterPassword("right-password"));
+
+        Assert.ThrowsAny<CryptographicException>(() =>
+            CryptoService.CreateOrLoad(store, CryptoUnlockOptions.WithMasterPassword("wrong-password")));
     }
 }

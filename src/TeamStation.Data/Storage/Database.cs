@@ -11,9 +11,9 @@ namespace TeamStation.Data.Storage;
 /// whole process would serialize the UI needlessly.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class Database : IKeyStore
+public sealed class Database : ISecretStore
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
 
     public string Path { get; }
 
@@ -86,7 +86,11 @@ CREATE TABLE IF NOT EXISTS folders (
     default_mode         INTEGER,
     default_quality      INTEGER,
     default_access       INTEGER,
-    default_password_enc BLOB
+    default_password_enc BLOB,
+    default_tv_path      TEXT,
+    default_wake_broadcast TEXT,
+    pre_launch_script    TEXT,
+    post_launch_script   TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_folders_parent ON folders(parent_folder_id);
 CREATE TABLE IF NOT EXISTS entries (
@@ -94,6 +98,7 @@ CREATE TABLE IF NOT EXISTS entries (
     parent_folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL,
     name             TEXT NOT NULL,
     tv_id            TEXT NOT NULL,
+    profile_name     TEXT NOT NULL DEFAULT 'Default',
     password_enc     BLOB,
     mode             INTEGER,
     quality          INTEGER,
@@ -105,11 +110,43 @@ CREATE TABLE IF NOT EXISTS entries (
     notes            TEXT,
     tags_csv         TEXT,
     last_connected   TEXT,
+    tv_path_override TEXT,
+    is_pinned        INTEGER NOT NULL DEFAULT 0,
+    wake_mac         TEXT,
+    wake_broadcast   TEXT,
+    pre_launch_script TEXT,
+    post_launch_script TEXT,
     created_utc      TEXT NOT NULL,
     modified_utc     TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_entries_parent ON entries(parent_folder_id);
 CREATE INDEX IF NOT EXISTS ix_entries_name   ON entries(name);
+CREATE INDEX IF NOT EXISTS ix_entries_last_connected ON entries(last_connected);
+CREATE TABLE IF NOT EXISTS session_history (
+    id             TEXT PRIMARY KEY,
+    entry_id       TEXT,
+    entry_name     TEXT NOT NULL,
+    tv_id          TEXT NOT NULL,
+    profile_name   TEXT NOT NULL,
+    mode           INTEGER,
+    route          TEXT NOT NULL,
+    process_id     INTEGER,
+    started_utc    TEXT NOT NULL,
+    ended_utc      TEXT,
+    notes          TEXT,
+    outcome        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_session_history_started ON session_history(started_utc);
+CREATE TABLE IF NOT EXISTS audit_log (
+    id            TEXT PRIMARY KEY,
+    occurred_utc  TEXT NOT NULL,
+    action        TEXT NOT NULL,
+    target_type   TEXT NOT NULL,
+    target_id     TEXT,
+    summary       TEXT NOT NULL,
+    detail        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
 ";
         cmd.ExecuteNonQuery();
         tx.Commit();
@@ -181,26 +218,117 @@ CREATE INDEX ix_entries_name   ON entries(name);
             }
             WriteSchemaVersion(c, tx, 2);
             tx.Commit();
+            version = 2;
         }
+
+        if (version < 3)
+        {
+            using var tx = c.BeginTransaction();
+            AddColumnIfMissing(c, tx, "entries", "profile_name", "TEXT NOT NULL DEFAULT 'Default'");
+            AddColumnIfMissing(c, tx, "entries", "tv_path_override", "TEXT");
+            AddColumnIfMissing(c, tx, "entries", "is_pinned", "INTEGER NOT NULL DEFAULT 0");
+            AddColumnIfMissing(c, tx, "entries", "wake_mac", "TEXT");
+            AddColumnIfMissing(c, tx, "entries", "wake_broadcast", "TEXT");
+            AddColumnIfMissing(c, tx, "entries", "pre_launch_script", "TEXT");
+            AddColumnIfMissing(c, tx, "entries", "post_launch_script", "TEXT");
+            AddColumnIfMissing(c, tx, "folders", "default_tv_path", "TEXT");
+            AddColumnIfMissing(c, tx, "folders", "default_wake_broadcast", "TEXT");
+            AddColumnIfMissing(c, tx, "folders", "pre_launch_script", "TEXT");
+            AddColumnIfMissing(c, tx, "folders", "post_launch_script", "TEXT");
+
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = @"
+CREATE INDEX IF NOT EXISTS ix_entries_last_connected ON entries(last_connected);
+CREATE TABLE IF NOT EXISTS session_history (
+    id             TEXT PRIMARY KEY,
+    entry_id       TEXT,
+    entry_name     TEXT NOT NULL,
+    tv_id          TEXT NOT NULL,
+    profile_name   TEXT NOT NULL,
+    mode           INTEGER,
+    route          TEXT NOT NULL,
+    process_id     INTEGER,
+    started_utc    TEXT NOT NULL,
+    ended_utc      TEXT,
+    notes          TEXT,
+    outcome        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_session_history_started ON session_history(started_utc);
+CREATE TABLE IF NOT EXISTS audit_log (
+    id            TEXT PRIMARY KEY,
+    occurred_utc  TEXT NOT NULL,
+    action        TEXT NOT NULL,
+    target_type   TEXT NOT NULL,
+    target_id     TEXT,
+    summary       TEXT NOT NULL,
+    detail        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
+";
+                cmd.ExecuteNonQuery();
+            }
+
+            WriteSchemaVersion(c, tx, 3);
+            tx.Commit();
+        }
+    }
+
+    private static void AddColumnIfMissing(
+        SqliteConnection c,
+        SqliteTransaction tx,
+        string table,
+        string column,
+        string definition)
+    {
+        using (var probe = c.CreateCommand())
+        {
+            probe.Transaction = tx;
+            probe.CommandText = $"PRAGMA table_info({table});";
+            using var reader = probe.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+        }
+
+        using var cmd = c.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
+        cmd.ExecuteNonQuery();
     }
 
     // ---- IKeyStore ----
     public byte[]? Load()
     {
-        using var c = OpenConnection();
-        using var cmd = c.CreateCommand();
-        cmd.CommandText = "SELECT value FROM _meta WHERE key = 'dek_v1';";
-        var result = cmd.ExecuteScalar();
-        return result as byte[];
+        return LoadValue("dek_v1");
     }
 
     public void Save(byte[] wrapped)
     {
-        ArgumentNullException.ThrowIfNull(wrapped);
+        SaveValue("dek_v1", wrapped);
+    }
+
+    public byte[]? LoadValue(string key)
+    {
         using var c = OpenConnection();
         using var cmd = c.CreateCommand();
-        cmd.CommandText = "INSERT OR REPLACE INTO _meta(key, value) VALUES ('dek_v1', $v);";
-        cmd.Parameters.AddWithValue("$v", wrapped);
+        cmd.CommandText = "SELECT value FROM _meta WHERE key = $key;";
+        cmd.Parameters.AddWithValue("$key", key);
+        var result = cmd.ExecuteScalar();
+        return result as byte[];
+    }
+
+    public void SaveValue(string key, byte[] value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        using var c = OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "INSERT OR REPLACE INTO _meta(key, value) VALUES ($key, $v);";
+        cmd.Parameters.AddWithValue("$key", key);
+        cmd.Parameters.AddWithValue("$v", value);
         cmd.ExecuteNonQuery();
     }
 }

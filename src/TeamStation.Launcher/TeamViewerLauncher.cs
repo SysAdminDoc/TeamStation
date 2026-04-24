@@ -16,7 +16,7 @@ public sealed class TeamViewerLauncher
 
     public TeamViewerLauncher() : this(TeamViewerPathResolver.Resolve) { }
 
-    internal TeamViewerLauncher(Func<string?> pathResolver)
+    public TeamViewerLauncher(Func<string?> pathResolver)
     {
         _pathResolver = pathResolver;
     }
@@ -41,7 +41,11 @@ public sealed class TeamViewerLauncher
 
     private LaunchOutcome LaunchViaCli(ConnectionEntry entry, LaunchOptions options)
     {
-        var exe = _pathResolver() ?? throw new FileNotFoundException(
+        var exe = string.IsNullOrWhiteSpace(entry.TeamViewerPathOverride)
+            ? _pathResolver()
+            : entry.TeamViewerPathOverride;
+        if (string.IsNullOrWhiteSpace(exe))
+            throw new FileNotFoundException(
             "TeamViewer.exe not found. Install TeamViewer and make sure the full client is available in its normal install location.");
 
         var argv = CliArgvBuilder.Build(entry, base64Password: options.UseBase64Password);

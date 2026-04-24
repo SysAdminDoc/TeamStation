@@ -57,12 +57,34 @@ public partial class App : Application
             }
 
             var dbPath = StoragePaths.ResolveDatabasePath();
+            var settingsService = new SettingsService(StoragePaths.ResolveSettingsPath());
+            var settings = settingsService.Load();
+            if (!settings.HasAcceptedLaunchNotice)
+            {
+                var accepted = MessageBox.Show(
+                    "TeamStation is a shortcut manager for the official TeamViewer client. It stores credentials locally, launches the unmodified TeamViewer app, and does not inspect or relay sessions.\n\nSaved passwords are encrypted at rest, but TeamViewer still receives credentials during launch. Continue?",
+                    "TeamStation first run",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Information,
+                    MessageBoxResult.Cancel) == MessageBoxResult.OK;
+                if (!accepted)
+                {
+                    Shutdown(0);
+                    return;
+                }
+
+                settings.HasAcceptedLaunchNotice = true;
+                settingsService.Save(settings);
+            }
+
             var db = new Database(dbPath);
-            var crypto = CryptoService.CreateOrLoad(db);
+            var crypto = CreateCrypto(db);
             var entries = new EntryRepository(db, crypto);
             var folders = new FolderRepository(db, crypto);
-            var launcher = new TeamViewerLauncher();
-            var tvExePath = TeamViewerPathResolver.Resolve();
+            var sessions = new SessionRepository(db);
+            var audit = new AuditLogRepository(db);
+            var launcher = new TeamViewerLauncher(() => ResolveTeamViewerPath(settings));
+            var tvExePath = ResolveTeamViewerPath(settings);
             var version = Assembly.GetExecutingAssembly()
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                 ?? "dev";
@@ -119,13 +141,17 @@ public partial class App : Application
                     MessageBox.Show(owner!, message, "TeamStation",
                         MessageBoxButton.OKCancel, MessageBoxImage.Warning,
                         MessageBoxResult.Cancel) == MessageBoxResult.OK,
+                settings: settings,
+                settingsService: settingsService,
+                sessions: sessions,
+                auditLog: audit,
                 tvExePath: tvExePath,
                 startupVersion: version,
                 startupDbPath: dbPath);
 
             var window = new MainWindow(vm);
             MainWindow = window;
-            _tray = new TrayManager(window);
+            _tray = new TrayManager(window, vm);
             window.Show();
         }
         catch (Exception ex)
@@ -140,6 +166,26 @@ public partial class App : Application
         var body = $"{ex.GetType().Name}: {ex.Message}\n\n{ex}";
         MessageBox.Show(body, $"TeamStation — {title}",
             MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
+    private static string? ResolveTeamViewerPath(AppSettings settings)
+    {
+        return !string.IsNullOrWhiteSpace(settings.TeamViewerPathOverride) && File.Exists(settings.TeamViewerPathOverride)
+            ? settings.TeamViewerPathOverride
+            : TeamViewerPathResolver.Resolve();
+    }
+
+    private static CryptoService CreateCrypto(Database db)
+    {
+        if (!StoragePaths.IsPortable(out _))
+            return CryptoService.CreateOrLoad(db);
+
+        var hasMasterPassword = CryptoService.HasMasterPassword(db);
+        var dialog = new MasterPasswordWindow(createNew: !hasMasterPassword);
+        if (dialog.ShowDialog() != true)
+            throw new InvalidOperationException("A master password is required in portable mode.");
+
+        return CryptoService.CreateOrLoad(db, CryptoUnlockOptions.WithMasterPassword(dialog.Password));
     }
 
     protected override void OnExit(ExitEventArgs e)

@@ -23,11 +23,13 @@ public sealed class EntryRepository
         using var c = _db.OpenConnection();
         using var cmd = c.CreateCommand();
         cmd.CommandText = @"
-SELECT id, parent_folder_id, name, tv_id, password_enc, mode, quality, access_control,
+SELECT id, parent_folder_id, name, tv_id, profile_name, password_enc, mode, quality, access_control,
        proxy_host, proxy_port, proxy_user, proxy_pass_enc,
-       notes, tags_csv, last_connected, created_utc, modified_utc
+       notes, tags_csv, last_connected, tv_path_override, is_pinned,
+       wake_mac, wake_broadcast, pre_launch_script, post_launch_script,
+       created_utc, modified_utc
 FROM entries
-ORDER BY name COLLATE NOCASE;";
+ORDER BY is_pinned DESC, last_connected DESC, name COLLATE NOCASE;";
         using var reader = cmd.ExecuteReader();
         var list = new List<ConnectionEntry>();
         while (reader.Read()) list.Add(Materialize(reader));
@@ -39,9 +41,11 @@ ORDER BY name COLLATE NOCASE;";
         using var c = _db.OpenConnection();
         using var cmd = c.CreateCommand();
         cmd.CommandText = @"
-SELECT id, parent_folder_id, name, tv_id, password_enc, mode, quality, access_control,
+SELECT id, parent_folder_id, name, tv_id, profile_name, password_enc, mode, quality, access_control,
        proxy_host, proxy_port, proxy_user, proxy_pass_enc,
-       notes, tags_csv, last_connected, created_utc, modified_utc
+       notes, tags_csv, last_connected, tv_path_override, is_pinned,
+       wake_mac, wake_broadcast, pre_launch_script, post_launch_script,
+       created_utc, modified_utc
 FROM entries WHERE id = $id;";
         cmd.Parameters.AddWithValue("$id", id.ToString("D"));
         using var reader = cmd.ExecuteReader();
@@ -57,17 +61,22 @@ FROM entries WHERE id = $id;";
         using var cmd = c.CreateCommand();
         cmd.CommandText = @"
 INSERT INTO entries(
-    id, parent_folder_id, name, tv_id, password_enc, mode, quality, access_control,
+    id, parent_folder_id, name, tv_id, profile_name, password_enc, mode, quality, access_control,
     proxy_host, proxy_port, proxy_user, proxy_pass_enc,
-    notes, tags_csv, last_connected, created_utc, modified_utc)
+    notes, tags_csv, last_connected, tv_path_override, is_pinned,
+    wake_mac, wake_broadcast, pre_launch_script, post_launch_script,
+    created_utc, modified_utc)
 VALUES (
-    $id, $parent, $name, $tv_id, $pw, $mode, $quality, $ac,
+    $id, $parent, $name, $tv_id, $profile, $pw, $mode, $quality, $ac,
     $ph, $pp, $pu, $ppw,
-    $notes, $tags, $last, $created, $modified)
+    $notes, $tags, $last, $tv_path, $pinned,
+    $wake_mac, $wake_broadcast, $pre_script, $post_script,
+    $created, $modified)
 ON CONFLICT(id) DO UPDATE SET
     parent_folder_id = excluded.parent_folder_id,
     name             = excluded.name,
     tv_id            = excluded.tv_id,
+    profile_name     = excluded.profile_name,
     password_enc     = excluded.password_enc,
     mode             = excluded.mode,
     quality          = excluded.quality,
@@ -79,11 +88,18 @@ ON CONFLICT(id) DO UPDATE SET
     notes            = excluded.notes,
     tags_csv         = excluded.tags_csv,
     last_connected   = excluded.last_connected,
+    tv_path_override = excluded.tv_path_override,
+    is_pinned        = excluded.is_pinned,
+    wake_mac         = excluded.wake_mac,
+    wake_broadcast   = excluded.wake_broadcast,
+    pre_launch_script = excluded.pre_launch_script,
+    post_launch_script = excluded.post_launch_script,
     modified_utc     = excluded.modified_utc;";
         cmd.Parameters.AddWithValue("$id", entry.Id.ToString("D"));
         cmd.Parameters.AddWithValue("$parent", (object?)entry.ParentFolderId?.ToString("D") ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$name", entry.Name);
         cmd.Parameters.AddWithValue("$tv_id", entry.TeamViewerId);
+        cmd.Parameters.AddWithValue("$profile", string.IsNullOrWhiteSpace(entry.ProfileName) ? "Default" : entry.ProfileName.Trim());
         cmd.Parameters.AddWithValue("$pw", (object?)_crypto.EncryptString(entry.Password) ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$mode", (object?)entry.Mode is null ? DBNull.Value : (int)entry.Mode!);
         cmd.Parameters.AddWithValue("$quality", (object?)entry.Quality is null ? DBNull.Value : (int)entry.Quality!);
@@ -95,6 +111,12 @@ ON CONFLICT(id) DO UPDATE SET
         cmd.Parameters.AddWithValue("$notes", (object?)entry.Notes ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$tags", entry.Tags.Count == 0 ? (object)DBNull.Value : string.Join(',', entry.Tags));
         cmd.Parameters.AddWithValue("$last", (object?)entry.LastConnectedUtc?.ToString("O", CultureInfo.InvariantCulture) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$tv_path", (object?)entry.TeamViewerPathOverride ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$pinned", entry.IsPinned ? 1 : 0);
+        cmd.Parameters.AddWithValue("$wake_mac", (object?)entry.WakeMacAddress ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$wake_broadcast", (object?)entry.WakeBroadcastAddress ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$pre_script", (object?)entry.PreLaunchScript ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$post_script", (object?)entry.PostLaunchScript ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$created", entry.CreatedUtc.ToString("O", CultureInfo.InvariantCulture));
         cmd.Parameters.AddWithValue("$modified", entry.ModifiedUtc.ToString("O", CultureInfo.InvariantCulture));
         cmd.ExecuteNonQuery();
@@ -127,29 +149,36 @@ ON CONFLICT(id) DO UPDATE SET
             ParentFolderId = r.IsDBNull(1) ? null : Guid.Parse(r.GetString(1)),
             Name = r.GetString(2),
             TeamViewerId = r.GetString(3),
-            Password = r.IsDBNull(4) ? null : _crypto.DecryptString((byte[])r["password_enc"]),
-            Mode = r.IsDBNull(5) ? null : (ConnectionMode?)r.GetInt32(5),
-            Quality = r.IsDBNull(6) ? null : (ConnectionQuality?)r.GetInt32(6),
-            AccessControl = r.IsDBNull(7) ? null : (AccessControl?)r.GetInt32(7),
-            Notes = r.IsDBNull(12) ? null : r.GetString(12),
-            Tags = r.IsDBNull(13)
+            ProfileName = r.IsDBNull(4) ? "Default" : r.GetString(4),
+            Password = r.IsDBNull(5) ? null : _crypto.DecryptString((byte[])r["password_enc"]),
+            Mode = r.IsDBNull(6) ? null : (ConnectionMode?)r.GetInt32(6),
+            Quality = r.IsDBNull(7) ? null : (ConnectionQuality?)r.GetInt32(7),
+            AccessControl = r.IsDBNull(8) ? null : (AccessControl?)r.GetInt32(8),
+            Notes = r.IsDBNull(13) ? null : r.GetString(13),
+            Tags = r.IsDBNull(14)
                 ? new List<string>()
-                : r.GetString(13).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
-            LastConnectedUtc = r.IsDBNull(14) ? null : DateTimeOffset.Parse(r.GetString(14), CultureInfo.InvariantCulture),
+                : r.GetString(14).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
+            LastConnectedUtc = r.IsDBNull(15) ? null : DateTimeOffset.Parse(r.GetString(15), CultureInfo.InvariantCulture),
+            TeamViewerPathOverride = r.IsDBNull(16) ? null : r.GetString(16),
+            IsPinned = !r.IsDBNull(17) && r.GetInt32(17) != 0,
+            WakeMacAddress = r.IsDBNull(18) ? null : r.GetString(18),
+            WakeBroadcastAddress = r.IsDBNull(19) ? null : r.GetString(19),
+            PreLaunchScript = r.IsDBNull(20) ? null : r.GetString(20),
+            PostLaunchScript = r.IsDBNull(21) ? null : r.GetString(21),
         };
 
-        if (!r.IsDBNull(8) && !r.IsDBNull(9))
+        if (!r.IsDBNull(9) && !r.IsDBNull(10))
         {
             entry.Proxy = new ProxySettings(
-                Host: r.GetString(8),
-                Port: r.GetInt32(9),
-                Username: r.IsDBNull(10) ? null : r.GetString(10),
-                Password: r.IsDBNull(11) ? null : _crypto.DecryptString((byte[])r["proxy_pass_enc"]));
+                Host: r.GetString(9),
+                Port: r.GetInt32(10),
+                Username: r.IsDBNull(11) ? null : r.GetString(11),
+                Password: r.IsDBNull(12) ? null : _crypto.DecryptString((byte[])r["proxy_pass_enc"]));
         }
 
         // CreatedUtc is init-only; assign via reflection-free path by rebuilding object
-        var createdUtc = DateTimeOffset.Parse(r.GetString(15), CultureInfo.InvariantCulture);
-        var modifiedUtc = DateTimeOffset.Parse(r.GetString(16), CultureInfo.InvariantCulture);
+        var createdUtc = DateTimeOffset.Parse(r.GetString(22), CultureInfo.InvariantCulture);
+        var modifiedUtc = DateTimeOffset.Parse(r.GetString(23), CultureInfo.InvariantCulture);
         return CloneWithTimestamps(entry, createdUtc, modifiedUtc);
     }
 
@@ -162,11 +191,18 @@ ON CONFLICT(id) DO UPDATE SET
             ParentFolderId = src.ParentFolderId,
             Name = src.Name,
             TeamViewerId = src.TeamViewerId,
+            ProfileName = src.ProfileName,
             Password = src.Password,
             Mode = src.Mode,
             Quality = src.Quality,
             AccessControl = src.AccessControl,
             Proxy = src.Proxy,
+            TeamViewerPathOverride = src.TeamViewerPathOverride,
+            IsPinned = src.IsPinned,
+            WakeMacAddress = src.WakeMacAddress,
+            WakeBroadcastAddress = src.WakeBroadcastAddress,
+            PreLaunchScript = src.PreLaunchScript,
+            PostLaunchScript = src.PostLaunchScript,
             Notes = src.Notes,
             Tags = src.Tags,
             LastConnectedUtc = src.LastConnectedUtc,

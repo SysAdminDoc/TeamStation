@@ -24,8 +24,20 @@ public static class InheritanceResolver
         var quality = entry.Quality;
         var ac = entry.AccessControl;
         var password = entry.Password;
+        var tvPath = entry.TeamViewerPathOverride;
+        var wakeBroadcast = entry.WakeBroadcastAddress;
+        var preLaunchScript = entry.PreLaunchScript;
+        var postLaunchScript = entry.PostLaunchScript;
 
-        var anyNull = mode is null || quality is null || ac is null || string.IsNullOrEmpty(password);
+        var anyNull =
+            mode is null ||
+            quality is null ||
+            ac is null ||
+            string.IsNullOrEmpty(password) ||
+            string.IsNullOrEmpty(tvPath) ||
+            string.IsNullOrEmpty(wakeBroadcast) ||
+            string.IsNullOrEmpty(preLaunchScript) ||
+            string.IsNullOrEmpty(postLaunchScript);
         if (anyNull)
         {
             foreach (var ancestor in WalkAncestors(entry.ParentFolderId, foldersById))
@@ -35,9 +47,26 @@ public static class InheritanceResolver
                 if (ac is null && ancestor.DefaultAccessControl is { } a) ac = a;
                 if (string.IsNullOrEmpty(password) && !string.IsNullOrEmpty(ancestor.DefaultPassword))
                     password = ancestor.DefaultPassword;
+                if (string.IsNullOrEmpty(tvPath) && !string.IsNullOrEmpty(ancestor.DefaultTeamViewerPath))
+                    tvPath = ancestor.DefaultTeamViewerPath;
+                if (string.IsNullOrEmpty(wakeBroadcast) && !string.IsNullOrEmpty(ancestor.DefaultWakeBroadcastAddress))
+                    wakeBroadcast = ancestor.DefaultWakeBroadcastAddress;
+                if (string.IsNullOrEmpty(preLaunchScript) && !string.IsNullOrEmpty(ancestor.PreLaunchScript))
+                    preLaunchScript = ancestor.PreLaunchScript;
+                if (string.IsNullOrEmpty(postLaunchScript) && !string.IsNullOrEmpty(ancestor.PostLaunchScript))
+                    postLaunchScript = ancestor.PostLaunchScript;
 
-                if (mode is not null && quality is not null && ac is not null && !string.IsNullOrEmpty(password))
+                if (mode is not null &&
+                    quality is not null &&
+                    ac is not null &&
+                    !string.IsNullOrEmpty(password) &&
+                    !string.IsNullOrEmpty(tvPath) &&
+                    !string.IsNullOrEmpty(wakeBroadcast) &&
+                    !string.IsNullOrEmpty(preLaunchScript) &&
+                    !string.IsNullOrEmpty(postLaunchScript))
+                {
                     break;
+                }
             }
         }
 
@@ -47,11 +76,18 @@ public static class InheritanceResolver
             ParentFolderId = entry.ParentFolderId,
             Name = entry.Name,
             TeamViewerId = entry.TeamViewerId,
+            ProfileName = entry.ProfileName,
             Password = password,
             Mode = mode,
             Quality = quality,
             AccessControl = ac,
             Proxy = entry.Proxy,
+            TeamViewerPathOverride = tvPath,
+            IsPinned = entry.IsPinned,
+            WakeMacAddress = entry.WakeMacAddress,
+            WakeBroadcastAddress = wakeBroadcast,
+            PreLaunchScript = preLaunchScript,
+            PostLaunchScript = postLaunchScript,
             Notes = entry.Notes,
             Tags = entry.Tags,
             LastConnectedUtc = entry.LastConnectedUtc,
