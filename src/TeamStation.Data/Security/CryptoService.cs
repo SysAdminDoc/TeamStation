@@ -37,12 +37,14 @@ public sealed class CryptoService : IDisposable
     private const int TagSize = 16;
     private const int KeySize = 32;
     private const int MasterSaltSize = 32;
+    private const int DpapiEntropySize = 32;
     private const int LegacyPbkdf2Iterations = 310_000;
     private const int Argon2TimeCost = 3;
     private const int Argon2MemoryKiB = 64 * 1024; // 64 MiB
     private const int Argon2Parallelism = 2;
     private const string DpapiDekKey = "dek_v1";
     private const string DpapiDekPendingKey = "dek_v1_pending";
+    private const string DpapiEntropyKey = "dpapi_entropy_v1";
     private const string MasterWrappedDekKey = "dek_master_v1";
     private const string MasterSaltKey = "dek_master_salt_v1";
     private const string MasterKdfTag = "dek_master_kdf_v1";
@@ -108,22 +110,95 @@ public sealed class CryptoService : IDisposable
         if (options.UseMasterPassword)
             return CreateOrLoadWithMasterPassword(keyStore, options.MasterPasswordValue);
 
+        // Per-database entropy salt is hashed into ProtectedData's
+        // optionalEntropy parameter so the DPAPI trust boundary becomes
+        // "same Windows user AND has read this database file" instead of
+        // just "same Windows user". Defends against opportunistic malware
+        // that scrapes DPAPI blobs in bulk without ever opening our DB.
+        var entropy = GetOrCreateDpapiEntropy(keyStore, createIfMissing: true);
+
         var wrapped = keyStore.Load();
         byte[] dek;
         if (wrapped is null)
         {
             dek = RandomNumberGenerator.GetBytes(KeySize);
-            var protectedDek = ProtectedData.Protect(dek, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+            var protectedDek = ProtectedData.Protect(dek, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
             keyStore.Save(protectedDek);
         }
         else
         {
-            dek = ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+            dek = UnprotectDekWithLegacyFallback(wrapped, entropy, keyStore);
             if (dek.Length != KeySize)
                 throw new CryptographicException("Stored DEK has unexpected length.");
         }
 
         return new CryptoService(IntoPinned(dek));
+    }
+
+    /// <summary>
+    /// Fetches the per-database DPAPI entropy salt or generates and persists
+    /// one when missing. Falls through with <c>null</c> on stores that only
+    /// implement <see cref="IKeyStore"/> (no <see cref="ISecretStore.SaveValue"/>
+    /// surface) — those callers keep the legacy null-entropy behaviour and
+    /// the function does NOT crash, which preserves backward compatibility
+    /// with any test stub that pre-dates the entropy upgrade.
+    /// </summary>
+    private static byte[]? GetOrCreateDpapiEntropy(IKeyStore keyStore, bool createIfMissing)
+    {
+        if (keyStore is not ISecretStore secret)
+            return null;
+
+        var stored = secret.LoadValue(DpapiEntropyKey);
+        if (stored is { Length: DpapiEntropySize })
+            return stored;
+
+        if (!createIfMissing)
+            return null;
+
+        var fresh = RandomNumberGenerator.GetBytes(DpapiEntropySize);
+        secret.SaveValue(DpapiEntropyKey, fresh);
+        return fresh;
+    }
+
+    /// <summary>
+    /// Unwraps a stored DEK with the per-database entropy salt and falls back
+    /// to <c>optionalEntropy: null</c> on <see cref="CryptographicException"/>
+    /// so legacy v0.3.2 (and earlier) installs that wrapped under null
+    /// entropy keep working. On a successful legacy unwrap the DEK is
+    /// silently re-wrapped under the new entropy and the wrap row is
+    /// updated so the next load takes the fast path.
+    /// </summary>
+    private static byte[] UnprotectDekWithLegacyFallback(byte[] wrapped, byte[]? entropy, IKeyStore keyStore)
+    {
+        if (entropy is null)
+        {
+            // No ISecretStore surface — preserve legacy null-entropy behaviour.
+            return ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+        }
+
+        try
+        {
+            return ProtectedData.Unprotect(wrapped, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
+        }
+        catch (CryptographicException)
+        {
+            // Legacy null-entropy wrap. Unwrap with the original entropy,
+            // then re-wrap under the new entropy and persist so we don't
+            // hit the catch path again on the next load.
+            var dek = ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+            try
+            {
+                var rewrapped = ProtectedData.Protect(dek, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
+                keyStore.Save(rewrapped);
+            }
+            catch
+            {
+                // Re-wrap is best-effort. If the persist fails we still hand
+                // back a working DEK; the next load will hit the same legacy
+                // path and try again.
+            }
+            return dek;
+        }
     }
 
     public static bool HasMasterPassword(ISecretStore keyStore)
@@ -291,9 +366,17 @@ public sealed class CryptoService : IDisposable
     {
         var wrapped = keyStore.Load();
         if (wrapped is null) return null;
+        // The master-password "carry the existing DPAPI DEK over" path: try
+        // the new entropy first, fall through to a legacy null-entropy probe.
+        // We do NOT createIfMissing here — if no salt exists yet we want the
+        // legacy unwrap to succeed and the caller decides whether to seed the
+        // master-password envelope without persisting an unused salt row.
+        var entropy = GetOrCreateDpapiEntropy(keyStore, createIfMissing: false);
         try
         {
-            var dek = ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+            var dek = entropy is null
+                ? ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser)
+                : UnprotectDekWithLegacyFallback(wrapped, entropy, keyStore);
             return dek.Length == KeySize ? dek : null;
         }
         catch (CryptographicException)
@@ -448,12 +531,17 @@ public sealed class CryptoService : IDisposable
 
         var oldWrapped = secret.LoadValue(DpapiDekKey)
             ?? throw new InvalidOperationException("No DEK is stored; nothing to rotate from.");
-        var oldDekUnpinned = ProtectedData.Unprotect(oldWrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+        // Rotation participates in the same per-database entropy hardening
+        // as CreateOrLoad: read the salt (creating one on the fly if a
+        // pre-entropy install is rotating for the first time), unwrap with
+        // legacy fallback, and persist the new wrap with the salt baked in.
+        var entropy = GetOrCreateDpapiEntropy(keyStore, createIfMissing: true);
+        var oldDekUnpinned = UnprotectDekWithLegacyFallback(oldWrapped, entropy, keyStore);
         if (oldDekUnpinned.Length != KeySize)
             throw new CryptographicException("Stored DEK has unexpected length.");
 
         var newDekUnpinned = RandomNumberGenerator.GetBytes(KeySize);
-        var newWrapped = ProtectedData.Protect(newDekUnpinned, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+        var newWrapped = ProtectedData.Protect(newDekUnpinned, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
 
         // Hand the pinned buffers to the services so the caller sees the
         // same memory-hygiene guarantees on temporary rotation services as
