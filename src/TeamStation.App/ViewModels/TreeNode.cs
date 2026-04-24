@@ -6,6 +6,7 @@ public abstract class TreeNode : ViewModelBase
 {
     private bool _isExpanded;
     private bool _isSelected;
+    private bool _isVisible = true;
 
     protected TreeNode(FolderNode? parent)
     {
@@ -18,4 +19,5 @@ public abstract class TreeNode : ViewModelBase
 
     public bool IsExpanded { get => _isExpanded; set => SetField(ref _isExpanded, value); }
     public bool IsSelected { get => _isSelected; set => SetField(ref _isSelected, value); }
+    public bool IsVisible { get => _isVisible; set => SetField(ref _isVisible, value); }
 }

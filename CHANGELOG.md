@@ -2,6 +2,26 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [0.0.7] - 2026-04-23
+
+### Added
+- **Search / filter on the tree.** New search box in the toolbar with 150 ms input debounce. Filter matches on entry name, TeamViewer ID, notes, tags, and folder names. Folders are kept visible whenever any descendant matches, and auto-expand so the match is reachable without extra clicks. Empty query restores the full tree.
+  - `TreeNode.IsVisible` drives `TreeViewItem.Visibility` via a `BooleanToVisibilityConverter`.
+  - `MainViewModel.ApplyFilter()` runs a post-order DFS per root, so folder visibility tracks *current-subtree* matches without touching untouched branches.
+  - `ClearSearchCommand` resets in one click.
+- **JSON backup.** `TeamStation.Core/Serialization/JsonBackup` serializes the full folder + entry graph (and proxy settings) using `System.Text.Json` with `JsonStringEnumConverter`, pretty-printed, nulls omitted.
+  - **Export** prompts for a path via `SaveFileDialog`; warns before writing if any password field would appear in plaintext; writes a versioned envelope (`formatVersion`, `exportedAtUtc`, `folders`, `entries`).
+  - **Import** prompts via `OpenFileDialog`, parses, counts rows, asks for explicit confirmation ("existing rows with matching IDs will be overwritten"), and upserts through the same repository path so crypto re-encrypts each password.
+
+### Verified
+- Clean Release build, 0 warnings / 0 errors.
+- **Round-trip test:** a one-off harness seeded 1 folder (with accent `#F9E2AF`, default password, default mode) and 2 entries (one with null mode + concrete password, one with `FileTransfer` mode + tags), called `JsonBackup.Build`, wiped the DB, then called `JsonBackup.Parse` and re-upserted. All fields — accent color, default password, tags, null-vs-concrete mode, plaintext password — survived intact.
+- App boots cleanly with the new toolbar layout.
+
+### Notes
+- Import overwrites rows with matching IDs. If you want to merge two databases that share IDs (e.g. from a past clone), export one, hand-edit the IDs, then import.
+- `v0.1.0` still gating on CSV import (TeamViewer Management Console export format), tray with recent connections, embedded log panel, and a real-peer run of `TvLaunchSpike`.
+
 ## [0.0.6] - 2026-04-23
 
 ### Added

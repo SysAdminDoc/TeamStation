@@ -15,6 +15,7 @@
         WindowStartupLocation="CenterScreen"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <Style TargetType="Button" x:Key="ToolbarButton">
             <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
@@ -28,11 +29,26 @@
             <Setter Property="Foreground" Value="{StaticResource Crust}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        <Style TargetType="Button" x:Key="IconButton" BasedOn="{StaticResource ToolbarButton}">
+            <Setter Property="MinWidth" Value="44" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
         <Style TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+            <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVis}}" />
             <Setter Property="Padding" Value="2,3" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style TargetType="TextBox" x:Key="SearchBox">
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="MinWidth" Value="220" />
         </Style>
     </Window.Resources>
 
@@ -66,15 +82,35 @@
 
         <Border Grid.Row="1" Background="{StaticResource MantleBrush}" Padding="16,10"
                 BorderThickness="0,1,0,0" BorderBrush="{StaticResource CrustBrush}">
-            <StackPanel Orientation="Horizontal">
-                <Button Content="Launch" Style="{StaticResource PrimaryButton}" Command="{Binding LaunchCommand}" />
-                <Button Content="Add entry" Style="{StaticResource ToolbarButton}" Command="{Binding AddEntryCommand}" />
-                <Button Content="Add folder" Style="{StaticResource ToolbarButton}" Command="{Binding AddFolderCommand}" />
-                <Button Content="Edit" Style="{StaticResource ToolbarButton}" Command="{Binding EditCommand}" />
-                <Button Content="Rename" Style="{StaticResource ToolbarButton}" Command="{Binding RenameCommand}" />
-                <Button Content="Move" Style="{StaticResource ToolbarButton}" Command="{Binding MoveCommand}" />
-                <Button Content="Delete" Style="{StaticResource ToolbarButton}" Command="{Binding DeleteCommand}" />
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button Content="Launch" Style="{StaticResource PrimaryButton}" Command="{Binding LaunchCommand}" />
+                    <Button Content="Add entry" Style="{StaticResource ToolbarButton}" Command="{Binding AddEntryCommand}" />
+                    <Button Content="Add folder" Style="{StaticResource ToolbarButton}" Command="{Binding AddFolderCommand}" />
+                    <Button Content="Edit" Style="{StaticResource ToolbarButton}" Command="{Binding EditCommand}" />
+                    <Button Content="Rename" Style="{StaticResource ToolbarButton}" Command="{Binding RenameCommand}" />
+                    <Button Content="Move" Style="{StaticResource ToolbarButton}" Command="{Binding MoveCommand}" />
+                    <Button Content="Delete" Style="{StaticResource ToolbarButton}" Command="{Binding DeleteCommand}" />
+                    <Button Content="Import" Style="{StaticResource ToolbarButton}" Command="{Binding ImportCommand}" />
+                    <Button Content="Export" Style="{StaticResource ToolbarButton}" Command="{Binding ExportCommand}" />
+                </StackPanel>
+
+                <Grid Grid.Column="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Style="{StaticResource SearchBox}"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
+                    <Button Grid.Column="1" Content="Clear" Style="{StaticResource IconButton}"
+                            Margin="8,0,0,0" Command="{Binding ClearSearchCommand}" />
+                </Grid>
+            </Grid>
         </Border>
 
         <Border Grid.Row="2" Margin="16,12,16,12" Background="{StaticResource MantleBrush}" CornerRadius="6">

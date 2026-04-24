@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Runtime.Versioning;
 using System.Windows;
 using TeamStation.App.Mvvm;
 using TeamStation.App.Views;
 using TeamStation.Core.Models;
+using TeamStation.Core.Serialization;
 using TeamStation.Core.Services;
 using TeamStation.Data.Storage;
 using TeamStation.Launcher;
@@ -18,10 +20,14 @@ public sealed class MainViewModel : ViewModelBase
     private readonly TeamViewerLauncher _launcher;
     private readonly Func<ConnectionEntry, Window?, bool> _editEntryDialog;
     private readonly Func<Folder, Window?, bool> _editFolderDialog;
+    private readonly Func<Window?, string?> _chooseExportPath;
+    private readonly Func<Window?, string?> _chooseImportPath;
+    private readonly Func<Window?, string, bool> _confirmDialog;
 
     private TreeNode? _selected;
     private string _status = string.Empty;
     private string _tvExePath;
+    private string _searchText = string.Empty;
     private Dictionary<Guid, Folder> _foldersById = new();
 
     public MainViewModel(
@@ -30,6 +36,9 @@ public sealed class MainViewModel : ViewModelBase
         TeamViewerLauncher launcher,
         Func<ConnectionEntry, Window?, bool> editEntryDialog,
         Func<Folder, Window?, bool> editFolderDialog,
+        Func<Window?, string?> chooseExportPath,
+        Func<Window?, string?> chooseImportPath,
+        Func<Window?, string, bool> confirmDialog,
         string? tvExePath)
     {
         _entries = entries;
@@ -37,6 +46,9 @@ public sealed class MainViewModel : ViewModelBase
         _launcher = launcher;
         _editEntryDialog = editEntryDialog;
         _editFolderDialog = editFolderDialog;
+        _chooseExportPath = chooseExportPath;
+        _chooseImportPath = chooseImportPath;
+        _confirmDialog = confirmDialog;
         _tvExePath = tvExePath ?? "TeamViewer.exe not found — install TeamViewer before launching";
 
         AddEntryCommand = new RelayCommand(AddEntry);
@@ -47,6 +59,9 @@ public sealed class MainViewModel : ViewModelBase
         DeleteCommand = new RelayCommand(Delete, () => Selected is not null);
         EditCommand = new RelayCommand(EditSelected, () => Selected is not null);
         LaunchCommand = new RelayCommand(Launch, () => Selected is EntryNode);
+        ExportCommand = new RelayCommand(Export);
+        ImportCommand = new RelayCommand(Import);
+        ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
 
         Reload();
     }
@@ -82,6 +97,19 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand DeleteCommand { get; }
     public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
+    public System.Windows.Input.ICommand ExportCommand { get; }
+    public System.Windows.Input.ICommand ImportCommand { get; }
+    public System.Windows.Input.ICommand ClearSearchCommand { get; }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetField(ref _searchText, value ?? string.Empty))
+                ApplyFilter();
+        }
+    }
 
     public void Reload()
     {
@@ -205,6 +233,127 @@ public sealed class MainViewModel : ViewModelBase
                     Status = $"Saved folder \"{folder.Name}\".";
                 }
                 break;
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        var query = _searchText.Trim();
+        if (query.Length == 0)
+        {
+            foreach (var node in EnumerateAll(RootNodes))
+                node.IsVisible = true;
+            return;
+        }
+
+        foreach (var root in RootNodes)
+            _ = ComputeVisibility(root, query);
+    }
+
+    private static bool ComputeVisibility(TreeNode node, string query)
+    {
+        var selfMatches = NodeMatches(node, query);
+
+        if (node is FolderNode folder)
+        {
+            var anyChildVisible = false;
+            foreach (var child in folder.Children)
+                if (ComputeVisibility(child, query))
+                    anyChildVisible = true;
+
+            var visible = selfMatches || anyChildVisible;
+            node.IsVisible = visible;
+            if (visible && anyChildVisible) folder.IsExpanded = true;
+            return visible;
+        }
+
+        node.IsVisible = selfMatches;
+        return selfMatches;
+    }
+
+    private static bool NodeMatches(TreeNode node, string query)
+    {
+        if (Contains(node.Name, query)) return true;
+        if (node is EntryNode entry)
+        {
+            if (Contains(entry.Model.TeamViewerId, query)) return true;
+            if (Contains(entry.Model.Notes, query)) return true;
+            foreach (var tag in entry.Model.Tags)
+                if (Contains(tag, query)) return true;
+        }
+        return false;
+    }
+
+    private static bool Contains(string? haystack, string needle) =>
+        haystack is not null && haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+
+    private static IEnumerable<TreeNode> EnumerateAll(IEnumerable<TreeNode> roots)
+    {
+        foreach (var n in roots)
+        {
+            yield return n;
+            if (n is FolderNode f)
+                foreach (var child in EnumerateAll(f.Children))
+                    yield return child;
+        }
+    }
+
+    private void Export()
+    {
+        var path = _chooseExportPath(Application.Current?.MainWindow);
+        if (path is null) return;
+
+        var anyPasswords = _entries.GetAll().Any(e => !string.IsNullOrEmpty(e.Password))
+                           || _folders.GetAll().Any(f => !string.IsNullOrEmpty(f.DefaultPassword));
+        if (anyPasswords && !_confirmDialog(Application.Current?.MainWindow,
+                "This export contains passwords in PLAINTEXT.\n\n" +
+                "Anyone with access to the resulting file can read them. Store it only where you would store a password manager vault.\n\n" +
+                "Continue?"))
+        {
+            Status = "Export cancelled.";
+            return;
+        }
+
+        try
+        {
+            var backup = JsonBackup.Build(_folders.GetAll(), _entries.GetAll());
+            File.WriteAllText(path, backup);
+            Status = $"Exported to {path}.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Export failed: {ex.Message}";
+            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Export failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void Import()
+    {
+        var path = _chooseImportPath(Application.Current?.MainWindow);
+        if (path is null) return;
+
+        try
+        {
+            var text = File.ReadAllText(path);
+            var (folders, entries) = JsonBackup.Parse(text);
+
+            if (!_confirmDialog(Application.Current?.MainWindow,
+                $"Import {folders.Count} folder(s) and {entries.Count} entr{(entries.Count == 1 ? "y" : "ies")} from\n\n{path}\n\n" +
+                "Existing rows with matching IDs will be overwritten. Continue?"))
+            {
+                Status = "Import cancelled.";
+                return;
+            }
+
+            foreach (var f in folders) _folders.Upsert(f);
+            foreach (var e in entries) _entries.Upsert(e);
+            Reload();
+            Status = $"Imported {folders.Count} folder(s) and {entries.Count} entr{(entries.Count == 1 ? "y" : "ies")}.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Import failed: {ex.Message}";
+            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Import failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
