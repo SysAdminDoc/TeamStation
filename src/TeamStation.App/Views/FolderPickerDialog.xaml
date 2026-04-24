@@ -14,8 +14,8 @@
             <Setter Property="Background" Value="{StaticResource MantleBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="18" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8" />
         </Style>
     </Window.Resources>
 
@@ -27,9 +27,18 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
-            <TextBlock Text="Move item" FontSize="26" FontWeight="SemiBold" />
-            <TextBlock Margin="0,10,0,0"
-                       Text="Choose a destination folder, or move the item to the top level if it should sit outside any folder."
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                           FontSize="12"
+                           Text="&#xE8DE;"
+                           Foreground="{StaticResource Subtext1Brush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0" />
+                <TextBlock Text="MOVE" Style="{StaticResource CaptionText}" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="Choose destination" Style="{StaticResource HeadlineText}" />
+            <TextBlock Margin="0,8,0,0"
+                       Text="Pick a target folder, or move the item to the top level if it should sit outside any folder."
                        Style="{StaticResource SectionSubtitleText}" />
         </StackPanel>
 
@@ -44,28 +53,26 @@
                                 Background="Transparent"
                                 BorderBrush="Transparent"
                                 BorderThickness="1"
-                                CornerRadius="12"
-                                Padding="12,10"
-                                Margin="0,0,0,6">
+                                CornerRadius="6"
+                                Padding="10,8"
+                                Margin="0,0,0,2">
                             <StackPanel Orientation="Horizontal">
-                                <Border Width="14"
-                                        Height="14"
-                                        CornerRadius="4"
-                                        Background="{Binding AccentBrush}"
-                                        BorderBrush="{StaticResource PanelBorderBrush}"
-                                        BorderThickness="1"
-                                        Margin="0,2,10,0" />
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                                           FontSize="13"
+                                           Text="&#xE8B7;"
+                                           Foreground="{Binding AccentBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,10,0" />
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
                         <HierarchicalDataTemplate.Triggers>
                             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsMouseOver}" Value="True">
-                                <Setter TargetName="PickerRow" Property="Background" Value="{StaticResource Surface0Brush}" />
-                                <Setter TargetName="PickerRow" Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+                                <Setter TargetName="PickerRow" Property="Background" Value="{DynamicResource Surface1Brush}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsSelected}" Value="True">
-                                <Setter TargetName="PickerRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
-                                <Setter TargetName="PickerRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
+                                <Setter TargetName="PickerRow" Property="Background" Value="{DynamicResource BlueSoftBrush}" />
+                                <Setter TargetName="PickerRow" Property="BorderBrush" Value="{DynamicResource BlueBrush}" />
                             </DataTrigger>
                         </HierarchicalDataTemplate.Triggers>
                     </HierarchicalDataTemplate>

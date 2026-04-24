@@ -14,8 +14,8 @@
             <Setter Property="Background" Value="{StaticResource MantleBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="18" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="22,20" />
         </Style>
     </Window.Resources>
 
@@ -28,22 +28,39 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
-            <TextBlock x:Name="DialogTitleText" FontSize="28" FontWeight="SemiBold" />
-            <TextBlock Margin="0,10,0,0"
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                           FontSize="12"
+                           Text="&#xE8B7;"
+                           Foreground="{StaticResource MauveBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0" />
+                <TextBlock Text="FOLDER" Style="{StaticResource CaptionText}" Foreground="{StaticResource MauveBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock x:Name="DialogTitleText" Style="{StaticResource DisplayText}" />
+            <TextBlock Margin="0,8,0,0"
                        Text="Tune how this folder looks and what descendant connections inherit when they leave settings on folder defaults."
                        Style="{StaticResource SectionSubtitleText}" />
         </StackPanel>
 
         <Border x:Name="ValidationBorder"
                 Grid.Row="1"
-                Margin="0,18,0,0"
+                Margin="0,16,0,0"
                 Padding="14,12"
                 Background="{StaticResource RedSoftBrush}"
                 BorderBrush="#44E86D8F"
                 BorderThickness="1"
-                CornerRadius="12"
+                CornerRadius="8"
                 Visibility="Collapsed">
-            <TextBlock x:Name="ValidationText" Foreground="{StaticResource RedBrush}" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal">
+                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                           FontSize="14"
+                           Text="&#xE814;"
+                           Foreground="{StaticResource RedBrush}"
+                           VerticalAlignment="Top"
+                           Margin="0,1,10,0" />
+                <TextBlock x:Name="ValidationText" Foreground="{StaticResource RedBrush}" TextWrapping="Wrap" />
+            </StackPanel>
         </Border>
 
         <ScrollViewer Grid.Row="2" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
