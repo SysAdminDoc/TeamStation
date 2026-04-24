@@ -15,27 +15,27 @@
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}">
     <Window.Resources>
         <Style x:Key="PanelCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource MantleBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="18" />
-            <Setter Property="Padding" Value="18" />
-        </Style>
-
-        <Style x:Key="SubPanelCard" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="14" />
-            <Setter Property="Padding" Value="16" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14" />
+        </Style>
+
+        <Style x:Key="SubPanelCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12" />
         </Style>
 
         <Style x:Key="ChipBorderStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="999" />
-            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="8,5" />
             <Setter Property="Margin" Value="0,0,8,8" />
         </Style>
 
@@ -54,9 +54,9 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
-            <Setter Property="Padding" Value="12,10" />
-            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Margin" Value="0,0,0,4" />
         </Style>
 
         <DataTemplate x:Key="EntryInspectorTemplate" DataType="{x:Type vm:EntryNode}">
@@ -324,50 +324,59 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Grid>
+    <Grid Background="{StaticResource BaseBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Margin="18,18,18,0" Style="{StaticResource PanelCard}">
+        <Border Grid.Row="0" Margin="12,12,12,8" Style="{StaticResource PanelCard}">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="420" />
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                <StackPanel>
-                    <TextBlock Text="LOCAL TEAMVIEWER WORKSPACE" Style="{StaticResource CaptionText}" Foreground="{StaticResource BlueBrush}" />
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                        <TextBlock Text="TeamStation" FontSize="30" FontWeight="SemiBold" />
-                        <Border Margin="12,4,0,0"
-                                Padding="10,4"
-                                CornerRadius="999"
-                                Background="{StaticResource Surface0Brush}"
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="TeamStation" FontSize="22" FontWeight="SemiBold" />
+                        <Border Margin="10,1,0,0"
+                                Padding="7,3"
+                                CornerRadius="4"
+                                Background="{StaticResource Surface1Brush}"
                                 BorderBrush="{StaticResource PanelBorderBrush}"
                                 BorderThickness="1"
-                                VerticalAlignment="Top">
+                                VerticalAlignment="Center">
                             <TextBlock x:Name="VersionBadge" Foreground="{StaticResource Subtext1Brush}" FontSize="11" FontWeight="SemiBold" />
                         </Border>
                     </StackPanel>
-                    <TextBlock Margin="0,10,0,0"
-                               Text="Organize unattended machines in a clear folder tree, inspect launch details before connecting, and keep TeamViewer credentials in a local encrypted workspace."
-                               Style="{StaticResource SectionSubtitleText}" />
-                </StackPanel>
 
-                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                    <WrapPanel HorizontalAlignment="Right">
-                        <Border Padding="10,6" CornerRadius="999" BorderThickness="1" BorderBrush="{StaticResource PanelBorderBrush}">
+                    <TextBlock Grid.Column="1"
+                               Margin="18,3,18,0"
+                               Text="{Binding DatabaseLocationDisplay}"
+                               Foreground="{StaticResource Subtext0Brush}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+
+                    <WrapPanel Grid.Column="2" HorizontalAlignment="Right">
+                        <Border ToolTip="{Binding TvExePath}">
                             <Border.Style>
-                                <Style TargetType="Border">
+                                <Style TargetType="Border" BasedOn="{StaticResource ChipBorderStyle}">
                                     <Setter Property="Background" Value="{StaticResource GreenSoftBrush}" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsTeamViewerReady}" Value="False">
                                             <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource RedSoftBrush}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -378,29 +387,9 @@
                             <TextBlock Text="{Binding TreeSummary}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" />
                         </Border>
                     </WrapPanel>
+                </Grid>
 
-                    <Border Margin="0,14,0,0" Style="{StaticResource SubPanelCard}">
-                        <StackPanel>
-                            <TextBlock Text="Launch target" Style="{StaticResource CaptionText}" />
-                            <TextBlock Margin="0,6,0,0" Text="{Binding TvExePath}" TextWrapping="Wrap" />
-                            <TextBlock Margin="0,14,0,0" Text="Database location" Style="{StaticResource CaptionText}" />
-                            <TextBlock Margin="0,6,0,0" Text="{Binding DatabaseLocationDisplay}" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="1" Margin="18,12,18,0" Style="{StaticResource PanelCard}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="360" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel>
-                    <TextBlock Text="Workspace actions" Style="{StaticResource CaptionText}" />
-                    <WrapPanel Margin="0,12,0,0">
+                <WrapPanel Grid.Row="1" Margin="0,12,0,0">
                         <Button Content="Launch" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" Command="{Binding LaunchCommand}" />
                         <Button Content="{Binding SelectedPinText}" Margin="0,0,8,8" Command="{Binding TogglePinCommand}" />
                         <Button Content="New connection" Margin="0,0,8,8" Command="{Binding AddEntryCommand}" />
@@ -418,44 +407,42 @@
                         <Button Content="Export sessions" Margin="0,0,8,8" Command="{Binding ExportSessionsCommand}" />
                         <Button Content="Settings" Margin="0,0,8,8" Command="{Binding OpenSettingsCommand}" />
                         <Button Content="{Binding ActivityButtonText}" Margin="0,0,8,8" Command="{Binding ToggleLogCommand}" />
-                    </WrapPanel>
+                </WrapPanel>
 
-                    <Border Margin="0,14,0,0" Style="{StaticResource SubPanelCard}" Padding="14">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.2*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                <Grid Grid.Row="2" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.1*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="360" />
+                    </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Quick ID" Style="{StaticResource CaptionText}" />
-                                <TextBox Margin="0,6,0,0" Text="{Binding QuickTeamViewerId, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="Name" Style="{StaticResource CaptionText}" />
-                                <TextBox Margin="0,6,0,0" Text="{Binding QuickName, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="4">
-                                <TextBlock Text="Password" Style="{StaticResource CaptionText}" />
-                                <PasswordBox Margin="0,6,0,0"
-                                             behaviors:PasswordBoxBinding.BoundPassword="{Binding QuickPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="6" VerticalAlignment="Bottom">
-                                <CheckBox Content="Save" IsChecked="{Binding QuickSaveConnection}" Margin="0,0,0,8" />
-                                <Button Content="Quick connect" Style="{StaticResource PrimaryButton}" Command="{Binding QuickConnectCommand}" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </StackPanel>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Quick ID" Style="{StaticResource CaptionText}" />
+                        <TextBox Margin="0,5,0,0" Text="{Binding QuickTeamViewerId, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Name" Style="{StaticResource CaptionText}" />
+                        <TextBox Margin="0,5,0,0" Text="{Binding QuickName, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Password" Style="{StaticResource CaptionText}" />
+                        <PasswordBox Margin="0,5,0,0"
+                                     behaviors:PasswordBoxBinding.BoundPassword="{Binding QuickPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="6" VerticalAlignment="Bottom">
+                        <CheckBox Content="Save" IsChecked="{Binding QuickSaveConnection}" Margin="0,0,0,6" />
+                        <Button Content="Quick connect" Style="{StaticResource PrimaryButton}" Command="{Binding QuickConnectCommand}" />
+                    </StackPanel>
 
-                <StackPanel Grid.Column="1" Margin="18,0,0,0">
-                    <TextBlock Text="Search workspace" Style="{StaticResource CaptionText}" />
-                    <Grid Margin="0,12,0,0">
+                    <StackPanel Grid.Column="8">
+                        <TextBlock Text="Search" Style="{StaticResource CaptionText}" />
+                        <Grid Margin="0,5,0,0">
                         <TextBox Padding="14,10,46,10"
                                  Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
                         <TextBlock Margin="14,0,46,0"
@@ -481,10 +468,15 @@
                                 Content="X"
                                 Visibility="{Binding HasSearchText, Converter={StaticResource BoolToVis}}"
                                 Command="{Binding ClearSearchCommand}" />
-                    </Grid>
-                    <TextBlock Margin="0,8,0,0" Text="{Binding SearchHintText}" Style="{StaticResource BodyMutedText}" />
-                    <Button Margin="0,12,0,0" Content="Save search" Command="{Binding SaveSearchCommand}" />
-                    <ItemsControl Margin="0,12,0,0"
+                        </Grid>
+                        <DockPanel Margin="0,8,0,0" LastChildFill="False">
+                            <Button DockPanel.Dock="Left" Content="Save search" Command="{Binding SaveSearchCommand}" MinWidth="110" />
+                            <TextBlock Margin="10,5,0,0" Text="{Binding SearchHintText}" Style="{StaticResource BodyMutedText}" />
+                        </DockPanel>
+                    </StackPanel>
+                </Grid>
+
+                <ItemsControl Grid.Row="3" Margin="0,8,0,0"
                                   ItemsSource="{Binding SavedSearches}"
                                   Visibility="{Binding HasSavedSearches, Converter={StaticResource BoolToVis}}">
                         <ItemsControl.ItemsPanel>
@@ -500,15 +492,14 @@
                                         CommandParameter="{Binding}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                </ItemsControl>
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" Margin="18,12,18,12">
+        <Grid Grid.Row="1" Margin="12,0,12,8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="430" />
-                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="410" />
+                <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -593,7 +584,7 @@
 
                                                 <Border Width="42"
                                                         Height="28"
-                                                        CornerRadius="8"
+                                                        CornerRadius="4"
                                                         Background="{StaticResource BlueSoftBrush}"
                                                         BorderBrush="{StaticResource BlueSoftBrush}"
                                                         BorderThickness="1"
@@ -709,51 +700,30 @@
 
             <Border Grid.Column="2" Style="{StaticResource PanelCard}">
                 <Grid>
-                    <Border Style="{StaticResource SubPanelCard}"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Center"
-                            Width="540"
-                            Visibility="{Binding ShowSelectionPlaceholder, Converter={StaticResource BoolToVis}}">
-                        <StackPanel>
-                            <TextBlock Text="Select a connection or folder" FontSize="26" FontWeight="SemiBold" TextAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center"
+                                HorizontalAlignment="Center"
+                                Width="560"
+                                Visibility="{Binding ShowSelectionPlaceholder, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Select a connection or folder"
+                                       FontSize="24"
+                                       FontWeight="SemiBold"
+                                       TextAlignment="Center" />
                             <TextBlock Margin="0,12,0,0"
                                        Text="Launch details, inherited defaults, notes, and status cues appear here so you can verify what will happen before you connect."
                                        Style="{StaticResource SectionSubtitleText}"
                                        TextAlignment="Center" />
 
-                            <Grid Margin="0,22,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="14" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0" Style="{StaticResource SubPanelCard}">
-                                    <StackPanel>
-                                        <TextBlock Text="Why it feels safe" Style="{StaticResource SectionTitleText}" />
-                                        <TextBlock Margin="0,10,0,0"
-                                                   Text="Passwords stay encrypted at rest and TeamStation never depends on a remote account or cloud sync."
-                                                   Style="{StaticResource SectionSubtitleText}" />
-                                    </StackPanel>
-                                </Border>
-
-                                <Border Grid.Column="2" Style="{StaticResource SubPanelCard}">
-                                    <StackPanel>
-                                        <TextBlock Text="How to move faster" Style="{StaticResource SectionTitleText}" />
-                                        <TextBlock Margin="0,10,0,0"
-                                                   Text="Use folders for customer or site grouping, then let child connections inherit launch defaults until they need exceptions."
-                                                   Style="{StaticResource SectionSubtitleText}" />
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
+                            <TextBlock Margin="0,18,0,0"
+                                       Text="Use folders for customer or site grouping. Passwords stay encrypted at rest, and launch details remain visible before a connection starts."
+                                       Style="{StaticResource BodyMutedText}"
+                                       TextAlignment="Center" />
 
                             <WrapPanel Margin="0,22,0,0" HorizontalAlignment="Center">
                                 <Button Content="New connection" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" Command="{Binding AddEntryCommand}" />
                                 <Button Content="New folder" Margin="0,0,8,8" Command="{Binding AddFolderCommand}" />
                                 <Button Content="Restore JSON" Margin="0,0,0,8" Command="{Binding ImportCommand}" />
                             </WrapPanel>
-                        </StackPanel>
-                    </Border>
+                    </StackPanel>
 
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
@@ -772,8 +742,8 @@
             </Border>
         </Grid>
 
-        <Border Grid.Row="3"
-                Margin="18,0,18,12"
+        <Border Grid.Row="2"
+                Margin="12,0,12,8"
                 Style="{StaticResource PanelCard}"
                 Visibility="{Binding IsLogVisible, Converter={StaticResource BoolToVis}}">
             <Grid>
@@ -825,7 +795,7 @@
                                     <Border Grid.Column="1"
                                             Margin="12,0,12,0"
                                             Padding="8,3"
-                                            CornerRadius="999"
+                                            CornerRadius="4"
                                             Background="{Binding LevelBrush}">
                                         <TextBlock Text="{Binding LevelTag}"
                                                    Foreground="{StaticResource CrustBrush}"
@@ -847,7 +817,7 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Background="{StaticResource CrustBrush}" Padding="18,12">
+        <Border Grid.Row="3" Background="{StaticResource CrustBrush}" Padding="18,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -862,7 +832,7 @@
                             VerticalAlignment="Center"
                             Margin="0,0,10,0" />
                     <Border Padding="10,4"
-                            CornerRadius="999"
+                            CornerRadius="4"
                             Background="{StaticResource Surface0Brush}"
                             BorderBrush="{StaticResource PanelBorderBrush}"
                             BorderThickness="1"

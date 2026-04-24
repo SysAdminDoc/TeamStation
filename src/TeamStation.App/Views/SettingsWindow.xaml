@@ -24,6 +24,12 @@
 
         <ScrollViewer Grid.Row="1" Margin="0,20,0,0" VerticalScrollBarVisibility="Auto">
             <StackPanel>
+                <TextBlock Text="Theme" Style="{StaticResource FieldLabelText}" />
+                <ComboBox x:Name="ThemeBox"
+                          DisplayMemberPath="Name"
+                          SelectedValuePath="Id" />
+                <TextBlock Margin="0,6,0,18" Text="Choose the app palette. Dark is the default; Light and High contrast are included for different working environments." Style="{StaticResource BodyMutedText}" />
+
                 <TextBlock Text="TeamViewer executable" Style="{StaticResource FieldLabelText}" />
                 <Grid>
                     <Grid.ColumnDefinitions>

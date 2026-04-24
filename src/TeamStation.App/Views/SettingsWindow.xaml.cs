@@ -13,6 +13,8 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         _settings = settings;
+        ThemeBox.ItemsSource = ThemeManager.Themes;
+        ThemeBox.SelectedValue = ThemeManager.Normalize(settings.Theme);
         TeamViewerPathBox.Text = settings.TeamViewerPathOverride ?? string.Empty;
         ApiTokenBox.Password = settings.TeamViewerApiToken ?? string.Empty;
         WakeBox.IsChecked = settings.WakeOnLanBeforeLaunch;
@@ -49,6 +51,7 @@ public partial class SettingsWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         _settings.TeamViewerPathOverride = BlankToNull(TeamViewerPathBox.Text);
+        _settings.Theme = ThemeBox.SelectedValue as string ?? "Dark";
         _settings.TeamViewerApiToken = BlankToNull(ApiTokenBox.Password);
         _settings.WakeOnLanBeforeLaunch = WakeBox.IsChecked == true;
         _settings.PreferClipboardPasswordLaunch = ClipboardPasswordBox.IsChecked == true;

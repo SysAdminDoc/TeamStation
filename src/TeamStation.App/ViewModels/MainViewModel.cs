@@ -710,6 +710,7 @@ public sealed class MainViewModel : ViewModelBase
             return;
 
         _settingsService.Save(_settings);
+        ThemeManager.Apply(_settings.Theme);
         TvExePath = !string.IsNullOrWhiteSpace(_settings.TeamViewerPathOverride)
             ? _settings.TeamViewerPathOverride
             : TeamViewerPathResolver.Resolve() ?? "TeamViewer.exe not found - install TeamViewer before launching";

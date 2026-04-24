@@ -62,6 +62,8 @@ public partial class App : Application
             var dbPath = StoragePaths.ResolveDatabasePath();
             var settingsService = new SettingsService(StoragePaths.ResolveSettingsPath());
             var settings = settingsService.Load();
+            settings.Theme = ThemeManager.Normalize(settings.Theme);
+            ThemeManager.Apply(settings.Theme);
             if (!settings.HasAcceptedLaunchNotice)
             {
                 var accepted = MessageBox.Show(
