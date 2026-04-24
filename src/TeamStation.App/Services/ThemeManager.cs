@@ -143,12 +143,21 @@ public static class ThemeManager
     {
         app.Resources[key] = color;
         var brushKey = key + "Brush";
-        if (app.Resources.Contains(brushKey) && app.Resources[brushKey] is SolidColorBrush brush)
+        if (app.Resources.Contains(brushKey) && app.Resources[brushKey] is SolidColorBrush brush && !brush.IsFrozen)
         {
+            // Fast path: the brush was declared mutable and is not yet sealed
+            // by a parent Freezable (e.g. a ControlTemplate). Update in-place
+            // so every StaticResource consumer picks the change up automatically.
             brush.Color = color;
             return;
         }
 
+        // Fallback path: brush either does not exist or was frozen when a
+        // ControlTemplate that referenced it at parse time was sealed. Swap in
+        // a fresh mutable brush — any DynamicResource consumer picks the new
+        // reference up automatically; StaticResource consumers that hold the
+        // old frozen brush will not re-theme until the view is re-created,
+        // which is acceptable for the rare freeze path.
         app.Resources[brushKey] = new SolidColorBrush(color);
     }
 

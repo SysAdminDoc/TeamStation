@@ -101,3 +101,4 @@ publish/
 publish-test/
 *.publish.local
 .factory/
+docs/research/

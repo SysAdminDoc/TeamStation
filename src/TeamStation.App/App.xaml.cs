@@ -123,6 +123,12 @@ public partial class App : Application
     private static void ShowFatal(Exception ex, string title)
     {
         var body = $"{ex.GetType().Name}: {ex.Message}\n\n{ex}";
+        try
+        {
+            var dumpPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "teamstation-fatal.log");
+            System.IO.File.AppendAllText(dumpPath, $"[{DateTime.Now:O}] {title}\n{body}\n\n");
+        }
+        catch { /* best-effort — do not block the MessageBox */ }
         MessageBox.Show(body, $"TeamStation — {title}",
             MessageBoxButton.OK, MessageBoxImage.Error);
     }
