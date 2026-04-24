@@ -207,19 +207,36 @@ public sealed class CryptoService
         _ => throw new CryptographicException($"Unknown master-key KDF: {kdfId}"),
     };
 
-    private static byte[] DerivePbkdf2(string masterPassword, byte[] salt) =>
-        Rfc2898DeriveBytes.Pbkdf2(masterPassword, salt, LegacyPbkdf2Iterations, HashAlgorithmName.SHA256, KeySize);
+    private static byte[] DerivePbkdf2(string masterPassword, byte[] salt)
+    {
+        // Rfc2898DeriveBytes.Pbkdf2 takes the password as `string` directly,
+        // so no extra byte[] copy of the master password exists on our
+        // heap beyond the immutable String itself. Nothing to zero here.
+        return Rfc2898DeriveBytes.Pbkdf2(masterPassword, salt, LegacyPbkdf2Iterations, HashAlgorithmName.SHA256, KeySize);
+    }
 
     private static byte[] DeriveArgon2id(string masterPassword, byte[] salt)
     {
-        using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(masterPassword))
+        // Argon2id's ctor takes a byte[], so we MUST materialise the UTF-8
+        // bytes of the master password. Zero that buffer as soon as the
+        // derivation completes so a post-derivation memory dump cannot
+        // scrape a recoverable copy of the master password from the heap.
+        var pwBytes = Encoding.UTF8.GetBytes(masterPassword);
+        try
         {
-            Salt = salt,
-            Iterations = Argon2TimeCost,
-            MemorySize = Argon2MemoryKiB,
-            DegreeOfParallelism = Argon2Parallelism,
-        };
-        return argon2.GetBytes(KeySize);
+            using var argon2 = new Argon2id(pwBytes)
+            {
+                Salt = salt,
+                Iterations = Argon2TimeCost,
+                MemorySize = Argon2MemoryKiB,
+                DegreeOfParallelism = Argon2Parallelism,
+            };
+            return argon2.GetBytes(KeySize);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(pwBytes);
+        }
     }
 
     /// <summary>

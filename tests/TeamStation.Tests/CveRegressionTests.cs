@@ -73,7 +73,10 @@ public class CveRegressionTests
             Mode = ConnectionMode.RemoteControl,
         };
 
-        Assert.ThrowsAny<Exception>(() => UriSchemeBuilder.Build(entry));
+        // Tightened from ThrowsAny<Exception>: the rejection must come
+        // from LaunchInputValidator, not from a side-effect bug in the
+        // scheme mapper or an NRE in the path assembly.
+        Assert.Throws<LaunchValidationException>(() => UriSchemeBuilder.Build(entry));
     }
 
     [Theory]
@@ -89,7 +92,7 @@ public class CveRegressionTests
             Mode = ConnectionMode.RemoteControl,
         };
 
-        Assert.ThrowsAny<Exception>(() => CliArgvBuilder.Build(entry));
+        Assert.Throws<LaunchValidationException>(() => CliArgvBuilder.Build(entry));
     }
 
     /// <summary>
@@ -129,7 +132,7 @@ public class CveRegressionTests
     {
         _ = label;
         var entry = new ConnectionEntry { Name = "target", TeamViewerId = payload, Mode = ConnectionMode.RemoteControl };
-        Assert.ThrowsAny<Exception>(() => UriSchemeBuilder.Build(entry));
+        Assert.Throws<LaunchValidationException>(() => UriSchemeBuilder.Build(entry));
     }
 
     [Theory]
@@ -138,7 +141,7 @@ public class CveRegressionTests
     {
         _ = label;
         var entry = new ConnectionEntry { Name = "target", TeamViewerId = payload, Mode = ConnectionMode.RemoteControl };
-        Assert.ThrowsAny<Exception>(() => CliArgvBuilder.Build(entry));
+        Assert.Throws<LaunchValidationException>(() => CliArgvBuilder.Build(entry));
     }
 
     public static TheoryData<string, string> ProxyEndpointExploitVectors() => new()

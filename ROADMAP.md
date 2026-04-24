@@ -10,9 +10,9 @@ Prioritization:
 
 ---
 
-## Current main progress after v0.1.1
+## Current main progress after v0.3.0
 
-The next product pass has landed the largest adoption blockers from P1/P2:
+v0.3.0 ships the largest adoption blockers from P1/P2 plus a focused security hardening pass:
 
 - App settings, first-run trust notice, portable-mode master password, and configurable TeamViewer.exe path.
 - Quick connect, saved searches, per-entry profile names, pinned entries, and pinned/recent tray launch menu.
@@ -148,6 +148,15 @@ The advanced workflow features from the v0.1.2 internal / v0.2.0 / v0.2.1 waves 
 - [ ] **P2 — Extend fuzz coverage to `ProxyHost` + `ProxyUsername` + `ProxyPassword`.** The iteration-1 fuzz targets only the four public validator methods; full argv/URI-builder fuzz would catch boundary bugs missed by individual validators.
 - [ ] **P1 — Surface `RotateDek` in Settings UI.** Now that the crypto primitive exists, wire a "Rotate encryption key" button that runs the migrator across `folders` + `entries` inside a single `BEGIN IMMEDIATE` transaction. Rollback on any failure, toast + log on success.
 - [ ] **P1 — Apply atomic-write pattern to `JsonBackup` export.** Current `Export` path writes to temp + atomic move but lacks the exception-rollback-and-cleanup sidecar test proved necessary for `SettingsService`. Mirror the guarantee and pin it with a twin of `AtomicWriteCrashTests`.
+
+### Postflight security audit follow-ups (2026-04-24)
+
+The adversarial security pass that closed out the v0.3.0 factory run flagged three systemic concerns worth surfacing as P1 issues for a subsequent release. None are v0.3.0-release blockers — they live at the architectural layer and need scoped design work.
+
+- [ ] **P1 — DEK memory lifecycle.** `CryptoService._dek` is a plain managed `byte[]` that lives for the process lifetime and is never zeroed. An attacker with memory-dump / swapfile access can scrape the DEK and decrypt every credential. Fix: make `CryptoService` `IDisposable`, `ZeroMemory` the DEK on dispose, wire the lifetime into the main object graph shutdown path. Consider also pinning the buffer so a GC compaction doesn't leave multiple copies on the heap.
+- [ ] **P1 — Decrypted plaintext leaks via `System.String`.** `DecryptString` hands back a `string`, which is CLR-interned/pooled and cannot be zeroed. Every password ever decrypted persists in the managed heap until process exit. `AppSettings.TeamViewerApiToken` has the same shape. Redesign the credential-read API to return `byte[]` (or `ImmutableArray<byte>`) and let callers zero after use. Visible blast radius.
+- [ ] **P1 — `CryptoService.RotateDek` has a crash-window between save-new-wrap and migrator-complete.** Closing the previous-ordering data-loss window (iteration 2 L4) opened this one: a hard crash between `keyStore.Save(newWrapped)` and migrator completion leaves the store holding a new DEK that the on-disk ciphertexts do not match. Mitigation path: two-phase commit with a `dek_v1_pending` marker — stage new DEK under the pending key, run the migrator inside a DB transaction, swap on commit (atomic replace of `dek_v1` + delete of `dek_v1_pending`). Recovery on startup reconciles by inspecting both slots.
+- [ ] **P2 — DPAPI wrap adds no `optionalEntropy`.** Any same-user process can call `ProtectedData.Unprotect` on `dek_v1` without any additional secret. Mitigate by hashing a per-database salt into the entropy parameter; the salt lives in `_meta` alongside the wrap and is public. This changes the DPAPI trust boundary from "same-user" to "same-user plus has-read-our-db-file" — useful against opportunistic malware that scrapes DPAPI blobs in bulk.
 
 ### Competitor gap matrix (iteration 2, 2026-04-24)
 
