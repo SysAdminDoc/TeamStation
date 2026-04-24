@@ -40,13 +40,9 @@ public partial class SettingsWindow : Window
 
     private void BrowseCloud_Click(object sender, RoutedEventArgs e)
     {
-        using var dialog = new System.Windows.Forms.FolderBrowserDialog
-        {
-            Description = "Select cloud sync folder",
-            UseDescriptionForTitle = true,
-        };
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            CloudFolderBox.Text = dialog.SelectedPath;
+        var selectedPath = FileSystemFolderDialog.Pick(this, "Select cloud sync folder", CloudFolderBox.Text);
+        if (selectedPath is not null)
+            CloudFolderBox.Text = selectedPath;
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
