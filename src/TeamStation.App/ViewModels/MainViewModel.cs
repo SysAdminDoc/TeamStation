@@ -32,6 +32,9 @@ public sealed class MainViewModel : ViewModelBase
     private bool _isLogVisible;
     private Dictionary<Guid, Folder> _foldersById = new();
     private const int MaxLogEntries = 500;
+    private readonly string _startupVersion;
+    private readonly string? _startupDbPath;
+    private readonly object _logLock = new();
 
     public MainViewModel(
         EntryRepository entries,
@@ -43,7 +46,9 @@ public sealed class MainViewModel : ViewModelBase
         Func<Window?, string?> chooseImportPath,
         Func<Window?, string?> chooseImportCsvPath,
         Func<Window?, string, bool> confirmDialog,
-        string? tvExePath)
+        string? tvExePath,
+        string? startupVersion = null,
+        string? startupDbPath = null)
     {
         _entries = entries;
         _folders = folders;
@@ -55,6 +60,8 @@ public sealed class MainViewModel : ViewModelBase
         _chooseImportCsvPath = chooseImportCsvPath;
         _confirmDialog = confirmDialog;
         _tvExePath = tvExePath ?? "TeamViewer.exe not found — install TeamViewer before launching";
+        _startupVersion = startupVersion ?? "dev";
+        _startupDbPath = startupDbPath;
 
         AddEntryCommand = new RelayCommand(AddEntry);
         AddFolderCommand = new RelayCommand(AddFolder);
@@ -70,8 +77,18 @@ public sealed class MainViewModel : ViewModelBase
         ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
         ToggleLogCommand = new RelayCommand(() => IsLogVisible = !IsLogVisible);
 
+        // Enable cross-thread access for collection bindings; all *mutations*
+        // still happen on the UI thread, but this makes future async writes safe.
+        System.Windows.Data.BindingOperations.EnableCollectionSynchronization(Log, _logLock);
+        System.Windows.Data.BindingOperations.EnableCollectionSynchronization(RootNodes, _logLock);
+
         Reload();
-        AppendLog(LogLevel.Info, "TeamStation started.");
+        AppendLog(LogLevel.Info, $"TeamStation v{_startupVersion} started.");
+        if (!string.IsNullOrEmpty(_startupDbPath))
+            AppendLog(LogLevel.Info, $"Database: {_startupDbPath}");
+        AppendLog(LogLevel.Info, tvExePath is null
+            ? "TeamViewer.exe not found — launches will be disabled until TeamViewer is installed."
+            : $"TeamViewer.exe: {tvExePath}");
     }
 
     public ObservableCollection<TreeNode> RootNodes { get; } = new();
@@ -347,13 +364,35 @@ public sealed class MainViewModel : ViewModelBase
         try
         {
             var backup = JsonBackup.Build(_folders.GetAll(), _entries.GetAll());
-            File.WriteAllText(path, backup);
+            AtomicWriteAllText(path, backup);
             ReportStatus(LogLevel.Success, $"Exported to {path}.");
         }
         catch (Exception ex)
         {
             ReportStatus(LogLevel.Error, $"Export failed: {ex.Message}");
             MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Export failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>
+    /// Writes <paramref name="contents"/> to <paramref name="destination"/> via a
+    /// sibling temp file + <see cref="File.Move(string,string,bool)"/> so that
+    /// a crash or disk-full mid-write cannot leave a truncated backup on disk.
+    /// </summary>
+    private static void AtomicWriteAllText(string destination, string contents)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(destination)) ?? ".";
+        var temp = Path.Combine(dir, $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllText(temp, contents);
+            File.Move(temp, destination, overwrite: true);
+        }
+        catch
+        {
+            // Best-effort cleanup; ignore cleanup failures so the original error surfaces.
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { /* swallow */ }
+            throw;
         }
     }
 
@@ -374,6 +413,19 @@ public sealed class MainViewModel : ViewModelBase
                 ReportStatus(LogLevel.Warning, "Import cancelled.");
                 return;
             }
+
+            // Upsert folders before entries so foreign keys resolve. Union of
+            // in-import folder IDs with current-DB IDs is the full set of valid
+            // parent targets; anything outside that set is a dangling pointer
+            // that would trip foreign_keys=ON.
+            var knownFolderIds = new HashSet<Guid>(
+                _folders.GetAll().Select(f => f.Id).Concat(folders.Select(f => f.Id)));
+            foreach (var f in folders)
+                if (f.ParentFolderId is { } pid && !knownFolderIds.Contains(pid))
+                    f.ParentFolderId = null;
+            foreach (var e in entries)
+                if (e.ParentFolderId is { } pid && !knownFolderIds.Contains(pid))
+                    e.ParentFolderId = null;
 
             foreach (var f in folders) _folders.Upsert(f);
             foreach (var e in entries) _entries.Upsert(e);
@@ -416,6 +468,18 @@ public sealed class MainViewModel : ViewModelBase
                 return;
             }
 
+            // Insert folders first so that entries with ParentFolderId = folder.Id
+            // don't trip the foreign-key constraint. CsvImport already guarantees
+            // referenced folders are in result.Folders, but an entry could carry a
+            // stray ParentFolderId pointing at a folder that was neither in this
+            // import nor in the current DB (e.g. re-running a partial import) — null
+            // those out defensively.
+            var knownFolderIds = new HashSet<Guid>(
+                _folders.GetAll().Select(f => f.Id).Concat(result.Folders.Select(f => f.Id)));
+            foreach (var e in result.Entries)
+                if (e.ParentFolderId is { } pid && !knownFolderIds.Contains(pid))
+                    e.ParentFolderId = null;
+
             foreach (var f in result.Folders) _folders.Upsert(f);
             foreach (var e in result.Entries) _entries.Upsert(e);
             foreach (var (line, reason) in result.Skipped)
@@ -435,6 +499,22 @@ public sealed class MainViewModel : ViewModelBase
 
     public void Reparent(TreeNode source, FolderNode? newParent)
     {
+        // Belt-and-braces: never let a folder land inside its own subtree even
+        // if a caller somehow bypasses the drag/picker guards. Protects the DB
+        // from cycles that would break the recursive tree walks.
+        if (source is FolderNode srcFolder && newParent is not null)
+        {
+            for (var cursor = (FolderNode?)newParent; cursor is not null; cursor = cursor.Parent)
+            {
+                if (cursor.Id == srcFolder.Id)
+                {
+                    ReportStatus(LogLevel.Warning,
+                        $"Cannot move \"{source.Name}\" inside its own subtree.");
+                    return;
+                }
+            }
+        }
+
         switch (source)
         {
             case FolderNode folder:

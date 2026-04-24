@@ -18,6 +18,8 @@ public static class JsonBackup
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // Tolerate lowercase / camelCase keys in hand-edited backups.
+        PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() },
     };
 
@@ -35,13 +37,40 @@ public static class JsonBackup
 
     public static (List<Folder> folders, List<ConnectionEntry> entries) Parse(string json)
     {
-        var dto = JsonSerializer.Deserialize<BackupDto>(json, Options)
-                  ?? throw new InvalidDataException("Backup JSON was empty.");
-        if (dto.FormatVersion < 1 || dto.FormatVersion > FormatVersion)
-            throw new InvalidDataException($"Backup format version {dto.FormatVersion} not supported.");
+        if (string.IsNullOrWhiteSpace(json))
+            throw new InvalidDataException("Backup JSON was empty.");
 
-        var folders = dto.Folders.Select(f => f.ToFolder()).ToList();
-        var entries = dto.Entries.Select(e => e.ToEntry()).ToList();
+        BackupDto? dto;
+        try { dto = JsonSerializer.Deserialize<BackupDto>(json, Options); }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException($"Backup JSON is malformed: {ex.Message}", ex);
+        }
+        if (dto is null)
+            throw new InvalidDataException("Backup JSON was empty.");
+        if (dto.FormatVersion < 1)
+            throw new InvalidDataException(
+                $"Backup has no format version (got {dto.FormatVersion}). This file may be from a different tool.");
+        if (dto.FormatVersion > FormatVersion)
+            throw new InvalidDataException(
+                $"Backup format version {dto.FormatVersion} is newer than this build supports (max {FormatVersion}). Upgrade TeamStation and retry.");
+
+        // Tolerate missing / null collections: older hand-edited backups may omit them.
+        var folders = (dto.Folders ?? new()).Select(f => f.ToFolder()).ToList();
+        var entries = (dto.Entries ?? new()).Select(e => e.ToEntry()).ToList();
+
+        // Null-out parent references that don't resolve within the import set.
+        // Without this, inserting an entry whose ParentFolderId points at a folder
+        // not in the import (and not already in the DB) would hit the foreign-key
+        // constraint. Defensive: re-home orphans to root rather than aborting.
+        var folderIds = new HashSet<Guid>(folders.Select(f => f.Id));
+        foreach (var f in folders)
+            if (f.ParentFolderId is { } pid && !folderIds.Contains(pid))
+                f.ParentFolderId = null;
+        foreach (var e in entries)
+            if (e.ParentFolderId is { } pid && !folderIds.Contains(pid))
+                e.ParentFolderId = null;
+
         return (folders, entries);
     }
 
@@ -49,8 +78,10 @@ public static class JsonBackup
     {
         public int FormatVersion { get; set; }
         public DateTimeOffset ExportedAtUtc { get; set; }
-        public List<FolderDto> Folders { get; set; } = new();
-        public List<EntryDto> Entries { get; set; } = new();
+        // Nullable on the wire so we can tolerate hand-edited backups that
+        // omit a collection entirely. Parse() defends with `?? new()`.
+        public List<FolderDto>? Folders { get; set; }
+        public List<EntryDto>? Entries { get; set; }
     }
 
     private sealed class FolderDto

@@ -2,6 +2,46 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-04-23
+
+Principal-engineer hardening pass on the MVP surface. Every change sits behind a test where practical.
+
+### Fixed
+- **Folder move: sibling targets were unreachable.** `FolderPickerDialog` was filtering whole root-level subtrees whenever they *contained* the moved folder — which meant moving `Customer A / Downtown site` to a sibling of `Downtown site` was impossible because the entire `Customer A` root got hidden. Replaced with a picker-specific `PickerFolderItem` tree that prunes only the moved folder's own subtree, so siblings remain valid targets. ([FolderPickerDialog.xaml.cs](src/TeamStation.App/Views/FolderPickerDialog.xaml.cs))
+- **CSV header matching missed spaced headers.** `CsvImport.Normalize` kept underscores but stripped spaces, so a file with columns `TeamViewer ID` / `Friendly Name` didn't match the `teamviewer_id` / `friendly_name` aliases. Normalisation now strips all non-alphanumerics on both sides, so `TV-ID`, `TV_ID`, `TV ID`, and `TVID` all collapse to `tvid`.
+- **JsonBackup crashed on hand-edited backups.** Parse now tolerates null / missing `folders` / `entries` arrays, camelCase or PascalCase keys, and malformed JSON (surfaces a clear `InvalidDataException` instead of propagating `JsonException`).
+- **Dangling parent references tripped the foreign-key constraint on import.** Both JSON and CSV import now null out any `ParentFolderId` that doesn't resolve to an existing folder (in-DB or in-import). The entry / folder lands at root instead of aborting the import.
+- **Non-atomic JSON export could truncate on crash.** Export writes to a sibling temp file and does an atomic `File.Move(overwrite: true)`; temp file is cleaned up on failure.
+- **Legacy `TeamViewer/Version*` folders sorted lexically.** `Version9` would rank above `Version10` under `StringComparer.OrdinalIgnoreCase`. Replaced with numeric parsing of the version suffix so the newest install wins.
+- **Two instances could race on the SQLite database.** Added a `Local\` mutex guard; the second instance surfaces a friendly notice and exits.
+- **Tray context menu leaked GDI resources.** `TrayManager` now owns and disposes the `ContextMenuStrip`, unsubscribes `StateChanged` cleanly on exit, and guards each dispose in try/catch so one failure doesn't leave the icon stuck.
+- **Folder accent colour recomputed on every binding read.** `FolderNode.AccentBrush` now caches the parsed frozen brush; `RefreshAccent()` invalidates on edit.
+- **Reparent could theoretically create a cycle** if called from code bypassing the UI guards. `MainViewModel.Reparent` now walks the new-parent's ancestor chain and rejects the move if it would land the source inside its own subtree.
+
+### Added
+- **xUnit test project** (`tests/TeamStation.Tests`) with 109 passing tests covering:
+  - `LaunchInputValidator` — valid + rejected IDs / passwords / proxy endpoints, CVE-2020-13699 shapes.
+  - `CsvImport` — column-alias normalisation across separator styles, quoted-field parsing, dedup, skip reporting.
+  - `JsonBackup` — round-trip fidelity, null tolerance, orphan stripping, format-version guardrails.
+  - `InheritanceResolver` — ancestor walk, nearest-wins ordering, cycle termination.
+  - `CliArgvBuilder` — argv shape per mode, URI-only throws, Base64 password default, proxy triplet.
+  - `UriSchemeBuilder` — scheme per mode, URL-encoding, CLI/URI capability matrix.
+  - `CryptoService` — DEK persistence, nonce uniqueness per call, tag-tamper detection, unicode + long inputs.
+  - `DatabaseIntegrationTests` — real on-disk SQLite, schema bootstrap, upsert/update/delete, FK `ON DELETE SET NULL` for deleted folders, nullable-enum round-trip, tag round-trip, `TouchLastConnected` isolation.
+- **`AutoScrollBehavior`** attached property — scrolls the log `ListBox` to the newest entry on add.
+- **Global unhandled-exception nets** (`AppDomain.UnhandledException`, `DispatcherUnhandledException`, `TaskScheduler.UnobservedTaskException`) surface as a MessageBox instead of silent Windows Error Reporting.
+- **`BindingOperations.EnableCollectionSynchronization`** on `Log` and `RootNodes` so future async writes from non-UI threads can't break the bindings.
+- **Startup log diagnostics** — version, DB path, detected TeamViewer path are now emitted to the log panel on first run.
+- **`AutomationProperties.Name`** on the log panel for screen-reader discoverability.
+
+### Changed
+- `MainViewModel` constructor takes optional `startupVersion` / `startupDbPath` parameters for the new diagnostics log lines.
+- `JsonBackup.Options.PropertyNameCaseInsensitive = true` so camelCase hand-edited backups parse.
+- Release workflow (`.github/workflows/release.yml`) no longer runs an extra `dotnet build` before publish (publish auto-builds); argv for `gh release create` is now an array so an empty `--prerelease` flag never leaks as a literal `""` argument; `fetch-depth: 0` so tag pushes work.
+
+### Notes
+- No functional changes in shipped behaviour beyond the above fixes. DB schema is unchanged from v0.1.0 (v2). No migration needed.
+
 ## [0.1.0] - 2026-04-23
 
 **First MVP release.** Every feature promised by the P0 section of `ROADMAP.md` is in. TeamStation now has everything a sysadmin needs to replace the built-in TeamViewer contact list, plus a few things that list never had.

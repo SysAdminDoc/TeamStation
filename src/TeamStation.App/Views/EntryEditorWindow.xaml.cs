@@ -66,8 +66,10 @@ public partial class EntryEditorWindow : Window
         _entry.Quality = GetNullableEnum<ConnectionQuality>(QualityBox);
         _entry.AccessControl = GetNullableEnum<AccessControl>(AcBox);
         _entry.Notes = string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim();
+        // Split, trim, dedupe case-insensitively while preserving first-seen order.
         _entry.Tags = TagsBox.Text
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         DialogResult = true;

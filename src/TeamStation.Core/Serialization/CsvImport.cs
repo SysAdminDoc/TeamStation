@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using TeamStation.Core.Models;
 
@@ -115,13 +114,27 @@ public static class CsvImport
     private static List<string> ParseTags(string? raw) =>
         string.IsNullOrEmpty(raw)
             ? new List<string>()
-            : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                 .ToList();
 
     private static bool IsNumericId(string s) =>
         !string.IsNullOrEmpty(s) && s.Length is >= 8 and <= 12 && s.All(char.IsDigit);
 
-    private static string Normalize(string header) =>
-        new string((header ?? string.Empty).Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray()).ToLowerInvariant();
+    /// <summary>
+    /// Normalises a column header or alias to lowercase alphanumerics only.
+    /// This makes "TeamViewer ID", "teamviewer_id", "TV-ID" and "tvid" all
+    /// collapse to the same canonical form, so users don't have to care
+    /// about separator conventions in their source file.
+    /// </summary>
+    private static string Normalize(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        var sb = new StringBuilder(value.Length);
+        foreach (var c in value)
+            if (char.IsLetterOrDigit(c)) sb.Append(char.ToLowerInvariant(c));
+        return sb.ToString();
+    }
 
     private sealed class ColumnIndex
     {
@@ -132,22 +145,21 @@ public static class CsvImport
         public int Notes { get; }
         public int Tags { get; }
 
-        public ColumnIndex(List<string> header)
+        public ColumnIndex(List<string> normalizedHeader)
         {
-            Name = FindAny(header, NameAliases);
-            Id = FindAny(header, IdAliases);
-            Folder = FindAny(header, FolderAliases);
-            Password = FindAny(header, PasswordAliases);
-            Notes = FindAny(header, NotesAliases);
-            Tags = FindAny(header, TagsAliases);
+            Name = FindAny(normalizedHeader, NameAliases);
+            Id = FindAny(normalizedHeader, IdAliases);
+            Folder = FindAny(normalizedHeader, FolderAliases);
+            Password = FindAny(normalizedHeader, PasswordAliases);
+            Notes = FindAny(normalizedHeader, NotesAliases);
+            Tags = FindAny(normalizedHeader, TagsAliases);
         }
 
         private static int FindAny(List<string> header, string[] aliases)
         {
             foreach (var alias in aliases)
             {
-                var aliasNorm = new string(alias.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray()).ToLowerInvariant();
-                var ix = header.IndexOf(aliasNorm);
+                var ix = header.IndexOf(Normalize(alias));
                 if (ix >= 0) return ix;
             }
             return -1;

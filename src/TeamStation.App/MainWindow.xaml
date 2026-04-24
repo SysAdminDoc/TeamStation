@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:TeamStation.App.ViewModels"
+        xmlns:behaviors="clr-namespace:TeamStation.App.Mvvm"
         mc:Ignorable="d"
         Title="TeamStation"
         Height="720" Width="1200"
@@ -186,7 +187,9 @@
                          Foreground="{StaticResource TextBrush}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          HorizontalContentAlignment="Stretch"
-                         Margin="8,0,8,8">
+                         Margin="8,0,8,8"
+                         behaviors:AutoScrollBehavior.AutoScrollToEnd="True"
+                         AutomationProperties.Name="Log">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Background" Value="Transparent" />

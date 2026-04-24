@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.1-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,20 +31,27 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 
 ## Status
 
+`v0.1.1` — Hardening pass on top of the MVP. Fixed the folder-picker bug that blocked moving a folder to a sibling, broadened CSV header matching so "Friendly Name" / "TV ID" / "Remote Control ID" columns work, made JSON import tolerant of hand-edited backups (null arrays, camelCase keys, dangling parent references), atomic export writes, a single-instance guard, numeric sort on legacy `Version*` directories, tray-menu cleanup, log auto-scroll, and a 109-test xUnit suite wired into the solution. See [CHANGELOG.md](CHANGELOG.md).
+
 `v0.1.0` — **First MVP release.** TeamStation now has everything a sysadmin needs to replace the built-in TeamViewer contact list: a nested folder tree with drag-to-reorder, entries with name / ID / password / mode / quality / access-control / notes / tags, DPAPI-wrapped AES-256-GCM at rest, one-click launch that walks folder-chain inheritance at launch time, debounced multi-field search, CSV import (TeamViewer Management Console, Remote Desktop Manager, mRemoteNG, and ad-hoc spreadsheet formats all supported via flexible column aliases), JSON backup with round-trip fidelity, an embedded log panel, and a system tray with minimize-to-tray. See [CHANGELOG.md](CHANGELOG.md).
 
-## Planned feature highlights (v0.1.0)
+## Feature highlights (shipping)
 
-- Nested folder/group tree with drag-to-reorder
-- Per-entry fields: friendly name, TeamViewer ID, password, connection mode (Remote Control / File Transfer / Chat / VPN / Presentation), quality, notes, tags
-- One-click launch via `TeamViewer.exe` CLI; optional `teamviewer10://` URI launcher as a fallback
-- Encrypted credential storage: AES-256-GCM with a DPAPI-wrapped user-scoped key, stored in local SQLite
-- Search, filter by tag, recent-connections tray menu
-- CSV import (TeamViewer Management Console export format) and JSON export
-- Embedded log panel, async launches, toast notifications
-- Dark-first UI: Catppuccin Mocha by default, GitHub Dark and Light themes included
+- Nested folder tree with drag-to-reorder, self-subtree-drop rejection, and per-folder accent colors
+- Per-entry fields: friendly name, TeamViewer ID, password, connection mode (Remote Control / File Transfer / Chat / VPN / Video Call / Presentation), quality, access control, proxy, notes, tags
+- Runtime **inheritance cascade** — mode / quality / access control / password can be set to "(inherit from folder)" and resolved at launch time
+- CVE-2020-13699-hardened launcher — numeric-ID regex, password denylist, argv-array `Process.Start` only
+- DPAPI-wrapped AES-256-GCM credential storage in local SQLite (WAL, FKs)
+- Debounced multi-field search; folders with matching descendants stay visible and auto-expand
+- Flexible **CSV import** (TeamViewer Management Console, Remote Desktop Manager, mRemoteNG, ad-hoc spreadsheets) with column aliases that tolerate spaces / underscores / hyphens / case
+- **JSON backup** round-trip, atomic on-disk writes, hand-edit tolerant (null arrays, camelCase keys, orphan-safe)
+- Embedded 500-entry log panel with auto-scroll, severity-coloured
+- System tray with minimize-to-tray, Show / Exit menu
+- Single-instance enforcement so two launches don't race on one SQLite file
+- Portable mode via a marker file next to the exe
+- Dark-first UI (Catppuccin Mocha)
 
-Full roadmap with P0 / P1 / P2 prioritization: [ROADMAP.md](ROADMAP.md).
+Roadmap / backlog: [ROADMAP.md](ROADMAP.md).
 
 ## Security model
 
@@ -91,6 +98,12 @@ Run the launch-feasibility spike (needs a real TeamViewer peer you own):
 dotnet run --project tools/TvLaunchSpike -c Release -- --id <TV_ID> --password <PW>
 ```
 It walks the CLI and URI-handler test matrix, captures operator observations, and writes `spike-report.md` next to the binary.
+
+Run the test suite:
+```powershell
+dotnet test -c Release
+```
+109 tests cover crypto, inheritance, CSV/JSON parsing, the CLI/URI builders, and end-to-end SQLite repo operations against a temp DB.
 
 ## Why not just use mRemoteNG?
 
