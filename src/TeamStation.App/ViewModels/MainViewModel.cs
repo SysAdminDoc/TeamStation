@@ -22,13 +22,16 @@ public sealed class MainViewModel : ViewModelBase
     private readonly Func<Folder, Window?, bool> _editFolderDialog;
     private readonly Func<Window?, string?> _chooseExportPath;
     private readonly Func<Window?, string?> _chooseImportPath;
+    private readonly Func<Window?, string?> _chooseImportCsvPath;
     private readonly Func<Window?, string, bool> _confirmDialog;
 
     private TreeNode? _selected;
     private string _status = string.Empty;
     private string _tvExePath;
     private string _searchText = string.Empty;
+    private bool _isLogVisible;
     private Dictionary<Guid, Folder> _foldersById = new();
+    private const int MaxLogEntries = 500;
 
     public MainViewModel(
         EntryRepository entries,
@@ -38,6 +41,7 @@ public sealed class MainViewModel : ViewModelBase
         Func<Folder, Window?, bool> editFolderDialog,
         Func<Window?, string?> chooseExportPath,
         Func<Window?, string?> chooseImportPath,
+        Func<Window?, string?> chooseImportCsvPath,
         Func<Window?, string, bool> confirmDialog,
         string? tvExePath)
     {
@@ -48,6 +52,7 @@ public sealed class MainViewModel : ViewModelBase
         _editFolderDialog = editFolderDialog;
         _chooseExportPath = chooseExportPath;
         _chooseImportPath = chooseImportPath;
+        _chooseImportCsvPath = chooseImportCsvPath;
         _confirmDialog = confirmDialog;
         _tvExePath = tvExePath ?? "TeamViewer.exe not found — install TeamViewer before launching";
 
@@ -61,9 +66,12 @@ public sealed class MainViewModel : ViewModelBase
         LaunchCommand = new RelayCommand(Launch, () => Selected is EntryNode);
         ExportCommand = new RelayCommand(Export);
         ImportCommand = new RelayCommand(Import);
+        ImportCsvCommand = new RelayCommand(ImportCsvFile);
         ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
+        ToggleLogCommand = new RelayCommand(() => IsLogVisible = !IsLogVisible);
 
         Reload();
+        AppendLog(LogLevel.Info, "TeamStation started.");
     }
 
     public ObservableCollection<TreeNode> RootNodes { get; } = new();
@@ -87,6 +95,18 @@ public sealed class MainViewModel : ViewModelBase
     public bool SelectedIsFolder => Selected is FolderNode;
 
     public string Status { get => _status; private set => SetField(ref _status, value); }
+
+    private void AppendLog(LogLevel level, string message)
+    {
+        Log.Add(new LogEntry(DateTimeOffset.Now, level, message));
+        while (Log.Count > MaxLogEntries) Log.RemoveAt(0);
+    }
+
+    private void ReportStatus(LogLevel level, string message)
+    {
+        Status = message;
+        AppendLog(level, message);
+    }
     public string TvExePath { get => _tvExePath; private set => SetField(ref _tvExePath, value); }
 
     public System.Windows.Input.ICommand AddEntryCommand { get; }
@@ -99,7 +119,17 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand LaunchCommand { get; }
     public System.Windows.Input.ICommand ExportCommand { get; }
     public System.Windows.Input.ICommand ImportCommand { get; }
+    public System.Windows.Input.ICommand ImportCsvCommand { get; }
     public System.Windows.Input.ICommand ClearSearchCommand { get; }
+    public System.Windows.Input.ICommand ToggleLogCommand { get; }
+
+    public ObservableCollection<LogEntry> Log { get; } = new();
+
+    public bool IsLogVisible
+    {
+        get => _isLogVisible;
+        set => SetField(ref _isLogVisible, value);
+    }
 
     public string SearchText
     {
@@ -220,7 +250,7 @@ public sealed class MainViewModel : ViewModelBase
                     entry.Refresh();
                     Reload();
                     SelectById(entry.Id);
-                    Status = $"Saved \"{entry.Name}\".";
+                    ReportStatus(LogLevel.Success, $"Saved \"{entry.Name}\".");
                 }
                 break;
 
@@ -230,7 +260,7 @@ public sealed class MainViewModel : ViewModelBase
                     _folders.Upsert(folder.Model);
                     Reload();
                     SelectById(folder.Id);
-                    Status = $"Saved folder \"{folder.Name}\".";
+                    ReportStatus(LogLevel.Success, $"Saved folder \"{folder.Name}\".");
                 }
                 break;
         }
@@ -310,7 +340,7 @@ public sealed class MainViewModel : ViewModelBase
                 "Anyone with access to the resulting file can read them. Store it only where you would store a password manager vault.\n\n" +
                 "Continue?"))
         {
-            Status = "Export cancelled.";
+            ReportStatus(LogLevel.Warning, "Export cancelled.");
             return;
         }
 
@@ -318,11 +348,11 @@ public sealed class MainViewModel : ViewModelBase
         {
             var backup = JsonBackup.Build(_folders.GetAll(), _entries.GetAll());
             File.WriteAllText(path, backup);
-            Status = $"Exported to {path}.";
+            ReportStatus(LogLevel.Success, $"Exported to {path}.");
         }
         catch (Exception ex)
         {
-            Status = $"Export failed: {ex.Message}";
+            ReportStatus(LogLevel.Error, $"Export failed: {ex.Message}");
             MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Export failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -341,19 +371,65 @@ public sealed class MainViewModel : ViewModelBase
                 $"Import {folders.Count} folder(s) and {entries.Count} entr{(entries.Count == 1 ? "y" : "ies")} from\n\n{path}\n\n" +
                 "Existing rows with matching IDs will be overwritten. Continue?"))
             {
-                Status = "Import cancelled.";
+                ReportStatus(LogLevel.Warning, "Import cancelled.");
                 return;
             }
 
             foreach (var f in folders) _folders.Upsert(f);
             foreach (var e in entries) _entries.Upsert(e);
             Reload();
-            Status = $"Imported {folders.Count} folder(s) and {entries.Count} entr{(entries.Count == 1 ? "y" : "ies")}.";
+            ReportStatus(LogLevel.Success, $"Imported {folders.Count} folder(s) and {entries.Count} entr{(entries.Count == 1 ? "y" : "ies")}.");
         }
         catch (Exception ex)
         {
-            Status = $"Import failed: {ex.Message}";
+            ReportStatus(LogLevel.Error, $"Import failed: {ex.Message}");
             MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "Import failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ImportCsvFile()
+    {
+        var path = _chooseImportCsvPath(Application.Current?.MainWindow);
+        if (path is null) return;
+
+        try
+        {
+            var text = File.ReadAllText(path);
+            var result = CsvImport.Parse(text, _folders.GetAll());
+
+            if (result.Errors.Count > 0)
+            {
+                foreach (var err in result.Errors) AppendLog(LogLevel.Error, $"CSV: {err}");
+                ReportStatus(LogLevel.Error, "CSV import aborted — see log for column-mapping errors.");
+                MessageBox.Show(Application.Current?.MainWindow!,
+                    string.Join('\n', result.Errors),
+                    "CSV import", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var message = $"CSV has {result.Folders.Count} new folder(s) and {result.Entries.Count} entr{(result.Entries.Count == 1 ? "y" : "ies")} to import from\n\n{path}\n\n" +
+                          (result.Skipped.Count > 0 ? $"{result.Skipped.Count} row(s) will be skipped — see log.\n\n" : string.Empty) +
+                          "Continue?";
+            if (!_confirmDialog(Application.Current?.MainWindow, message))
+            {
+                ReportStatus(LogLevel.Warning, "CSV import cancelled.");
+                return;
+            }
+
+            foreach (var f in result.Folders) _folders.Upsert(f);
+            foreach (var e in result.Entries) _entries.Upsert(e);
+            foreach (var (line, reason) in result.Skipped)
+                AppendLog(LogLevel.Warning, $"CSV line {line} skipped: {reason}");
+
+            Reload();
+            ReportStatus(LogLevel.Success,
+                $"Imported {result.Entries.Count} entr{(result.Entries.Count == 1 ? "y" : "ies")} " +
+                $"and {result.Folders.Count} new folder(s){(result.Skipped.Count > 0 ? $"; {result.Skipped.Count} skipped" : "")}.");
+        }
+        catch (Exception ex)
+        {
+            ReportStatus(LogLevel.Error, $"CSV import failed: {ex.Message}");
+            MessageBox.Show(Application.Current?.MainWindow!, ex.ToString(), "CSV import failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -375,9 +451,9 @@ public sealed class MainViewModel : ViewModelBase
         var id = source.Id;
         Reload();
         SelectById(id);
-        Status = newParent is null
+        ReportStatus(LogLevel.Info, newParent is null
             ? $"Moved \"{source.Name}\" to root."
-            : $"Moved \"{source.Name}\" to \"{newParent.Name}\".";
+            : $"Moved \"{source.Name}\" to \"{newParent.Name}\".");
     }
 
     // ---- Folder commands ----
@@ -494,13 +570,13 @@ public sealed class MainViewModel : ViewModelBase
             _entries.TouchLastConnected(entry.Id, DateTimeOffset.UtcNow);
             entry.Model.LastConnectedUtc = DateTimeOffset.UtcNow;
             entry.Refresh();
-            Status = outcome.Uri is not null
+            ReportStatus(LogLevel.Success, outcome.Uri is not null
                 ? $"Launched \"{entry.Name}\" via URI handler."
-                : $"Launched \"{entry.Name}\" (pid {outcome.ProcessId?.ToString() ?? "?"}).";
+                : $"Launched \"{entry.Name}\" (pid {outcome.ProcessId?.ToString() ?? "?"}).");
         }
         else
         {
-            Status = $"Launch failed: {outcome.Error}";
+            ReportStatus(LogLevel.Error, $"Launch failed: {outcome.Error}");
             MessageBox.Show(
                 Application.Current?.MainWindow!,
                 outcome.Error ?? "Unknown error.",

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using Microsoft.Win32;
+using TeamStation.App.Services;
 using TeamStation.App.ViewModels;
 using TeamStation.App.Views;
 using TeamStation.Data.Security;
@@ -11,6 +12,8 @@ namespace TeamStation.App;
 
 public partial class App : Application
 {
+    private TrayManager? _tray;
+
     private void OnStartup(object sender, StartupEventArgs e)
     {
         try
@@ -60,6 +63,17 @@ public partial class App : Application
                     };
                     return ofd.ShowDialog(owner) == true ? ofd.FileName : null;
                 },
+                chooseImportCsvPath: owner =>
+                {
+                    var ofd = new OpenFileDialog
+                    {
+                        Title = "Import CSV",
+                        Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                        DefaultExt = ".csv",
+                        CheckFileExists = true,
+                    };
+                    return ofd.ShowDialog(owner) == true ? ofd.FileName : null;
+                },
                 confirmDialog: (owner, message) =>
                     MessageBox.Show(owner!, message, "TeamStation",
                         MessageBoxButton.OKCancel, MessageBoxImage.Warning,
@@ -68,6 +82,7 @@ public partial class App : Application
 
             var window = new MainWindow(vm);
             MainWindow = window;
+            _tray = new TrayManager(window);
             window.Show();
         }
         catch (Exception ex)
@@ -79,5 +94,11 @@ public partial class App : Application
                 MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _tray?.Dispose();
+        base.OnExit(e);
     }
 }

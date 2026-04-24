@@ -33,6 +33,8 @@
             <SolidColorBrush x:Key="BlueBrush" Color="{StaticResource Blue}" />
             <SolidColorBrush x:Key="MauveBrush" Color="{StaticResource Mauve}" />
             <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource Green}" />
+            <SolidColorBrush x:Key="RedBrush" Color="{StaticResource Red}" />
+            <SolidColorBrush x:Key="YellowBrush" Color="{StaticResource Yellow}" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

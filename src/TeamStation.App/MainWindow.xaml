@@ -58,6 +58,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Background="{StaticResource MantleBrush}" Padding="16,10">
@@ -96,8 +97,11 @@
                     <Button Content="Rename" Style="{StaticResource ToolbarButton}" Command="{Binding RenameCommand}" />
                     <Button Content="Move" Style="{StaticResource ToolbarButton}" Command="{Binding MoveCommand}" />
                     <Button Content="Delete" Style="{StaticResource ToolbarButton}" Command="{Binding DeleteCommand}" />
-                    <Button Content="Import" Style="{StaticResource ToolbarButton}" Command="{Binding ImportCommand}" />
+                    <Button Content="Import JSON" Style="{StaticResource ToolbarButton}" Command="{Binding ImportCommand}" />
+                    <Button Content="Import CSV" Style="{StaticResource ToolbarButton}" Command="{Binding ImportCsvCommand}"
+                            ToolTip="Import entries from a CSV with a header row. Common column names are auto-detected (name/alias, teamviewer_id/id, group/folder, password, notes, tags)." />
                     <Button Content="Export" Style="{StaticResource ToolbarButton}" Command="{Binding ExportCommand}" />
+                    <Button Content="Log" Style="{StaticResource ToolbarButton}" Command="{Binding ToggleLogCommand}" />
                 </StackPanel>
 
                 <Grid Grid.Column="1">
@@ -162,7 +166,58 @@
             </TreeView>
         </Border>
 
-        <Border Grid.Row="3" Background="{StaticResource CrustBrush}" Padding="16,6">
+        <Border Grid.Row="3"
+                Background="{StaticResource MantleBrush}"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{StaticResource CrustBrush}"
+                Height="180"
+                Visibility="{Binding IsLogVisible, Converter={StaticResource BoolToVis}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Log" Foreground="{StaticResource Subtext1Brush}"
+                           FontWeight="SemiBold" Margin="16,8,16,4" />
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding Log}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Foreground="{StaticResource TextBrush}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         HorizontalContentAlignment="Stretch"
+                         Margin="8,0,8,8">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Padding" Value="8,2" />
+                            <Setter Property="Focusable" Value="False" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding TimeDisplay}"
+                                           Foreground="{StaticResource Subtext0Brush}" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
+                                <TextBlock Grid.Column="1" Text="{Binding LevelTag}" Margin="10,0,10,0"
+                                           Foreground="{Binding LevelBrush}" FontFamily="Cascadia Mono, Consolas" FontSize="11" Width="48" />
+                                <TextBlock Grid.Column="2" Text="{Binding Message}"
+                                           Foreground="{StaticResource TextBrush}" FontFamily="Cascadia Mono, Consolas" FontSize="11"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="4" Background="{StaticResource CrustBrush}" Padding="16,6">
             <TextBlock Foreground="{StaticResource Subtext0Brush}" FontSize="11"
                        Text="{Binding Status}" />
         </Border>

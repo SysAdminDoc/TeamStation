@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.0.7-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.8-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,7 +31,7 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 
 ## Status
 
-`v0.0.7` — Search/filter + JSON backup. A debounced search box in the toolbar filters the tree as you type, matching on entry name, TeamViewer ID, notes, tags, and folder names. Folders with a matching descendant stay visible and auto-expand so you can see the hit. Export writes the full folder + entry graph to a JSON file (passwords included in **plaintext** — confirm prompt warns before writing); Import reads it back with an ID-based upsert. TeamViewer's Management Console CSV import and the tray with recent connections remain the gating features for `v0.1.0`. See [CHANGELOG.md](CHANGELOG.md).
+`v0.0.8` — CSV import, log panel, and system tray. A flexible CSV importer matches columns by common aliases (`name`/`alias`/`host`, `teamviewer_id`/`id`/`device_id`, `group`/`folder`, `password`, `notes`, `tags`) so exports from TeamViewer's Management Console, Remote Desktop Manager, mRemoteNG, and ad-hoc spreadsheets all work without pre-massaging. Missing folders referenced in the `group` column are created automatically; rows with non-numeric IDs are skipped and reported. A collapsible log panel at the bottom of the window surfaces every status change alongside timestamped save / launch / import events (toggle with the **Log** button). The system tray icon stays visible while the app runs; minimising hides the window to tray; right-click gives **Show TeamStation** and **Exit**. All gating v0.1.0 features are now in place — the remaining blocker is running `TvLaunchSpike` against a real peer. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Planned feature highlights (v0.1.0)
 

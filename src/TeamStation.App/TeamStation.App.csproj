@@ -5,6 +5,12 @@
     <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <DisableWinExeOutputInference>true</DisableWinExeOutputInference>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <!-- WPF-first app: DPI awareness is declared in app.manifest. Suppress the
+         WinForms analyzer that wants to manage DPI through its own API. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>TeamStation</AssemblyName>
     <RootNamespace>TeamStation.App</RootNamespace>
@@ -14,6 +20,15 @@
     <ProjectReference Include="..\TeamStation.Core\TeamStation.Core.csproj" />
     <ProjectReference Include="..\TeamStation.Launcher\TeamStation.Launcher.csproj" />
     <ProjectReference Include="..\TeamStation.Data\TeamStation.Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Turn on UseWindowsForms but keep WPF types as the default.
+         Remove the implicit WinForms using to avoid Brush/Point/ComboBox/TreeView/
+         Application/MouseEventArgs/DragEventArgs/TreeNode collisions. Access WinForms
+         types through the explicit `WinForms.` alias in TrayManager. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
   </ItemGroup>
 
 </Project>

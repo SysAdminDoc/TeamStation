@@ -2,6 +2,33 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [0.0.8] - 2026-04-23
+
+### Added
+- **CSV import** (`TeamStation.Core/Serialization/CsvImport`).
+  - RFC 4180 parser handles quoted fields, embedded commas and newlines, and escaped quotes.
+  - Flexible column-name matching: `name` / `alias` / `friendly_name` / `host` / `computer_name`; `teamviewer_id` / `tv_id` / `remotecontrol_id` / `id` / `device_id`; `group` / `folder` / `category` / `parent`; `password` / `pw`; `notes` / `description` / `comment`; `tags` / `labels`. Case-insensitive, underscore-tolerant.
+  - Folders referenced in the `group` column are created on-the-fly (deduped both against the existing tree and within the same import batch).
+  - Non-numeric TeamViewer IDs are skipped with a line-referenced reason surfaced in the log.
+  - Results flow through the regular repositories so every password is re-encrypted by the `CryptoService`.
+- **Embedded log panel.** Catppuccin-styled collapsible panel at the bottom of the window shows a rolling 500-entry log of info / success / warning / error events. Toggled via the **Log** button in the toolbar. Every `ReportStatus` call pushes a timestamped `LogEntry` so the status bar stays a one-liner while history accumulates.
+- **System tray icon.** `TrayManager` owns a `NotifyIcon` (WinForms, included with the Windows Desktop SDK once `UseWindowsForms=true`). The tray icon is rendered at runtime from a small dark-blue bitmap so the repo ships without a committed `.ico`. Minimising the window hides it to tray; left-click restores; right-click offers **Show TeamStation** and **Exit**.
+
+### Changed
+- `MainViewModel` routes all user-visible status updates through a new `ReportStatus(LogLevel, string)` helper so the status bar and the log panel stay in sync. Save / launch / move / import / export paths now emit appropriately-severed entries (`Success`, `Warning`, `Error`) rather than plain info text.
+- Toolbar split: the single **Import** button became **Import JSON** + **Import CSV**.
+
+### Infrastructure
+- `TeamStation.App.csproj` enables `UseWindowsForms=true`. Implicit usings for `System.Windows.Forms` and `System.Drawing` are removed via `<Using Remove="…" />` to keep WPF's `Brush` / `Point` / `TreeView` / `ComboBox` / `Application` / `MouseEventArgs` / `DragEventArgs` / `TreeNode` as the unambiguous defaults. The WinForms analyzer warning WFO0003 (DPI-in-manifest) is suppressed because this is a WPF-first app where the manifest-declared PerMonitorV2 awareness is correct.
+
+### Verified
+- Clean Release build, 0 warnings / 0 errors across all five projects.
+- **CSV parse harness** seeded a 4-row CSV with inconsistent column casing (`Group`, `Alias`, `TeamViewer_ID`, `Password`, `Notes`, `Tags`) and mixed content: two entries under "Customer A", one under "Lab", one with an empty group. Parser produced exactly 2 folders (deduped) and 4 entries, with passwords / notes / tags preserved and the unassigned row correctly routed to root.
+- App boots cleanly with the new toolbar layout, tray icon registration, and log panel — no startup exceptions.
+
+### Notes
+- `v0.1.0` is now a single task away: running `TvLaunchSpike` against a real TeamViewer peer to close the two open feasibility questions (`--PasswordB64` silent-launch behavior, URI-handler param survival post-CVE-2020-13699).
+
 ## [0.0.7] - 2026-04-23
 
 ### Added
