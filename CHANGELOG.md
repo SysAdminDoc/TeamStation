@@ -4,6 +4,37 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-04-24
+
+UI overhaul. Reshapes the workspace around the mRemoteNG / Visual Studio sysadmin-tool layout users expect from a TeamViewer connection manager: classic top menubar, compact icon toolbar, slim quick-connect strip, 2-pane split with a categorised property-grid inspector, dockable activity log, and a single-line status bar. No view-model or behaviour changes — the entire pass is visual + accessibility.
+
+### Changed
+
+- **Main window — mRemoteNG-style workbench.** Top-of-window menubar (File / Edit / View / Connection / Tools); 17 equal-weight toolbar buttons collapsed into four semantic groups (Connection, Organization, Data, System) with vertical dividers between them; each toolbar button is a Segoe Fluent Icons glyph plus a tiny label. Right-anchored status cluster shows the TeamViewer-ready chip and library counter. Quick-connect compresses from a 4-row hero header into one horizontal strip (ID / Name / Password / Save / Connect + Search). 2-pane split with a `GridSplitter` so the sidebar is no longer locked at 410 px.
+- **Inspector — property-grid layout.** Selection renders as categorised sections (BASICS, LAUNCH BEHAVIOR, OPERATIONAL, NOTES, EXTERNAL TOOLS, SECURITY for connections; STRUCTURE, INHERITED DEFAULTS, APPEARANCE, HOW INHERITANCE WORKS for folders). Alternating Surface0 row shading, 180 px labels, MonoText for technical values (TeamViewer ID, route, proxy, TeamViewer.exe path, accent hex). Hero strip at the top carries the display name, breadcrumb, colour-coded chips, and a Launch primary + icon-only Edit / Move / Pin / Delete actions.
+- **Tree rows.** Folder rows now show a Fluent folder glyph tinted with the folder's accent colour; entry rows show a Fluent connection glyph + monospace TeamViewer ID + tag summary, with a small route chip + pin icon on the right.
+- **Empty + selection states.** Welcome, no-results, and selection placeholders gained a Fluent-icon anchor, `HeadlineText` title, human copy, and a clear single primary action plus a Ghost secondary. They feel like designed moments instead of blank panes.
+- **Log panel.** Dockable at 240 px height; level badges became 999-radius capsules with uppercase mono tags; 11 px mono timestamp in Subtext0; header gained a Fluent activity glyph + Clear button and an icon-only Hide.
+- **Status bar.** Dropped from 3 rows to one slim row: status pill (semantic colour) + message on the left, DB location (MonoText) + version chip on the right. No redundant status dot, no duplicated search hint.
+- **Chips.** All chips standardise on a 999-radius pill shape with 10 x 4 padding — header chips, toolbar status chips, tree badges, log-level tags. No more mismatched 4 px squares.
+- **Dialogs (Entry editor, Folder editor, Settings, Master password, Folder picker, Input).** Hard-coded 24-28 px SemiBold titles replaced with the shared `DisplayText` / `HeadlineText` styles; every dialog announces itself with a tiny Fluent-icon + uppercase caption above the title (CONNECTION / FOLDER / PREFERENCES / PORTABLE MODE / MOVE). Card radii dropped from 16 to 10 px and padding tightened to 22 x 20 to match the main window's 8 px panel language. Validation banners lead with a Fluent warning glyph and an 8 px radius. Settings reorganised into five categorised section cards (Appearance, TeamViewer, Launch safety, Backup &amp; search, External tools); the external-tools editor switched to MonoText so the `Name|Command|Arguments` lines align cleanly. Folder-picker tree adopted the Fluent folder glyph and the same hover / select state vocabulary as the main tree.
+
+### Added
+
+- **Typography scale.** New `DisplayText` (30 pt SemiBold, Variable Display), `HeadlineText` (22 pt), and `MonoText` (Cascadia / JetBrains Mono / Consolas) styles complement the existing Caption / SectionTitle / SectionSubtitle / FieldLabel / BodyMuted ladder. Body sizes use Segoe UI Variable Text; 22 pt+ uses Variable Display so larger copy stays optically tight.
+- **Custom CheckBox template.** Replaces the beige Win9x-inset default with a flat 18 x 18 rounded box, soft blue checked fill, a Path-stroked checkmark on check, a centred indeterminate pill, and explicit hover / focus states.
+- **Custom ScrollBar template.** 10 px wide, transparent track, rounded thumb (4 px radius) that thickens from 0.55 -> 1.0 opacity on hover / drag. Zero-sized line buttons remove the arrow glyphs so the scrollbar reads as a single silent rail, matching modern platform conventions.
+- **Button focus ring + variants.** Templated focus ring is invisible until the button has keyboard focus, so Tab navigation is no longer silent. New `Subtle` variant for dense toolbar zones (transparent until hover); existing Primary / Ghost / Danger / Icon variants kept and tightened.
+- **`Divider` + `VerticalDivider` styles.** 1 px rules at 60 % opacity for separating toolbar groups and category boundaries without heavy borders.
+- **Drop shadows on tooltips and context menus.** `HasDropShadow=True` so flyouts read as proper Windows 11 surfaces instead of bare rectangles.
+- **Fatal-exception breadcrumb.** `App.ShowFatal` now best-effort-appends to `%TEMP%\teamstation-fatal.log` before showing the MessageBox, so a startup crash leaves a triage trail without blocking the dialog.
+
+### Fixed
+
+- **Theme switching no longer crashes when a brush gets sealed.** `ThemeManager.Set` now checks `brush.IsFrozen` before mutating and falls back to swapping in a fresh mutable brush. The new ControlTemplates reference theme-mutable brushes via `DynamicResource` so the swap is picked up by every consumer.
+- **Search "X" character replaced with a real glyph.** The clear-search button now renders the proper Segoe Fluent Icons cancel glyph and gains a tooltip; previously it used the literal letter "X".
+- **Status of TeamViewer client and library counter always visible** in the toolbar header even after the toolbar wraps on narrow windows; the previous chip cluster was buried behind the saved-search row.
+
 ## [0.3.1] - 2026-04-24
 
 Focused security-hardening patch closing three of the v0.3.0 postflight audit follow-ups. No public API removed; one breaking change to the `ISecretStore` interface (new `DeleteValue` member — only relevant to downstream packagers that implemented the interface themselves).
