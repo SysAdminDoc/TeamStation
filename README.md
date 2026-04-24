@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.0.5-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.6-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,7 +31,7 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 
 ## Status
 
-`v0.0.5` — Drag and drop, folder editor, new-entry defaults. Entries and folders can be dragged anywhere in the tree (self-subtree drops are blocked so a folder can't land inside itself). Folders now have their own editor: name, optional accent color, default password, default mode / quality / access-control. New entries created inside a folder pre-fill from the nearest ancestor that carries those defaults. The full-field runtime inheritance cascade (so entries without a value literally *read* their parent's at launch time) lands in `v0.0.6`; CSV import, search, and tray remain the gating features for `v0.1.0`. See [CHANGELOG.md](CHANGELOG.md).
+`v0.0.6` — Runtime inheritance + folder accent colors. An entry's mode, quality, access-control, and password can each be set to **(inherit from folder)** in the editor. On launch, TeamStation walks the folder chain upward and resolves each null field from the nearest ancestor that carries a default — so changing a folder's default password once updates every inheriting entry under it on the next launch. Schema moved to v2 with a tested v1→v2 migration path. Folder dots in the tree now render in each folder's chosen accent color. CSV import, search, and tray remain the gating features for `v0.1.0`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Planned feature highlights (v0.1.0)
 

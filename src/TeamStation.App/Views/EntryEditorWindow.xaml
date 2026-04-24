@@ -73,6 +73,7 @@
 
                 <TextBlock Text="Connection mode" Style="{StaticResource FieldLabel}" />
                 <ComboBox x:Name="ModeBox">
+                    <ComboBoxItem Tag="{x:Null}" Content="(inherit from folder)" />
                     <ComboBoxItem Tag="{x:Static models:ConnectionMode.RemoteControl}" Content="Remote Control" />
                     <ComboBoxItem Tag="{x:Static models:ConnectionMode.FileTransfer}" Content="File Transfer" />
                     <ComboBoxItem Tag="{x:Static models:ConnectionMode.Vpn}" Content="VPN" />
@@ -83,6 +84,7 @@
 
                 <TextBlock Text="Quality" Style="{StaticResource FieldLabel}" />
                 <ComboBox x:Name="QualityBox">
+                    <ComboBoxItem Tag="{x:Null}" Content="(inherit from folder)" />
                     <ComboBoxItem Tag="{x:Static models:ConnectionQuality.AutoSelect}" Content="Auto" />
                     <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeQuality}" Content="Optimize quality" />
                     <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeSpeed}" Content="Optimize speed" />
@@ -92,6 +94,7 @@
 
                 <TextBlock Text="Access control" Style="{StaticResource FieldLabel}" />
                 <ComboBox x:Name="AcBox">
+                    <ComboBoxItem Tag="{x:Null}" Content="(inherit from folder)" />
                     <ComboBoxItem Tag="{x:Static models:AccessControl.Undefined}" Content="Undefined (use TeamViewer default)" />
                     <ComboBoxItem Tag="{x:Static models:AccessControl.FullAccess}" Content="Full access" />
                     <ComboBoxItem Tag="{x:Static models:AccessControl.ConfirmAll}" Content="Confirm all" />

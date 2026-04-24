@@ -28,7 +28,8 @@ public sealed class TeamViewerLauncher
 
         try
         {
-            return options.ForceUri || UriSchemeBuilder.IsUriOnly(entry.Mode)
+            var mode = entry.Mode ?? ConnectionMode.RemoteControl;
+            return options.ForceUri || UriSchemeBuilder.IsUriOnly(mode)
                 ? LaunchViaUri(entry)
                 : LaunchViaCli(entry, options);
         }

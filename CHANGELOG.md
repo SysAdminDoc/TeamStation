@@ -2,6 +2,29 @@
 
 All notable changes to TeamStation are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [0.0.6] - 2026-04-23
+
+### Added
+- **Runtime inheritance cascade.** `ConnectionEntry.Mode`, `Quality`, `AccessControl`, and `Password` are now nullable. A null value means "inherit from the folder chain" and is resolved at launch time by a new `InheritanceResolver` service in `TeamStation.Core/Services/`. The resolver walks up `ParentFolderId` pointers, pulling the first non-null default from each ancestor, without mutating the source entry.
+- **(inherit from folder)** option added to the mode / quality / access-control combos in `EntryEditorWindow`. New entries created inside a folder default to all-null so they literally defer to the folder until the user chooses otherwise.
+- **Folder accent colors now render.** Each folder's tree dot uses its `AccentColor` (validated `#RRGGBB`); fallback to Catppuccin Mauve when unset. Parsing failures gracefully fall back rather than throwing.
+- **Schema v2 migration.** `Database.MigrateIfNeeded` rebuilds the `entries` table with nullable `mode` / `quality` / `access_control` columns, preserving all existing data via a `CREATE TABLE entries_v2 + INSERT SELECT + DROP + RENAME` transaction. Fresh installs go straight to v2 via an `isFresh` path that stamps the schema version without running migrations.
+
+### Changed
+- `TeamViewerLauncher` defaults a null mode to `RemoteControl` for transport selection (CLI vs URI). Callers wanting concrete values should pass the resolver's output.
+- `CliArgvBuilder` emits no `--mode` / `--quality` / `--ac` flag when the corresponding field is null, deferring to TeamViewer's own defaults.
+- `EntryNode.Summary` renders "inherit" instead of an enum name when the entry's mode is null.
+- `MainViewModel.AddEntry` no longer pre-copies folder defaults into the draft. New entries start fully inheriting from their parent folder; the user can override any field in the editor.
+
+### Verified
+- Clean Release build, 0 warnings / 0 errors across all five projects.
+- **v1 → v2 migration:** seeded a simulated v0.0.5 database with `entries.mode INTEGER NOT NULL` and a legacy row, launched the app, confirmed the post-launch schema shows `mode INTEGER` (nullable), `schema_version` is hex `02000000`, and the legacy row's data is intact.
+- **Fresh install:** deleted the database, launched the app, confirmed the new DB lands on schema v2 directly with a populated DEK.
+- **Inheritance load:** seeded a folder with a yellow accent (`#F9E2AF`) and an entry with all three enum columns NULL. App rendered the tree cleanly without exceptions.
+
+### Notes
+- `v0.1.0` gating features still outstanding: search/filter, CSV import, JSON export, tray with recent connections, embedded log panel, and running `TvLaunchSpike` against a real peer.
+
 ## [0.0.5] - 2026-04-23
 
 ### Added

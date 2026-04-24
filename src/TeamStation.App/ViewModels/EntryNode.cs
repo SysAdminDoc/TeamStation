@@ -25,9 +25,11 @@ public sealed class EntryNode : TreeNode
     }
 
     public string TeamViewerId => Model.TeamViewerId;
-    public ConnectionMode Mode => Model.Mode;
+    public ConnectionMode? Mode => Model.Mode;
 
-    public string Summary => $"{Model.TeamViewerId} — {Model.Mode}";
+    public string Summary =>
+        Model.Mode is { } m ? $"{Model.TeamViewerId} — {m}"
+                            : $"{Model.TeamViewerId} — inherit";
 
     public string LastConnectedDisplay =>
         Model.LastConnectedUtc is null ? "never" : Model.LastConnectedUtc.Value.LocalDateTime.ToString("g");

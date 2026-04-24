@@ -45,8 +45,9 @@ public static class CliArgvBuilder
                 argv.Add("--mode"); argv.Add("fileTransfer"); break;
             case ConnectionMode.Vpn:
                 argv.Add("--mode"); argv.Add("vpn"); break;
+            case null:
             case ConnectionMode.RemoteControl:
-                // default mode — no flag
+                // null or default mode — no flag
                 break;
             case ConnectionMode.Chat:
             case ConnectionMode.VideoCall:
@@ -55,16 +56,16 @@ public static class CliArgvBuilder
                     $"Mode {entry.Mode} is not supported by the TeamViewer CLI; use UriSchemeBuilder instead.");
         }
 
-        if (entry.Quality != ConnectionQuality.AutoSelect)
+        if (entry.Quality is { } q && q != ConnectionQuality.AutoSelect)
         {
             argv.Add("--quality");
-            argv.Add(((int)entry.Quality).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            argv.Add(((int)q).ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
-        if (entry.AccessControl != AccessControl.Undefined)
+        if (entry.AccessControl is { } ac && ac != AccessControl.Undefined)
         {
             argv.Add("--ac");
-            argv.Add(((int)entry.AccessControl).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            argv.Add(((int)ac).ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         if (entry.Proxy is { } proxy)

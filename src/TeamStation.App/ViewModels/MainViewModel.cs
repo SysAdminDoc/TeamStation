@@ -4,6 +4,7 @@ using System.Windows;
 using TeamStation.App.Mvvm;
 using TeamStation.App.Views;
 using TeamStation.Core.Models;
+using TeamStation.Core.Services;
 using TeamStation.Data.Storage;
 using TeamStation.Launcher;
 
@@ -21,6 +22,7 @@ public sealed class MainViewModel : ViewModelBase
     private TreeNode? _selected;
     private string _status = string.Empty;
     private string _tvExePath;
+    private Dictionary<Guid, Folder> _foldersById = new();
 
     public MainViewModel(
         EntryRepository entries,
@@ -85,6 +87,8 @@ public sealed class MainViewModel : ViewModelBase
     {
         var folders = _folders.GetAll();
         var entries = _entries.GetAll();
+
+        _foldersById = folders.ToDictionary(f => f.Id, f => f);
 
         var folderNodes = folders.ToDictionary(
             f => f.Id,
@@ -157,14 +161,17 @@ public sealed class MainViewModel : ViewModelBase
             EntryNode e => e.Parent,
             _ => null
         };
+        // When created inside a folder, start with all inheritable fields set to
+        // null so the entry defers to the folder chain at launch time. Users can
+        // override any field in the editor.
         var draft = new ConnectionEntry
         {
             Name = "New connection",
             ParentFolderId = parentFolder?.Id,
-            Password = ResolveInheritedPassword(parentFolder),
-            Mode = parentFolder is not null ? FindInheritedMode(parentFolder) ?? ConnectionMode.RemoteControl : ConnectionMode.RemoteControl,
-            Quality = parentFolder is not null ? FindInheritedQuality(parentFolder) ?? ConnectionQuality.AutoSelect : ConnectionQuality.AutoSelect,
-            AccessControl = parentFolder is not null ? FindInheritedAc(parentFolder) ?? AccessControl.Undefined : AccessControl.Undefined,
+            Password = null,
+            Mode = parentFolder is null ? ConnectionMode.RemoteControl : null,
+            Quality = parentFolder is null ? ConnectionQuality.AutoSelect : null,
+            AccessControl = parentFolder is null ? AccessControl.Undefined : null,
         };
         if (_editEntryDialog(draft, Application.Current?.MainWindow))
         {
@@ -199,35 +206,6 @@ public sealed class MainViewModel : ViewModelBase
                 }
                 break;
         }
-    }
-
-    private static string? ResolveInheritedPassword(FolderNode? start)
-    {
-        for (var cursor = start; cursor is not null; cursor = cursor.Parent)
-            if (!string.IsNullOrEmpty(cursor.Model.DefaultPassword))
-                return cursor.Model.DefaultPassword;
-        return null;
-    }
-
-    private static ConnectionMode? FindInheritedMode(FolderNode start)
-    {
-        for (var cursor = (FolderNode?)start; cursor is not null; cursor = cursor.Parent)
-            if (cursor.Model.DefaultMode is { } m) return m;
-        return null;
-    }
-
-    private static ConnectionQuality? FindInheritedQuality(FolderNode start)
-    {
-        for (var cursor = (FolderNode?)start; cursor is not null; cursor = cursor.Parent)
-            if (cursor.Model.DefaultQuality is { } q) return q;
-        return null;
-    }
-
-    private static AccessControl? FindInheritedAc(FolderNode start)
-    {
-        for (var cursor = (FolderNode?)start; cursor is not null; cursor = cursor.Parent)
-            if (cursor.Model.DefaultAccessControl is { } a) return a;
-        return null;
     }
 
     public void Reparent(TreeNode source, FolderNode? newParent)
@@ -358,7 +336,10 @@ public sealed class MainViewModel : ViewModelBase
     private void Launch()
     {
         if (Selected is not EntryNode entry) return;
-        var outcome = _launcher.Launch(entry.Model);
+        // Resolve folder-chain inheritance at launch time so folder default
+        // changes propagate to every entry that defers to them.
+        var effective = InheritanceResolver.Resolve(entry.Model, _foldersById);
+        var outcome = _launcher.Launch(effective);
         if (outcome.Success)
         {
             _entries.TouchLastConnected(entry.Id, DateTimeOffset.UtcNow);

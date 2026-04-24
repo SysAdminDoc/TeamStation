@@ -7,9 +7,18 @@ public sealed class ConnectionEntry
     public string Name { get; set; } = string.Empty;
     public string TeamViewerId { get; set; } = string.Empty;
     public string? Password { get; set; }
-    public ConnectionMode Mode { get; set; } = ConnectionMode.RemoteControl;
-    public ConnectionQuality Quality { get; set; } = ConnectionQuality.AutoSelect;
-    public AccessControl AccessControl { get; set; } = AccessControl.Undefined;
+
+    /// <summary>
+    /// Connection mode. <c>null</c> means "inherit from parent folder chain"
+    /// (resolved at launch time by <see cref="Services.InheritanceResolver"/>).
+    /// </summary>
+    public ConnectionMode? Mode { get; set; }
+
+    /// <summary>Connection quality. <c>null</c> means "inherit from parent folder chain".</summary>
+    public ConnectionQuality? Quality { get; set; }
+
+    /// <summary>Access control. <c>null</c> means "inherit from parent folder chain".</summary>
+    public AccessControl? AccessControl { get; set; }
     public ProxySettings? Proxy { get; set; }
     public string? Notes { get; set; }
     public List<string> Tags { get; set; } = new();

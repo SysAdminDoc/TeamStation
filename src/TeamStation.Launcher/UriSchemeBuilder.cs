@@ -20,7 +20,7 @@ public static class UriSchemeBuilder
         ArgumentNullException.ThrowIfNull(entry);
         LaunchInputValidator.ValidateTeamViewerId(entry.TeamViewerId);
 
-        var scheme = SchemeFor(entry.Mode);
+        var scheme = SchemeFor(entry.Mode ?? ConnectionMode.RemoteControl);
         var uri = $"{scheme}?device={Uri.EscapeDataString(entry.TeamViewerId)}";
 
         if (!string.IsNullOrEmpty(entry.Password))

@@ -85,9 +85,9 @@ ON CONFLICT(id) DO UPDATE SET
         cmd.Parameters.AddWithValue("$name", entry.Name);
         cmd.Parameters.AddWithValue("$tv_id", entry.TeamViewerId);
         cmd.Parameters.AddWithValue("$pw", (object?)_crypto.EncryptString(entry.Password) ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("$mode", (int)entry.Mode);
-        cmd.Parameters.AddWithValue("$quality", (int)entry.Quality);
-        cmd.Parameters.AddWithValue("$ac", (int)entry.AccessControl);
+        cmd.Parameters.AddWithValue("$mode", (object?)entry.Mode is null ? DBNull.Value : (int)entry.Mode!);
+        cmd.Parameters.AddWithValue("$quality", (object?)entry.Quality is null ? DBNull.Value : (int)entry.Quality!);
+        cmd.Parameters.AddWithValue("$ac", (object?)entry.AccessControl is null ? DBNull.Value : (int)entry.AccessControl!);
         cmd.Parameters.AddWithValue("$ph", (object?)entry.Proxy?.Host ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$pp", (object?)entry.Proxy?.Port ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$pu", (object?)entry.Proxy?.Username ?? DBNull.Value);
@@ -128,9 +128,9 @@ ON CONFLICT(id) DO UPDATE SET
             Name = r.GetString(2),
             TeamViewerId = r.GetString(3),
             Password = r.IsDBNull(4) ? null : _crypto.DecryptString((byte[])r["password_enc"]),
-            Mode = (ConnectionMode)r.GetInt32(5),
-            Quality = (ConnectionQuality)r.GetInt32(6),
-            AccessControl = (AccessControl)r.GetInt32(7),
+            Mode = r.IsDBNull(5) ? null : (ConnectionMode?)r.GetInt32(5),
+            Quality = r.IsDBNull(6) ? null : (ConnectionQuality?)r.GetInt32(6),
+            AccessControl = r.IsDBNull(7) ? null : (AccessControl?)r.GetInt32(7),
             Notes = r.IsDBNull(12) ? null : r.GetString(12),
             Tags = r.IsDBNull(13)
                 ? new List<string>()
