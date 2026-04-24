@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.0.3-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.4-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,7 +31,7 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 
 ## Status
 
-`v0.0.3` — First functional build. Add, edit, delete, and launch entries from a sortable list view. Passwords encrypted at rest with AES-256-GCM under a DPAPI-wrapped 256-bit DEK stored in the local SQLite database (`%LocalAppData%\TeamStation\teamstation.db`, WAL mode). The `TvLaunchSpike` tool still runs the two open feasibility tests. No folder tree yet, no import/export, no tray — those land in v0.0.4 and v0.1.0. See [CHANGELOG.md](CHANGELOG.md).
+`v0.0.4` — Nested folder tree shipping. The flat list is now a `TreeView` with folders-first sorting, inline selection tracking, and context-menu commands. You can create root folders and subfolders, rename anything, move entries or whole folders (with a destination picker), delete with subtree confirmation, and launch by double-click. Passwords still encrypted at rest with AES-256-GCM under a DPAPI-wrapped 256-bit DEK. Drag-and-drop reorder and inheritance cascade land in `v0.0.5`; CSV import and tray in `v0.1.0`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Planned feature highlights (v0.1.0)
 

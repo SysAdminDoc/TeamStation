@@ -28,6 +28,12 @@
             <Setter Property="Foreground" Value="{StaticResource Crust}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        <Style TargetType="TreeViewItem">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+            <Setter Property="Padding" Value="2,3" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -58,50 +64,67 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="1" Background="{StaticResource MantleBrush}" Padding="16,10" BorderThickness="0,1,0,0" BorderBrush="{StaticResource CrustBrush}">
+        <Border Grid.Row="1" Background="{StaticResource MantleBrush}" Padding="16,10"
+                BorderThickness="0,1,0,0" BorderBrush="{StaticResource CrustBrush}">
             <StackPanel Orientation="Horizontal">
                 <Button Content="Launch" Style="{StaticResource PrimaryButton}" Command="{Binding LaunchCommand}" />
-                <Button Content="Add" Style="{StaticResource ToolbarButton}" Command="{Binding AddCommand}" />
-                <Button Content="Edit" Style="{StaticResource ToolbarButton}" Command="{Binding EditCommand}" />
+                <Button Content="Add entry" Style="{StaticResource ToolbarButton}" Command="{Binding AddEntryCommand}" />
+                <Button Content="Add folder" Style="{StaticResource ToolbarButton}" Command="{Binding AddFolderCommand}" />
+                <Button Content="Edit" Style="{StaticResource ToolbarButton}" Command="{Binding EditEntryCommand}" />
+                <Button Content="Rename" Style="{StaticResource ToolbarButton}" Command="{Binding RenameCommand}" />
+                <Button Content="Move" Style="{StaticResource ToolbarButton}" Command="{Binding MoveCommand}" />
                 <Button Content="Delete" Style="{StaticResource ToolbarButton}" Command="{Binding DeleteCommand}" />
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="2" Margin="16,12,16,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <Border Background="{StaticResource MantleBrush}" CornerRadius="6">
-                <ListView x:Name="EntryList"
-                          ItemsSource="{Binding Entries}"
-                          SelectedItem="{Binding Selected, Mode=TwoWay}"
-                          Background="Transparent"
-                          Foreground="{StaticResource TextBrush}"
-                          BorderThickness="0"
-                          HorizontalContentAlignment="Stretch"
-                          MouseDoubleClick="EntryList_MouseDoubleClick">
-                    <ListView.View>
-                        <GridView>
-                            <GridView.ColumnHeaderContainerStyle>
-                                <Style TargetType="GridViewColumnHeader">
-                                    <Setter Property="Background" Value="{StaticResource CrustBrush}" />
-                                    <Setter Property="Foreground" Value="{StaticResource Subtext1Brush}" />
-                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                    <Setter Property="Padding" Value="10,8" />
-                                    <Setter Property="BorderThickness" Value="0" />
-                                    <Setter Property="HorizontalContentAlignment" Value="Left" />
-                                </Style>
-                            </GridView.ColumnHeaderContainerStyle>
-                            <GridViewColumn Header="Name" Width="280" DisplayMemberBinding="{Binding Name}" />
-                            <GridViewColumn Header="TeamViewer ID" Width="160" DisplayMemberBinding="{Binding TeamViewerId}" />
-                            <GridViewColumn Header="Mode" Width="160" DisplayMemberBinding="{Binding Mode}" />
-                            <GridViewColumn Header="Last connected" Width="200" DisplayMemberBinding="{Binding LastConnectedDisplay}" />
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-            </Border>
-        </Grid>
+        <Border Grid.Row="2" Margin="16,12,16,12" Background="{StaticResource MantleBrush}" CornerRadius="6">
+            <TreeView x:Name="Tree"
+                      ItemsSource="{Binding RootNodes}"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Foreground="{StaticResource TextBrush}"
+                      SelectedItemChanged="Tree_SelectedItemChanged"
+                      MouseDoubleClick="Tree_MouseDoubleClick"
+                      Padding="8">
+                <TreeView.Resources>
+                    <HierarchicalDataTemplate DataType="{x:Type vm:FolderNode}" ItemsSource="{Binding Children}">
+                        <StackPanel Orientation="Horizontal">
+                            <Rectangle Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center"
+                                       Fill="{StaticResource MauveBrush}" RadiusX="2" RadiusY="2" />
+                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </HierarchicalDataTemplate>
+                    <DataTemplate DataType="{x:Type vm:EntryNode}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center"
+                                       Fill="{StaticResource BlueBrush}" RadiusX="5" RadiusY="5" />
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" />
+                            <TextBlock Grid.Column="2" Text="{Binding Summary}" Margin="16,0,8,0"
+                                       Foreground="{StaticResource Subtext0Brush}" FontSize="11" />
+                        </Grid>
+                    </DataTemplate>
+                </TreeView.Resources>
+                <TreeView.ContextMenu>
+                    <ContextMenu DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="Launch" Command="{Binding LaunchCommand}" FontWeight="SemiBold" />
+                        <Separator />
+                        <MenuItem Header="Add entry" Command="{Binding AddEntryCommand}" />
+                        <MenuItem Header="Add folder" Command="{Binding AddFolderCommand}" />
+                        <MenuItem Header="Add subfolder" Command="{Binding AddSubfolderCommand}" />
+                        <Separator />
+                        <MenuItem Header="Edit..." Command="{Binding EditEntryCommand}" />
+                        <MenuItem Header="Rename..." Command="{Binding RenameCommand}" />
+                        <MenuItem Header="Move to..." Command="{Binding MoveCommand}" />
+                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+                    </ContextMenu>
+                </TreeView.ContextMenu>
+            </TreeView>
+        </Border>
 
         <Border Grid.Row="3" Background="{StaticResource CrustBrush}" Padding="16,6">
             <TextBlock Foreground="{StaticResource Subtext0Brush}" FontSize="11"

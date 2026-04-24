@@ -17,11 +17,13 @@ public partial class App : Application
             var db = new Database(dbPath);
             var crypto = CryptoService.CreateOrLoad(db);
             var entries = new EntryRepository(db, crypto);
+            var folders = new FolderRepository(db, crypto);
             var launcher = new TeamViewerLauncher();
             var tvExePath = TeamViewerPathResolver.Resolve();
 
             var vm = new MainViewModel(
                 entries: entries,
+                folders: folders,
                 launcher: launcher,
                 editDialog: (entry, owner) =>
                 {
