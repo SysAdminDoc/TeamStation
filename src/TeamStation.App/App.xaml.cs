@@ -87,6 +87,7 @@ public partial class App : Application
             {
                 OptimizeOnConnectionClose = settings.OptimizeDatabaseOnClose,
             };
+            var startupIntegrity = db.CheckIntegrity();
             _crypto = CreateCrypto(db);
             var crypto = _crypto;
 
@@ -121,7 +122,8 @@ public partial class App : Application
                 database: db,
                 tvExePath: tvExePath,
                 startupVersion: version,
-                startupDbPath: dbPath);
+                startupDbPath: dbPath,
+                startupIntegrityReport: startupIntegrity);
 
             var window = new MainWindow(vm);
             MainWindow = window;

@@ -528,6 +528,20 @@ public class MainWindowKeyboardNavTests
     }
 
     [Fact]
+    public void Startup_runs_database_integrity_check_before_main_window_is_shown()
+    {
+        var appPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "App.xaml.cs");
+        var vmPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var appSource = File.ReadAllText(appPath);
+        var vmSource = File.ReadAllText(vmPath);
+
+        Assert.Contains("var startupIntegrity = db.CheckIntegrity()", appSource);
+        Assert.Contains("startupIntegrityReport: startupIntegrity", appSource);
+        Assert.Contains("AppendDatabaseIntegrityLog(startupIntegrityReport)", vmSource);
+        Assert.Contains("report.IsOk ? LogLevel.Info : LogLevel.Warning", vmSource);
+    }
+
+    [Fact]
     public void Master_password_dialog_disables_continue_until_ready()
     {
         var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "MasterPasswordWindow.xaml");

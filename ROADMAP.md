@@ -393,7 +393,7 @@ Items that are P1 / table-stakes vs. competitors but need more design surface th
 
 - [ ] **Structured (JSON) log export** from the activity log panel for operators piping into ELK / Splunk / Grafana Loki. Separate from the v0.4.0 audit-log export — activity logs carry more detail but aren't tamper-evident. iter-1 sources #33, #43.
 - [ ] **Launch-latency histogram** in the log panel — UI-click → `Process.Start` time, crypto-operation time, DB-query time. Catches regressions against the v0.4.0 `Microsoft.Data.Sqlite` 10.0.6 upgrade. iter-1 source #35.
-- [ ] **`PRAGMA integrity_check` on startup**, warn on corruption before the first user action. iter-1 source #18.
+- [x] **`PRAGMA integrity_check` on startup**, warn on corruption before the first user action. `Database.CheckIntegrity()` now runs during `App.OnStartup` after the DB opens and before the main window is shown; `MainViewModel` logs a calm info entry on `ok` and a warning with reported SQLite messages when the check fails or cannot complete. iter-1 source #18.
 - [ ] **Slow-query logging** — any SQLite query over a configurable threshold (default 100ms) logs the query + elapsed time in the activity panel. iter-1 source #42.
 
 ### Offline / resilience P2 wave (iter-1 category coverage)

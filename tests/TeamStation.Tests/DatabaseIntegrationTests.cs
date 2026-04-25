@@ -74,6 +74,17 @@ public class DatabaseIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void CheckIntegrity_reports_ok_for_fresh_database()
+    {
+        var report = _db.CheckIntegrity();
+
+        Assert.True(report.IsOk);
+        Assert.Equal("SQLite integrity check passed.", report.Summary);
+        Assert.Equal(["ok"], report.Messages);
+        Assert.Null(report.ErrorMessage);
+    }
+
+    [Fact]
     public void Upsert_and_GetAll_round_trip_a_folder()
     {
         var f = new Folder { Name = "Site A", AccentColor = "#F9E2AF", DefaultPassword = "pw" };

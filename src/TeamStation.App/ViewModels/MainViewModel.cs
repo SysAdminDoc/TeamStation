@@ -66,7 +66,8 @@ public sealed class MainViewModel : ViewModelBase
         Database database,
         string? tvExePath,
         string? startupVersion = null,
-        string? startupDbPath = null)
+        string? startupDbPath = null,
+        DatabaseIntegrityReport? startupIntegrityReport = null)
     {
         _entries = entries;
         _folders = folders;
@@ -154,9 +155,19 @@ public sealed class MainViewModel : ViewModelBase
             : $"TeamViewer.exe: {tvExePath}");
         AppendTeamViewerSafetyLog();
         AppendTeamViewerProvenanceLog(tvExePath);
+        AppendDatabaseIntegrityLog(startupIntegrityReport);
         if (!string.IsNullOrEmpty(_settingsService.LastLoadError))
             LogPanel.Append(LogLevel.Warning, _settingsService.LastLoadError!);
         PruneHistory();
+    }
+
+    private void AppendDatabaseIntegrityLog(DatabaseIntegrityReport? report)
+    {
+        if (report is null)
+            return;
+
+        var level = report.IsOk ? LogLevel.Info : LogLevel.Warning;
+        LogPanel.Append(level, report.Summary);
     }
 
     private void PruneHistory()

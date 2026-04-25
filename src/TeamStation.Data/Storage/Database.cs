@@ -34,6 +34,42 @@ public sealed class Database : ISecretStore
         return c;
     }
 
+    public DatabaseIntegrityReport CheckIntegrity(int maxMessages = 8)
+    {
+        if (maxMessages < 1)
+            maxMessages = 1;
+
+        try
+        {
+            using var c = OpenConnection();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "PRAGMA integrity_check;";
+
+            var messages = new List<string>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read() && messages.Count < maxMessages)
+            {
+                if (!reader.IsDBNull(0))
+                    messages.Add(reader.GetString(0));
+            }
+
+            if (messages.Count == 1 && string.Equals(messages[0], "ok", StringComparison.OrdinalIgnoreCase))
+                return DatabaseIntegrityReport.Ok;
+
+            return new DatabaseIntegrityReport(
+                IsOk: false,
+                Messages: messages.Count == 0 ? ["integrity_check returned no rows"] : messages,
+                ErrorMessage: null);
+        }
+        catch (Exception ex) when (ex is SqliteException or InvalidOperationException or ObjectDisposedException)
+        {
+            return new DatabaseIntegrityReport(
+                IsOk: false,
+                Messages: [],
+                ErrorMessage: $"{ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
     private void Initialize()
     {
         using var c = new SqliteConnection($"Data Source={Path};Cache=Shared");
@@ -391,6 +427,27 @@ CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
             {
                 // Connection state can change during shutdown; best effort is enough.
             }
+        }
+    }
+}
+
+public sealed record DatabaseIntegrityReport(
+    bool IsOk,
+    IReadOnlyList<string> Messages,
+    string? ErrorMessage)
+{
+    public static DatabaseIntegrityReport Ok { get; } = new(true, ["ok"], null);
+
+    public string Summary
+    {
+        get
+        {
+            if (IsOk)
+                return "SQLite integrity check passed.";
+            if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                return $"SQLite integrity check could not complete: {ErrorMessage}";
+
+            return "SQLite integrity check reported: " + string.Join("; ", Messages);
         }
     }
 }

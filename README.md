@@ -102,7 +102,7 @@ System requirements:
 - Windows 10 1809+ or Windows 11 (x64)
 - TeamViewer 15 Classic or TeamViewer Remote (the full client; **QuickSupport is not enough** — TeamStation needs `TeamViewer.exe` on the `PATH` or at its default install location)
 
-First run creates `%LocalAppData%\TeamStation\teamstation.db` with WAL mode, foreign keys, and default-on `PRAGMA optimize` maintenance when database connections close. Passwords are encrypted at rest with AES-256-GCM under a key wrapped by Windows DPAPI (user-scoped). No network traffic, no telemetry, no update pings.
+First run creates `%LocalAppData%\TeamStation\teamstation.db` with WAL mode, foreign keys, startup `PRAGMA integrity_check`, and default-on `PRAGMA optimize` maintenance when database connections close. Passwords are encrypted at rest with AES-256-GCM under a key wrapped by Windows DPAPI (user-scoped). No network traffic, no telemetry, no update pings.
 
 ## Build from source
 
