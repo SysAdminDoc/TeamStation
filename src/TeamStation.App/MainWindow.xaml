@@ -698,7 +698,10 @@
 
             <MenuItem Header="_View">
                 <MenuItem Header="{Binding ActivityButtonText}" Command="{Binding ToggleLogCommand}" />
-                <MenuItem Header="Clear activity log" Command="{Binding ClearLogCommand}" />
+                <MenuItem Header="Clear activity log"
+                          Command="{Binding ClearLogCommand}"
+                          ToolTip="{Binding LogClearTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
             </MenuItem>
 
             <MenuItem Header="_Connection">
@@ -715,7 +718,10 @@
             </MenuItem>
 
             <MenuItem Header="_Tools">
-                <MenuItem Header="Sync TeamViewer cloud" Command="{Binding SyncTeamViewerCloudCommand}" />
+                <MenuItem Header="Sync TeamViewer cloud"
+                          Command="{Binding SyncTeamViewerCloudCommand}"
+                          ToolTip="{Binding CloudSyncStatusText}"
+                          ToolTipService.ShowOnDisabled="True" />
                 <Separator />
                 <MenuItem Header="Save current search"
                           Command="{Binding SaveSearchCommand}"

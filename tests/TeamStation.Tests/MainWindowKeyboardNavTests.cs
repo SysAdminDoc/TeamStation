@@ -332,6 +332,20 @@ public class MainWindowKeyboardNavTests
         Assert.Equal("True", (string?)clearButton.Attribute("ToolTipService.ShowOnDisabled"));
     }
 
+    [Theory]
+    [InlineData("{Binding ClearLogCommand}", "{Binding LogClearTooltip}")]
+    [InlineData("{Binding SyncTeamViewerCloudCommand}", "{Binding CloudSyncStatusText}")]
+    public void Secondary_menu_commands_explain_disabled_state(string command, string tooltip)
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var item = doc.Descendants(Wpf + "MenuItem")
+            .FirstOrDefault(mi => ((string?)mi.Attribute("Command")) == command);
+
+        Assert.NotNull(item);
+        Assert.Equal(tooltip, (string?)item!.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)item.Attribute("ToolTipService.ShowOnDisabled"));
+    }
+
     [Fact]
     public void Log_panel_view_model_rebroadcasts_empty_state_properties()
     {
