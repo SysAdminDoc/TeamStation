@@ -111,6 +111,7 @@ public sealed class MainViewModel : ViewModelBase
         ImportCommand = new RelayCommand(Import);
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
         TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
+        BulkCopyIdsCommand = new RelayCommand(BulkCopyIds, () => SelectedNodes.OfType<EntryNode>().Any());
         BulkMoveCommand = new RelayCommand(BulkMove, () => SelectedNodes.OfType<EntryNode>().Any());
         BulkDeleteCommand = new RelayCommand(BulkDelete, () => SelectedNodes.OfType<EntryNode>().Any());
         BulkPinCommand = new RelayCommand(() => BulkSetPinned(true), () => SelectedNodes.OfType<EntryNode>().Any());
@@ -465,6 +466,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand DeleteCommand { get; }
     public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
+    public System.Windows.Input.ICommand BulkCopyIdsCommand { get; }
     public System.Windows.Input.ICommand BulkMoveCommand { get; }
     public System.Windows.Input.ICommand BulkDeleteCommand { get; }
     public System.Windows.Input.ICommand BulkPinCommand { get; }
@@ -507,6 +509,7 @@ public sealed class MainViewModel : ViewModelBase
 
     public int MultiSelectedEntryCount => SelectedNodes.OfType<EntryNode>().Count();
     public bool IsBulkSelectionActive => MultiSelectedEntryCount >= 2;
+    public string BulkCopyIdsSelectionLabel => $"Copy IDs from selection ({MultiSelectedEntryCount})";
     public string BulkMoveSelectionLabel => $"Move selection ({MultiSelectedEntryCount})";
     public string BulkDeleteSelectionLabel => $"Delete selection ({MultiSelectedEntryCount})";
     public string BulkPinSelectionLabel => $"Pin selection ({MultiSelectedEntryCount})";
@@ -556,6 +559,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedNodes));
         OnPropertyChanged(nameof(MultiSelectedEntryCount));
         OnPropertyChanged(nameof(IsBulkSelectionActive));
+        OnPropertyChanged(nameof(BulkCopyIdsSelectionLabel));
         OnPropertyChanged(nameof(BulkMoveSelectionLabel));
         OnPropertyChanged(nameof(BulkDeleteSelectionLabel));
         OnPropertyChanged(nameof(BulkPinSelectionLabel));
@@ -569,6 +573,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(BulkSetProxySelectionLabel));
         OnPropertyChanged(nameof(BulkClearProxySelectionLabel));
         OnPropertyChanged(nameof(MultiSelectionSummary));
+        ((RelayCommand)BulkCopyIdsCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkMoveCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkDeleteCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkPinCommand).RaiseCanExecuteChanged();
@@ -582,6 +587,36 @@ public sealed class MainViewModel : ViewModelBase
         ((RelayCommand)BulkSetProxyCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkClearProxyCommand).RaiseCanExecuteChanged();
         ((RelayCommand)ClearMultiSelectionCommand).RaiseCanExecuteChanged();
+    }
+
+    private void BulkCopyIds()
+    {
+        var ids = SelectedNodes.OfType<EntryNode>()
+            .Select(entry => entry.TeamViewerId.Trim())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            ReportStatus(LogLevel.Warning, "Selected connections do not have TeamViewer IDs to copy.");
+            return;
+        }
+
+        try
+        {
+            System.Windows.Clipboard.SetDataObject(string.Join(Environment.NewLine, ids), copy: true);
+        }
+        catch (Exception ex)
+        {
+            AppendLog(LogLevel.Warning, $"Bulk TeamViewer ID copy failed: {ex.Message}");
+            ReportStatus(LogLevel.Error, $"Could not copy TeamViewer IDs: {ex.Message}");
+            return;
+        }
+
+        var countText = DisplayText.Count(ids.Count, "TeamViewer ID");
+        Audit("bulk_copy_ids", "connection", null, $"Copied {countText} to clipboard via bulk action.");
+        ReportStatus(LogLevel.Success, $"Copied {countText} to the clipboard.");
     }
 
     private void BulkMove()

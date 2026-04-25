@@ -1149,6 +1149,14 @@
                             </StackPanel>
 
                             <WrapPanel Grid.Column="1" HorizontalAlignment="Right" MaxWidth="520">
+                                <Button Content="Copy IDs"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Copy the selected TeamViewer IDs to the clipboard, one per line."
+                                        Command="{Binding BulkCopyIdsCommand}" />
                                 <Button Content="Move"
                                         Style="{StaticResource GhostButton}"
                                         MinWidth="0"
@@ -1399,6 +1407,9 @@
                                     <!-- v0.3.5: bulk pin / unpin appear only when 2+ entries are
                                          multi-selected via Ctrl-click. Single-select uses the
                                          existing Toggle Pin item above. -->
+                                    <MenuItem Header="{Binding BulkCopyIdsSelectionLabel}"
+                                              Command="{Binding BulkCopyIdsCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <MenuItem Header="{Binding BulkMoveSelectionLabel}"
                                               Command="{Binding BulkMoveCommand}"
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />

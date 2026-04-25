@@ -160,6 +160,7 @@ public class MainWindowKeyboardNavTests
 
         Assert.Contains("{Binding BulkPinCommand}", commands);
         Assert.Contains("{Binding BulkUnpinCommand}", commands);
+        Assert.Contains("{Binding BulkCopyIdsCommand}", commands);
         Assert.Contains("{Binding BulkMoveCommand}", commands);
         Assert.Contains("{Binding BulkDeleteCommand}", commands);
         Assert.Contains("{Binding BulkAddTagCommand}", commands);
@@ -183,6 +184,8 @@ public class MainWindowKeyboardNavTests
 
         Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkMoveCommand}"
             && (string?)mi.Attribute("Header") == "{Binding BulkMoveSelectionLabel}");
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkCopyIdsCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkCopyIdsSelectionLabel}");
         Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkDeleteCommand}"
             && (string?)mi.Attribute("Header") == "{Binding BulkDeleteSelectionLabel}");
         Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkAddTagCommand}"
@@ -210,6 +213,7 @@ public class MainWindowKeyboardNavTests
         var source = File.ReadAllText(path);
 
         Assert.Contains("BulkMoveCommand = new RelayCommand(BulkMove", source);
+        Assert.Contains("BulkCopyIdsCommand = new RelayCommand(BulkCopyIds", source);
         Assert.Contains("BulkDeleteCommand = new RelayCommand(BulkDelete", source);
         Assert.Contains("BulkAddTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Add)", source);
         Assert.Contains("BulkRemoveTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Remove)", source);
@@ -225,12 +229,14 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("BulkProxyDialog.Prompt", source);
         Assert.Contains("TryGetCommonLaunchValue", source);
         Assert.Contains("TryGetCommonProxy", source);
+        Assert.Contains("System.Windows.Clipboard.SetDataObject", source);
         Assert.Contains("CreateModeOptions", source);
         Assert.Contains("CreateQualityOptions", source);
         Assert.Contains("CreateAccessControlOptions", source);
         Assert.Contains("Distinct(StringComparer.OrdinalIgnoreCase)", source);
         Assert.Contains("validationMessage: \"Enter at least one tag before applying.\"", source);
         Assert.Contains("bulk_move", source);
+        Assert.Contains("bulk_copy_ids", source);
         Assert.Contains("bulk_delete", source);
         Assert.Contains("FormatBulkDeletePreview", source);
         Assert.Contains("Delete selected connections", source);
