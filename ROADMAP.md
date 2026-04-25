@@ -1,8 +1,8 @@
 # TeamStation Roadmap
 
-**Last research pass:** 2026-04-25 (iter-4, cross-project capability research).
-**Source basis:** iter-1 (38 sources, 160 harvested, 49 scored), iter-2 (24 net-new delta sources), iter-3 (94 net-new findings across community/commercial/adjacent/standards/dependencies), iter-4 (32 source-backed project patterns across remote-admin tools, command palettes, automation controllers, asset systems, password managers, and Windows packaging). 156 prior distinct external sources plus iter-4 source links; full Appendix at the end.
-**Cadence:** factory-loop iterations have shipped v0.3.0 → v0.3.5 with steady security + UX hardening. This document supersedes the prior v0.3.6 backlog with a unified v0.4.0 / v0.5.0 / v1.0.0 plan informed by all three research iterations.
+**Last research pass:** 2026-04-25 (iter-5, repo-recon + external OSINT refresh).
+**Source basis:** iter-1 (38 sources, 160 harvested, 49 scored), iter-2 (24 net-new delta sources), iter-3 (94 net-new findings across community/commercial/adjacent/standards/dependencies), iter-4 (32 source-backed project patterns), iter-5 (72 additional source-backed repo/competitor/platform/security groups, 94 raw feature signals, 31 scored roadmap decisions). Full Appendix at the end.
+**Cadence:** factory-loop iterations have shipped v0.3.0 -> v0.3.5 plus unreleased main-branch workflow completions. This document supersedes the prior iter-4 backlog with a reconciled v0.4.0 / v0.5.0 / v1.0.0 plan that removes shipped items from active backlog and preserves rejected boundaries.
 
 Prioritization:
 
@@ -42,15 +42,164 @@ v0.3.0 → v0.3.5 ships the largest adoption blockers from P1/P2 plus a sustaine
 - mRemoteNG-style workbench layout — top menubar, semantic toolbar, two-pane split with property-grid inspector, dockable activity log, single-line status bar (v0.3.2).
 - A11y baseline on the connection tree: Enter / F2 / Delete single-key actions, `KeyboardNavigation.TabNavigation="Once"` to avoid the tab-trap, `AutomationProperties.Name` on the tree and search box (v0.3.3).
 - TeamViewer client version detection + status-bar update-available pill (v0.3.5) — surfaces CVE-2026-23572 baseline (15.74.5) without an auto-update path.
-- Bulk multi-select infrastructure on the connection tree + Bulk Pin/Unpin (v0.3.5) — Ctrl-click accumulator, `TreeNode.IsMultiSelected`, `MainViewModel.SelectedNodes`, foundation for `BulkSetTag` / `BulkSetProxy` / `BulkSetMode`.
+- Bulk multi-select infrastructure on the connection tree + Bulk Pin/Unpin (v0.3.5), followed by unreleased main-branch completion of Shift-range selection, bulk move/delete/copy IDs, bulk tag add/remove/replace, bulk TeamViewer mode/quality/access-control edits, and bulk proxy set/clear.
+- Protocol-first launch preference, explicit "Launch via protocol link", and TeamViewer Web Client handoff are already implemented on main. Remaining work is validation against current TeamViewer clients, not initial UI exposure.
 
-Still open before a formal 1.0 release: real-peer TeamViewer launch validation, Web API pagination/rate-limit hardening, online-state polling, conflict-aware cloud sync, signed installer packaging, per-monitor DPI hardening, immutable audit-trail UI, and UX testing on real support workflows.
+Still open before a formal 1.0 release: real-peer TeamViewer launch validation, protocol-handler validation, Web API pagination/rate-limit hardening, online-state polling, conflict-aware cloud sync, signed installer packaging, per-monitor DPI hardening, immutable audit-trail UI, and UX testing on real support workflows.
+
+---
+
+## State of Repo Memo (iter-5 recon, 2026-04-25)
+
+**What TeamStation does today:** a Windows-only, WPF/.NET 9, local-first TeamViewer connection manager for support operators. It stores encrypted TeamViewer connection metadata in SQLite, launches the official installed TeamViewer client, supports folder inheritance, imports, backups, TeamViewer history/cloud pull, external tools, session history, audit log, tray launch, protocol/web-client handoffs, and broad bulk editing.
+
+**What it claims:** "Think mRemoteNG, but TeamViewer-only." The product deliberately avoids implementing TeamViewer's protocol, avoids telemetry, keeps credentials local, and treats TeamViewer as the audited remote-control boundary.
+
+**What is incomplete or still unproven:** live launch behavior against a current peer TeamViewer install, URI handler behavior after CVE-2020-13699 and CVE-2026-23572 fixes, Web API rate limits/pagination/tier behavior, read-only connection reports, HMAC-chained audit integrity, signed MSI/winget/Intune distribution, per-monitor DPI proof, and formal import/export schema contracts.
+
+**Hard constraints:** MIT license, Windows WPF host, .NET 9 SDK (`global.json` pins 9.0.313), TeamViewer-only scope, SQLite + DPAPI/Argon2id/AES-GCM storage, no phone-home telemetry, no arbitrary plugin loader, and no keyboard chord shortcuts.
+
+**Design implication:** TeamStation should compete on operator speed, trustworthy local evidence, safer TeamViewer control-surface orchestration, import quality, and enterprise deployment polish. It should not chase RustDesk/MeshCentral/Guacamole by becoming a remote desktop protocol, relay, or agent platform.
+
+---
+
+## iter-5 Research Delta (2026-04-25)
+
+Phase 1 refreshed every required source class. The strongest new signal is consistent with iter-4: the opportunity is not "more protocols"; it is a TeamViewer operations workbench with stronger evidence, safer launch/control choices, deployment guidance, and sharper state reporting.
+
+### Direct OSS competitor matrix (captured via GitHub, 2026-04-25)
+
+| Project | Stars | Last pushed | Maintainer signal | Useful harvest | Fit for TeamStation |
+|---|---:|---|---|---|---|
+| [mRemoteNG](https://github.com/mRemoteNG/mRemoteNG) | 10,767 | 2026-04-24 | `sparerd`, `Kvarkas`, `kmscode` | multi-select launch, external tools, inheritance, duplicate-name path display | High for workflow parity; no protocol expansion |
+| [RustDesk](https://github.com/rustdesk/rustdesk) | 112,894 | 2026-04-25 | `rustdesk`, `fufesou`, `21pages` | online state, self-host trust, file/USB redirect demand, mobile/touch friction | Medium; use state/trust lessons only |
+| [MeshCentral](https://github.com/Ylianst/MeshCentral) | 6,447 | 2026-04-23 | `Ylianst`, `si458`, `krayon007` | stale-agent alerts, concurrency limits, event logs, provenance/SBOM requests | High for audit/state patterns; agent features rejected |
+| [Apache Guacamole client](https://github.com/apache/guacamole-client) | 1,644 | 2026-04-20 | `mike-jumper`, `necouchman`, `jmuehlner` | browser history, recording playback boundaries, auth extensibility | Medium; history/evidence patterns only |
+| [Apache Guacamole server](https://github.com/apache/guacamole-server) | 3,796 | 2026-04-23 | `mike-jumper`, `necouchman`, `jmuehlner` | protocol gateway architecture | Low; protocol relay is charter-blocked |
+| [FreeRDP](https://github.com/FreeRDP/FreeRDP) | 13,096 | 2026-04-25 | `akallabeth`, `awakecoding`, `bmiklautz` | mature protocol-client release hygiene | Low; protocol scope rejected |
+| [Remmina](https://github.com/FreeRDP/Remmina) | 2,487 | 2026-02-08 | `akallabeth`, `antenore`, `awakecoding`, `bmiklautz`, `dupondje` | GTK connection profiles and plugin ecosystem | Low; plugin/protocol expansion rejected |
+| [TigerVNC](https://github.com/TigerVNC/tigervnc) | 7,063 | 2026-04-13 | `CendioOssman`, `bphinz`, `dcommander` | logging, buffer-copy performance issues, build portability | Low; performance discipline only |
+| [UltraVNC](https://github.com/ultravnc/UltraVNC) | 1,310 | 2026-04-25 | `RudiDeVos`, `lbocquet`, `wqweto` | long-lived Windows remote-control UX | Low; VNC protocol rejected |
+| [rdesktop](https://github.com/rdesktop/rdesktop) | 1,360 | 2023-09-19 | maintainer-needed signal | maintenance risk of protocol clients | Low; cautionary only |
+| [Remotely](https://github.com/immense/Remotely) | 5,044 | 2024-12-17 | `cmbankester`, `dkattan` | remote scripting, session recording, attended access requests | Medium; evidence/runbook patterns only |
+| [DWService agent](https://github.com/dwservice/agent) | 559 | 2026-03-04 | `dwservice` | small cross-platform agent architecture | Low; agent boundary rejected |
+| [Aspia](https://github.com/dchapyshev/aspia) | 1,876 | 2026-04-24 | `dchapyshev` | remote desktop + file transfer packaging | Low; protocol rejected |
+| [Tactical RMM](https://github.com/amidaware/tacticalrmm) | 4,270 | 2026-04-09 | `dinger1986`, `sadnub`, `silversword411`, `wh1te909` | scripts, patching, agent, RMM packaging | Medium as anti-scope and deployment reference |
+
+### Feature harvesting ledger (94 raw signals, deduped into roadmap themes)
+
+Each item is source-traceable through the iter-5 appendix IDs. Status reflects Phase 3 prioritization.
+
+| # | Raw feature signal | Category | Prevalence | Sources | Decision |
+|---:|---|---|---|---|---|
+| 1 | Multi-select Enter/open selected connections | UX | table-stakes | E1, E50 | Shipped on main |
+| 2 | Shift-range selection in tree | UX/accessibility | table-stakes | E1 | Shipped on main |
+| 3 | Bulk add/remove/replace tags | UX/data | table-stakes | E1, E28 | Shipped on main |
+| 4 | Bulk set mode/quality/access-control | UX/platform | table-stakes | E1, E39 | Shipped on main |
+| 5 | Bulk set/clear proxy | UX/platform | table-stakes | E1, E39 | Shipped on main |
+| 6 | Duplicate-name path display in quick switchers | UX | common | E1, E24, E50 | Next: Action Center metadata |
+| 7 | External-tool folders and hide-from-UI controls | UX/dev-experience | common | E1, E8, E29 | Next: Runbook templates |
+| 8 | User-defined variables passed to external tools | dev-experience | common | E1, E24, E29 | Next: scoped variables |
+| 9 | Per-folder connection confirmation | safety | common | E1, E28 | Later |
+| 10 | Idle lock/close behavior | security | rare | E1 | Under consideration |
+| 11 | Online/offline state with data age | reliability | table-stakes | E2, E3, E39, E41 | Next |
+| 12 | Stale device/agent alert | reliability | common | E3, E51 | Next, TeamViewer API only |
+| 13 | Limit concurrent remote sessions | safety | common | E3, E51, E27 | Later |
+| 14 | Event and action log per device | observability | table-stakes | E3, E5, E28, E29 | Now via Evidence Pack |
+| 15 | Session history filters | observability | table-stakes | E5, E28, E29 | Now/Next |
+| 16 | Recording playback indicator | observability | common | E5, E28, E29, E31 | Later, `.tvs` only |
+| 17 | SBOM/build provenance for releases | distribution/security | rising | E3, E51, E63 | Next |
+| 18 | Read-only connection reports | observability/data | table-stakes commercial | E39, E40, E28 | Next |
+| 19 | API tier/capability matrix | integrations/docs | table-stakes | E39, E40, E44 | Now |
+| 20 | Web API OAuth/script-token health | security/integrations | common | E39, E40, E42 | Now via Trust Center |
+| 21 | API pagination/backoff | reliability | table-stakes | E39, E44 | Next |
+| 22 | API rate-limit remaining surfaced in UI | observability | common | E39, E44 | Next |
+| 23 | Device groups / managed groups mapping | data/integrations | table-stakes | E39, E41, E44 | Next |
+| 24 | SCIM user provisioning awareness | integrations | commercial | E42 | Later docs only |
+| 25 | Session links as newer TeamViewer model | platform | rising | E38, E45 | Under consideration until API proven |
+| 26 | Web Client handoff | platform/UX | common | E38, E45 | Shipped on main |
+| 27 | Direct Web Client URL by ID | platform | rare/unstable | E54 | Rejected until official stable contract |
+| 28 | Assignment/deployment command builder | distribution/platform | table-stakes | E46, E55, E56, E57 | Now/Next |
+| 29 | MSI `ASSIGNMENTOPTIONS` recipes | distribution | table-stakes enterprise | E46, E56, E57, E58 | Next deployment kit |
+| 30 | Grant Easy Access deployment checks | safety/platform | common | E38, E46, E55 | Next |
+| 31 | Managed group policy/reporting prerequisites | docs/integrations | common | E40, E41, E58 | Now docs |
+| 32 | Remote script/terminal API detection | integrations | rare | E43, E44 | Under consideration, gated |
+| 33 | COM API registration diagnostics | platform | rare | E39 | Later spike |
+| 34 | CLI/URI validation matrix | reliability/security | table-stakes for this project | E39, E47, E48 | Now |
+| 35 | Current TeamViewer CVE registry | security | table-stakes | E47, E48, E49 | Now |
+| 36 | Minimum safe TeamViewer version shown in README | docs/security | table-stakes | E47, E48 | Now |
+| 37 | RMM abuse transparency warning | security/trust | table-stakes | E59, E60, E61 | Now |
+| 38 | Signed binary/path verification for TeamViewer.exe | security | rare-but-high-value | E59, E60, E63 | Now |
+| 39 | Audit-chain verification | security/observability | commercial table-stakes | E28, E29, E31, E59 | Now |
+| 40 | Evidence Pack HTML + NDJSON | observability/docs | rare OSS, common commercial | E5, E28, E29, E31 | Now |
+| 41 | Operator notes after session | UX/observability | common | E53, E28 | Next |
+| 42 | Billable summary export | data | common commercial | E28, E29, E40 | Later |
+| 43 | Trust Center dashboard | UX/security | rare OSS | E28, E39, E47, E59 | Now |
+| 44 | Import preview/mapping report | migration/data | table-stakes | E18, E19, E50 | Now |
+| 45 | Typed custom fields | data | common | E18, E19, E21, E22 | Next |
+| 46 | Fieldsets by folder/profile | data | common | E18, E19 | Next |
+| 47 | Custom-field search/filter | data/UX | common | E18, E21, E24 | Next |
+| 48 | Import unsupported-field report | migration | common | E19 | Now |
+| 49 | JSON schema export contract | migration/docs/testing | table-stakes | E18, E19 | Next |
+| 50 | mRemoteNG XML import | migration | table-stakes | E1, E8 | Next |
+| 51 | Devolutions RDM XML import | migration | common | E28 | Next |
+| 52 | Royal TS archive import | migration | common | E29 | Next |
+| 53 | KeePassXC read-only credential adapter | integrations/security | table-stakes | E12 | Next |
+| 54 | Bitwarden CLI adapter | integrations/security | common | E13 | Next |
+| 55 | 1Password Connect adapter | integrations/security | common | E14 | Next |
+| 56 | Credential-provider health surface | observability/security | common | E14, E43 | Now/Next |
+| 57 | Secret redaction in exports | security/docs | table-stakes | E13, E14, E28 | Now |
+| 58 | Scoped environment variables | dev-experience | table-stakes | E15, E16, E17, E24 | Next |
+| 59 | Dry-run preview for tasks | safety/dev-experience | common | E21, E29 | Next |
+| 60 | Task timeout/output capture | reliability/dev-experience | common | E21, E29 | Next |
+| 61 | Runbook success/failure parsers | observability/dev-experience | rare-but-useful | E21, E22 | Later |
+| 62 | Workflow graph/runbook chains | dev-experience | advanced | E22 | Later |
+| 63 | In-app command palette/action center | UX | table-stakes for power tools | E23, E25, E26, E50 | Now |
+| 64 | Optional PowerToys Command Palette extension | integrations | rare | E23, E24 | Later |
+| 65 | Persisted command disabled reasons | accessibility/UX | rare | E23, E25 | Now as design requirement |
+| 66 | Per-monitor DPI V2 audit | accessibility/UX | table-stakes | E62, E1 | Now |
+| 67 | DPI screenshot regression tests | testing/accessibility | rare | E62 | Later |
+| 68 | `Strings.resx` externalization | i18n | table-stakes for translation | E70 | Later |
+| 69 | CJK/RTL layout audits | i18n/accessibility | common | E70 | Later |
+| 70 | Locale-aware exports | i18n/data | common | E70 | Later |
+| 71 | Signed MSI | distribution | table-stakes enterprise | E32, E33, E34, E35 | Next |
+| 72 | winget manifest | distribution | table-stakes Windows | E33 | Next |
+| 73 | Chocolatey package | distribution | common | E35 | Next |
+| 74 | Intune Win32 install/detection guide | distribution/docs | table-stakes enterprise | E34, E56, E57 | Next |
+| 75 | Artifact/Trusted Signing automation | distribution/security | rising | E63, E64 | Next |
+| 76 | Rollback-capable update manifest | reliability/distribution | common | E32, E63 | Later |
+| 77 | Air-gapped update mode | reliability/security | common | E34, E59 | Later |
+| 78 | SQLite `PRAGMA optimize` | performance | table-stakes | E65, E66 | Now |
+| 79 | WAL checkpoint discipline for backups/mirrors | reliability/performance | table-stakes | E66, E67 | Now/Next |
+| 80 | xUnit v3 migration spike | testing/dev-experience | rising | E68, E69 | Later |
+| 81 | Coverage gate | testing | common | E68, E69 | Next |
+| 82 | Mutation/property tests for launch validators | testing/security | rare but aligned | E48, E59 | Later |
+| 83 | Screenshot/docs assets refresh | docs/UX | table-stakes | E28, E33 | Now |
+| 84 | RMM/remote-access allowlist guidance | security/docs | table-stakes | E59, E60, E61 | Now |
+| 85 | Detection-friendly audit event names | security/observability | common | E60, E61 | Now |
+| 86 | Multi-user collaboration | multi-user | commercial | E28, E39, E42 | Rejected for single-user local charter |
+| 87 | Mobile companion app | mobile | common commercial | E2, E30, E38 | Rejected for WPF charter |
+| 88 | Agent/RMM backend | platform/OS | common RMM | E3, E37, E59 | Rejected |
+| 89 | Alternative protocols RDP/VNC/SSH/RustDesk | platform/OS | common | E4, E5, E6, E7, E8, E9 | Rejected |
+| 90 | Hidden/stealth sessions | safety/security | commercial | E27, E59 | Rejected |
+| 91 | Browser automation against TeamViewer web UI | security/platform | tempting but brittle | E45, E54 | Rejected |
+| 92 | SaaS webhook telemetry | observability | common | E28, E59 | Rejected by no-phone-home charter |
+| 93 | WinUI 3 migration | platform/OS | rising | E71 | Under consideration only |
+| 94 | Avalonia cross-platform fork | platform/OS | rare | E72 | Later, explicit fork |
+
+### Phase 3 prioritization summary
+
+- **Now:** validate TeamViewer control surfaces, add static CVE registry, expose Trust Center/evidence/audit integrity, reconcile README safe-version docs, add import preflight reporting, harden SQLite maintenance, and make Action Center metadata the command-discovery backbone.
+- **Next:** credential-provider broker, Web API pagination/online-state/reports, runbook templates, typed custom fields, signed installer/winget/Chocolatey/Intune, schema contracts, migration importers, coverage gate.
+- **Later:** PowerToys companion, xUnit v3 migration, workflow graphs, DPI screenshot regression, i18n packs, update rollback, TOTP, billable summaries, Avalonia fork.
+- **Under consideration:** TeamViewer session-link automation, Remote Management APIs, COM control contract, WebAuthn portable unlock, WinUI 3, Microsoft Store/MSIX.
+- **Rejected:** protocol reimplementation, non-TeamViewer protocols, hidden sessions, browser automation against TeamViewer web UI, RMM agents/backend, mobile companion apps in the WPF tree, mandatory cloud accounts, telemetry/phone-home, multi-user SaaS collaboration.
 
 ---
 
 ## v0.4.0 — Now (target: 2026-Q2)
 
-The highest-leverage P0/P1 items uncovered by iter-3 plus the open follow-ups from iter-1 / iter-2 that fit cleanly into one minor release. Theme: **enterprise readiness** — fix the per-monitor DPI bug that dominates mRemoteNG community complaints, ship the bulk-ops dialogs the multi-select infrastructure was laid down for, close the TeamViewer-version surface with a CVE registry, and start the audit-trail integrity story.
+The highest-leverage P0/P1 items uncovered by iter-3 through iter-5 plus the open follow-ups from iter-1 / iter-2 that fit cleanly into one minor release. Theme: **enterprise readiness** — prove TeamViewer control-surface behavior, fix the per-monitor DPI bug that dominates mRemoteNG community complaints, close the TeamViewer-version surface with a CVE registry, and start the audit-trail/evidence integrity story.
 
 Each item carries `[fit:F impact:I effort:E risk:R deps:D novelty:N → avg]` from the six-dimension scoring rubric and a justification line.
 
@@ -68,6 +217,13 @@ Goal: reduce direct `TeamViewer.exe` launch dependence where official TeamViewer
 - [ ] **COM API detection and diagnostics.** Surface whether `TeamViewer.exe api --install` has registered `TeamViewer.Application`; use it only for supported diagnostics until a current COM control contract is verified.
 - [ ] **Command-line reference coverage.** Track support for official CLI surfaces already relevant to TeamStation: `--id`, `--PasswordB64`, `--mode`, `--quality`, `--ac`, `--ProxyIP`, `--ProxyUser`, `--ProxyPassword`, plus future-safe entries for `--control` `.tvc`, `--play` `.tvs`, and `--sendto` file-transfer handoff.
 - [ ] **Rejected boundary.** No hidden sessions, protocol reverse engineering, credential injection into third-party surfaces, browser automation against TeamViewer web UI, or background remote-control start flows without explicit official support and user-visible consent.
+
+### TeamViewer capability and abuse-resistance pass (iter-5, P1)
+
+- [ ] **Capability matrix by TeamViewer surface.** Add `docs/teamviewer-capability-matrix.md` that records each supported control surface, required license/tier, required token scope, launch dependency, TeamViewer.exe dependency, credential behavior, observed failure mode, and proof status. Initial rows: CLI launch flags, URI handlers, Web Client handoff, Web API groups/devices, Web API connection reports, service cases/session links, SCIM, deployment/assignment commands, Remote Management scripts/terminal, `.tvc` playback/control, `.tvs` playback, and file-transfer handoff. Sources: E38-E48, E54-E58.
+- [ ] **Signed TeamViewer binary provenance check.** In Settings/Trust Center, show the discovered TeamViewer path, file version, publisher signature status when available, and whether the executable sits under an expected install root. This is not anti-malware; it is a local trust signal against accidentally launching a renamed or side-loaded executable. Sources: E47-E49, E59-E61.
+- [ ] **RMM-abuse transparency checklist.** Add a short local-only safety note to Trust Center and docs: TeamStation launches the official TeamViewer client, records local launch/audit events, never hides sessions, never reverse engineers, and recommends EDR/application-control allowlisting by publisher/path. Sources: E59-E61.
+- [ ] **TeamViewer deployment helper spec.** Before coding install/assignment automation, document safe command builders, redaction rules, dry-run output, accepted `assign` vs `assignment` forms, MSI `ASSIGNMENTOPTIONS`, retry/timeout fields, and managed-group prerequisites. Sources: E46, E55-E58.
 
 ### Cross-project capability research ledger (iter-4, 2026-04-25)
 
@@ -110,13 +266,13 @@ Intent: make TeamStation feel like a first-class TeamViewer operations workbench
 - [ ] **Per-monitor DPI V2 in WPF app.manifest + `VisualTreeHelper.GetDpi()` audit.** Test with 125% / 150% / 200% scaling and 4K + 1080p multi-monitor configurations. Cursor offset + click misalignment dominate mRemoteNG's recent issue tracker (#3222, #3223, #3261). HN community signal flags scaling as the #1 reason RustDesk users fall back to TeamViewer. The current TeamStation manifest does not declare per-monitor DPI awareness; this is a P0 bug for any operator running on a docked laptop with an external monitor at a different DPI.
 - **Justification:** Charter-aligned, unblocks multi-monitor sysadmins, modest WPF manifest + binding work. Sources: mRemoteNG #3222/#3223/#3261, [HN 42963070](https://news.ycombinator.com/item?id=42963070), [WPF DPI docs](https://learn.microsoft.com/en-us/windows/win32/hidpi/declaring-managed-apps-dpi-aware).
 
-### Bulk-ops value-pick dialog suite (P1, [5/4/4/4/5/3 → 4.17])
+### Bulk-ops value-pick dialog suite — shipped on main after v0.3.5
 
-- [ ] **BulkSetTag / BulkAddTag / BulkRemoveTag.** Multi-select entries → context menu → "Set tag…" dialog with add/remove/replace semantics. mRemoteNG ships this; r/sysadmin and Royal TS support threads call it the #1 migration friction operation. Reuses the v0.3.5 `MainViewModel.SelectedNodes` + `IsBulkSelectionActive` infrastructure.
-- [ ] **BulkSetProxy / ClearProxy.** Same dialog shape — pick proxy host:port:user:password (or "Clear proxy"), apply across `SelectedNodes.OfType<EntryNode>()`. Operator-fleet bulk reconfiguration.
-- [ ] **BulkSetMode / BulkSetQuality / BulkSetAccessControl.** Three additional dialogs that share a single value-pick component templated by enum source (`ConnectionMode`, `ConnectionQuality`, `AccessControl`).
-- [ ] **Shift-range-select on the tree.** Currently only Ctrl-click accumulates. Range-select needs walk-from-anchor semantics (anchor + cursor + everything in between in display order). Modest WPF work on top of the v0.3.5 `Tree_PreviewMouseLeftButtonDown` handler.
-- **Justification:** Top community-research signal across iter-1 and iter-3 (sources A.11, A.16). Infrastructure already shipped in v0.3.5; v0.4.0 adds the consumer dialogs.
+- [x] **BulkSetTag / BulkAddTag / BulkRemoveTag.** Multi-select entries now support add/remove/replace tag semantics from the selection banner/context menu.
+- [x] **BulkSetProxy / ClearProxy.** Selected entries can apply a shared proxy tuple or clear inherited proxy settings in one audited operation.
+- [x] **BulkSetMode / BulkSetQuality / BulkSetAccessControl.** Selected entries can receive shared TeamViewer mode, quality, and access-control values without opening each editor.
+- [x] **Shift-range-select on the tree.** The tree now supports anchor-to-cursor range selection in display order.
+- **Disposition:** Remove from active v0.4 backlog. Keep this section as shipped-status evidence so future research iterations do not re-harvest bulk editing as missing. Sources remain iter-1/iter-3 mRemoteNG/Royal TS/community signal plus iter-5 raw signals #1-#5.
 
 ### Surface RotateDek in Settings UI (P1 from iter-1, deferred since v0.3.1, [5/4/4/4/5/4 → 4.33])
 
@@ -435,9 +591,15 @@ One-time scan of the three most-cited OSS / freemium alternatives. Surface exist
 - [x] **P2 — TeamViewer client version detection + status-bar update-available pill.** Closes iter-2 P2. `TeamViewerVersionDetectorTests` (12 cases via `[Theory]`).
 - [x] **P1 — Bulk multi-select infrastructure on the connection tree + Bulk Pin/Unpin.** Foundation for the v0.4.0 dialog suite. `BulkMultiSelectTests` (5 cases).
 
+### Unreleased main after v0.3.5 — workflow completion + TeamViewer surface expansion (2026-04-25)
+
+- [x] **Bulk workflow completion.** Shift-range selection, bulk move/delete/copy IDs, bulk tag add/remove/replace, bulk TeamViewer mode/quality/access-control edits, and bulk proxy set/clear are implemented on main. Active backlog now shifts from "bulk editing exists" to "Action Center discovers and explains every command."
+- [x] **TeamViewer launch-surface expansion.** Protocol-first preference, forced protocol launch action, and Web Client handoff are implemented on main. Active backlog now shifts to validation against current TeamViewer clients and a capability matrix.
+- [x] **Roadmap cross-project research.** Iter-4 and iter-5 expanded the plan from UI polish into an operations-workbench strategy: evidence packs, Trust Center, runbooks, credential-provider broker, typed custom fields, deployment kit, audit integrity, and TeamViewer control-surface proof.
+
 ---
 
-## Appendix — Sources (156 prior distinct URLs + iter-4 research links)
+## Appendix — Sources (156 prior distinct URLs + iter-4 + iter-5 research links)
 
 ### iter-1 baseline (38 sources)
 
@@ -500,6 +662,85 @@ Purpose: identify project patterns that can make TeamStation more capable withou
 | D30 | Chocolatey | Package scripts, upgrade/uninstall hooks, naming, and package maintenance expectations | https://docs.chocolatey.org/en-us/create/create-packages/ |
 | D31 | HashiCorp Boundary | Session recording/accountability model for privileged access products | https://developer.hashicorp.com/boundary/docs/session-recording |
 | D32 | HashiCorp Boundary | Credential brokering pattern; TeamStation can borrow lookup semantics without becoming an access proxy | https://developer.hashicorp.com/boundary/tutorials/credential-management/hcp-vault-cred-brokering-quickstart |
+
+### iter-5 repo-recon + external OSINT refresh (72 source groups, 2026-04-25)
+
+These source groups back the iter-5 raw feature ledger and Phase 3 decisions above. GitHub star/pushed/maintainer values were captured with `gh repo view` on 2026-04-25 and should be treated as point-in-time metadata.
+
+| ID | Source class | Why it mattered | URL |
+|---|---|---|---|
+| E1 | Direct OSS: mRemoteNG repo/issues | Bulk workflows, external tools, duplicate-name path display, idle/confirmation requests | https://github.com/mRemoteNG/mRemoteNG |
+| E2 | Direct OSS: RustDesk repo/issues | Online state, self-host trust story, file/USB redirect and touch/mobile friction | https://github.com/rustdesk/rustdesk |
+| E3 | Direct OSS: MeshCentral repo/issues | Device/event logs, stale-agent alerts, concurrency limits, SBOM/provenance request | https://github.com/Ylianst/MeshCentral |
+| E4 | Direct OSS: Apache Guacamole repos | Browser gateway boundary and why TeamStation should not become a protocol relay | https://github.com/apache/guacamole-client |
+| E5 | Direct OSS docs: Guacamole administration/recording | Connection history and externally produced recording playback model | https://guacamole.apache.org/doc/gug/administration.html |
+| E6 | Direct OSS: FreeRDP | Mature protocol-client maintenance/release reference; protocol scope rejected | https://github.com/FreeRDP/FreeRDP |
+| E7 | Direct OSS: Remmina | Connection-profile UX and plugin ecosystem caution | https://github.com/FreeRDP/Remmina |
+| E8 | Direct OSS docs: mRemoteNG External Tools + inheritance | Variables, escaping, selected-connection command execution, folder inheritance | https://mremoteng.readthedocs.io/en/latest/user_interface/external_tools.html |
+| E9 | Direct OSS: TigerVNC | Logging, build, and performance issue patterns | https://github.com/TigerVNC/tigervnc |
+| E10 | Direct OSS: UltraVNC | Long-lived Windows remote-control app reference; VNC protocol rejected | https://github.com/ultravnc/UltraVNC |
+| E11 | Direct OSS: rdesktop | Maintainer-risk caution for protocol-client scope | https://github.com/rdesktop/rdesktop |
+| E12 | Adjacent OSS: KeePassXC | Built-in credential integration without arbitrary plugin loading | https://keepassxc.org/docs/ |
+| E13 | Adjacent OSS: Bitwarden CLI | Read-only launch-time secret lookup shape | https://bitwarden.com/help/cli/ |
+| E14 | Adjacent OSS/commercial: 1Password Connect | Token-scoped vault API, heartbeat, and API activity health | https://developer.1password.com/docs/connect/api-reference/ |
+| E15 | Adjacent tooling: Postman variables | Environment/local/sensitive variable scoping | https://learning.postman.com/docs/sending-requests/variables/variables |
+| E16 | Adjacent tooling: DBeaver admin variables | Variable resolution order and external variable files | https://dbeaver.com/docs/dbeaver/Admin-Variables/ |
+| E17 | Adjacent tooling: DBeaver preconfigured variables | Safe predefined variable catalog | https://dbeaver.com/docs/dbeaver/Pre-configured-Variables/ |
+| E18 | Adjacent OSS: NetBox custom fields | Typed fields, visibility, object links, and operational metadata | https://netbox.readthedocs.io/en/stable/customization/custom-fields/ |
+| E19 | Adjacent OSS: Snipe-IT custom fields/imports | Fieldsets and import discipline with explicit mappings | https://snipe-it.readme.io/docs/importing-assets |
+| E20 | Adjacent OSS: GLPI | ITSM/inventory boundary; reinforces custom-fields-not-asset-catalog decision | https://github.com/glpi-project/glpi |
+| E21 | Adjacent automation: AWX job templates | Promptable fields, credentials, callbacks, and task templates | https://docs.ansible.com/projects/awx/en/24.6.1/userguide/job_templates.html |
+| E22 | Adjacent automation: AWX workflows | Workflow graphs and chained operational templates | https://docs.ansible.com/projects/awx/en/24.6.1/userguide/workflows.html |
+| E23 | Adjacent Windows UX: PowerToys Command Palette | Fast action discovery and command metadata | https://learn.microsoft.com/en-us/windows/powertoys/command-palette/overview |
+| E24 | Adjacent OSS UX: Beekeeper Studio issue #4124 | Quick switcher should show folder/group organization | https://github.com/beekeeper-studio/beekeeper-studio/issues/4124 |
+| E25 | Adjacent UX: VS Code command palette guidelines | Command naming, categories, and discoverability expectations | https://code.visualstudio.com/api/ux-guidelines/command-palette |
+| E26 | Adjacent Windows UX: Windows Terminal actions | Declarative action metadata and command IDs | https://learn.microsoft.com/en-us/windows/terminal/customize-settings/actions |
+| E27 | Commercial competitor: ConnectWise ScreenConnect overview | Hidden/background tooling and session-control boundary signal | https://docs.connectwise.com/ScreenConnect_Documentation |
+| E28 | Commercial competitor: Devolutions RDM audits/reports/logs | Audit trail, activity log, reporting, real-time connection status | https://devolutions.net/remote-desktop-manager/features/audits-and-reports/ |
+| E29 | Commercial competitor: Royal TS tasks/credentials | Command tasks, replacement tokens, credential inheritance | https://docs.royalapps.com/r2023/royalts/reference/organization/dynamic-folder.html |
+| E30 | Commercial competitor: Zoho Assist features | Unattended access, session recording, mobile, scheduling, reboot/reconnect | https://www.zoho.com/assist/features.html |
+| E31 | Commercial competitor: BeyondTrust Remote Support audit | Session reports, recordings, surveys, real-time monitoring, compliance framing | https://www.beyondtrust.com/products/remote-support/features/audit |
+| E32 | Distribution: WiX Toolset | MSI authoring path | https://docs.firegiant.com/wix/ |
+| E33 | Distribution: WinGet manifest docs | Community/package manifest path | https://learn.microsoft.com/en-us/windows/package-manager/package/manifest |
+| E34 | Distribution: Intune Win32 app docs | Install/uninstall command and detection-rule requirements | https://learn.microsoft.com/en-us/intune/app-management/deployment/add-win32 |
+| E35 | Distribution: Chocolatey package docs | Package scripts, upgrade/uninstall hooks, maintenance expectations | https://docs.chocolatey.org/en-us/create/create-packages/ |
+| E36 | Adjacent RMM: RemoteIQ feature page | RMM feature boundary and why TeamStation should not become infrastructure monitoring | https://remoteiqrmm.com/ |
+| E37 | Adjacent OSS RMM: Tactical RMM | Agent/RMM anti-scope plus deployment automation inspiration | https://github.com/amidaware/tacticalrmm |
+| E38 | TeamViewer official: connect/get started | ID/password, Easy Access, confirmation, session links, Web Client access | https://support.teamviewer.com/en/support/solutions/articles/75000128752-get-started-with-teamviewer-remote |
+| E39 | TeamViewer official: API overview/developer docs | REST/OAuth, groups/devices, reports, service cases, license-gated functions | https://www.teamviewer.com/en-us/global/support/knowledge-base/teamviewer-classic/integrations/core-integrations/teamviewer-api/ |
+| E40 | TeamViewer official: connection reports | Incoming/outgoing report prerequisites, filters, CSV export, license gates | https://support.teamviewer.com/en/support/solutions/articles/75000128841-connection-reports |
+| E41 | TeamViewer official: device groups | Managed groups, managers, permissions, pending/offline behavior | https://support.teamviewer.com/en/support/solutions/articles/75000128719-device-groups |
+| E42 | TeamViewer official: SCIM API | User provisioning and OAuth/token contract | https://teamviewer.github.io/scim-api-docs/ |
+| E43 | TeamViewer official: Remote Management guide | Script/remote management feature boundary and capability-gating need | https://dl.teamviewer.com/docs/en/User-Guide-TeamViewer-Remote-Management.pdf |
+| E44 | TeamViewer Web API docs/community examples | `devices`, `groupid`, `online_state`, CORS/token friction, rate-limit unknowns | https://webapi.teamviewer.com/api/v1/docs/index |
+| E45 | TeamViewer Web Client/session-link signal | Web Client is official; direct-ID URLs are not documented as stable | https://www.teamviewer.com/en-us/global/support/documents/ |
+| E46 | TeamViewer Tensor setup/deployment guide | `TeamViewer.exe assign --api-token --grant-easy-access --alias` command surface | https://dl.teamviewer.com/docs/en/TeamViewerTensor_SetupGuide_ManualSolution.pdf |
+| E47 | TeamViewer official security bulletins | CVE bulletin inventory and CVE-2026-23572 baseline | https://www.teamviewer.com/en-mea/resources/trust-center/security-bulletins/ |
+| E48 | NVD CVE-2026-23572 | Affected versions before 15.74.5; access-control bypass context | https://nvd.nist.gov/vuln/detail/CVE-2026-23572 |
+| E49 | NVD CVE-2020-13699 | URI handler quoting vulnerability; validates TeamStation's URI/argv hardening | https://nvd.nist.gov/vuln/detail/CVE-2020-13699 |
+| E50 | Community: HN RustDesk discussion | Scaling, fallback-to-TeamViewer, self-host tradeoffs | https://news.ycombinator.com/item?id=42963070 |
+| E51 | Community/OSS: MeshCentral stale-agent issue | Stale-state alert demand | https://github.com/Ylianst/MeshCentral/issues/7762 |
+| E52 | Community/OSS: MeshCentral concurrent-session issue | Concurrent remote session limits as operational control | https://github.com/Ylianst/MeshCentral/issues/7754 |
+| E53 | Community: ConnectWise session-note request | Operator notes/ticket reason after remote sessions | https://www.reddit.com/r/ConnectWiseControl/comments/11kik98 |
+| E54 | Community: TeamViewer Web Client direct-URL request | Confirms direct Web Client URL is a user need but undocumented/unstable | https://www.reddit.com/r/teamviewer/comments/18o0xkl |
+| E55 | Community: TeamViewer Easy Access assignment command | Real-world `assign --api-token --grant-easy-access` script surface | https://www.reddit.com/r/teamviewer/comments/lc350w |
+| E56 | Community: TeamViewer automatic assignment + Intune | Operational pain around MSI, assignment, managed groups, policies | https://www.reddit.com/r/teamviewer/comments/1lj9sdy/teamviewer_automatic_assignment_easy_access_not/ |
+| E57 | Community: TeamViewer assignment retries/offline | `assignment --id --offline --retries --timeout` observed command shape | https://www.reddit.com/r/teamviewer/comments/1nuhn2l |
+| E58 | Community: TeamViewer Host Intune deployment | Managed group/API token/group ID deployment friction | https://www.reddit.com/r/Intune/comments/16d6shq |
+| E59 | CISA RMM Cyber Defense Plan | Remote-management tools are dual-use; need transparency and defensive guidance | https://www.cisa.gov/news-events/news/cisa-publishes-jcdc-remote-monitoring-and-management-systems-cyber-defense-plan |
+| E60 | MITRE ATT&CK T1219.002 Remote Desktop Software | TeamViewer/AnyDesk/ScreenConnect abuse context for audit and allowlisting | https://attack.mitre.org/techniques/T1219/002/ |
+| E61 | CISA advisory AA23-025A | Legitimate RMM/remote desktop tools abused as persistence/C2 | https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-025a |
+| E62 | Microsoft WPF DPI docs | Per-monitor DPI V2 manifest and WPF DPI handling | https://learn.microsoft.com/en-us/windows/win32/hidpi/declaring-managed-apps-dpi-aware |
+| E63 | Microsoft Artifact Signing | Cloud code-signing path for release hardening | https://azure.microsoft.com/en-us/products/artifact-signing |
+| E64 | DigiCert code-signing validity change | 459-day public code-signing certificate validity pressure | https://knowledge.digicert.com/alerts/code-signing-certificates-459-day-validity |
+| E65 | NuGet: Microsoft.Data.Sqlite 10.0.6 | Current package version and dependency floor | https://www.nuget.org/packages/microsoft.data.sqlite/ |
+| E66 | SQLite PRAGMA optimize docs | Recommended `PRAGMA optimize` maintenance behavior | https://www.sqlite.org/pragma.html |
+| E67 | SQLite WAL docs | WAL checkpoint/backup implications | https://sqlite.org/wal.html |
+| E68 | xUnit v3 migration guide | Test framework migration considerations | https://xunit.net/docs/getting-started/v3/migration |
+| E69 | xUnit release notes | v2/v3 release state and package names | https://xunit.net/releases |
+| E70 | WPF globalization/localization docs | Resource externalization and localization path | https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/wpf-globalization-and-localization-overview |
+| E71 | Microsoft WinUI 3 migration docs | Windows App SDK/WinUI migration tradeoffs from WPF | https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/migrate-to-windows-app-sdk/guides/winui3 |
+| E72 | Avalonia WPF migration docs | Cross-platform fork feasibility and WPF-to-Avalonia differences | https://docs.avaloniaui.net/docs/get-started/wpf/comparison-of-avalonia-with-wpf-and-uwp |
 
 ### Hot links (most actionable for v0.4.0+)
 
