@@ -282,9 +282,10 @@ Intent: make TeamStation feel like a first-class TeamViewer operations workbench
 
 ### Microsoft.Data.Sqlite 9.x → 10.0.6 (P1, [5/3/5/4/5/3 → 4.17])
 
-- [ ] **Upgrade NuGet `Microsoft.Data.Sqlite` to 10.0.6** (April 2026 stable). Wraps SQLite 3.45+ — improved WAL fsync batching, JSON function enhancements, `PRAGMA optimize` improvements. Patch-level API change; no source modifications expected.
-- [ ] **Add `PRAGMA optimize` on connection close** as part of the upgrade, gated behind a settings toggle (default on) — phiresky's SQLite tuning blog documents the latency reduction. iter-3 sources C1, C2.
+- [x] **Upgrade NuGet `Microsoft.Data.Sqlite` to 10.0.6** (April 2026 stable). `TeamStation.Data` now restores against `Microsoft.Data.Sqlite` 10.0.6; `dotnet restore` and Release build verified the package/API transition.
+- [x] **Add `PRAGMA optimize` on connection close** as part of the upgrade, gated behind a settings toggle (default on) — `Database.OpenConnection()` returns an optimizing connection that runs best-effort maintenance during `Close` / `Dispose`, and Settings exposes "Optimize SQLite planner statistics when database connections close" for troubleshooting opt-out.
 - **Justification:** Free perf + maintenance, no API change, no charter friction.
+- **Implementation note (main, 2026-04-25).** Added `AppSettings.OptimizeDatabaseOnClose` (default `true`), Settings UI binding, and regression tests covering default persistence plus `PRAGMA integrity_check` after optimize-on-dispose. Remaining observability work stays under the P2 wave: startup `integrity_check`, slow-query logging, and WAL recovery tests.
 
 ### CVE registry + status-bar regression alert (P1, [5/4/4/5/5/4 → 4.50])
 

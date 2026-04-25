@@ -221,6 +221,14 @@
                                    Text="Prunes session and audit history on startup. Use 0 to keep history indefinitely."
                                    Style="{StaticResource BodyMutedText}" />
 
+                        <CheckBox x:Name="OptimizeDatabaseBox"
+                                  AutomationProperties.Name="Optimize SQLite on connection close"
+                                  Content="Optimize SQLite planner statistics when database connections close"
+                                  Margin="0,18,0,4" />
+                        <TextBlock Margin="0,0,0,0"
+                                   Text="Keeps larger vaults responsive with SQLite's lightweight PRAGMA optimize maintenance. Disable only while diagnosing database issues."
+                                   Style="{StaticResource BodyMutedText}" />
+
                         <TextBlock Margin="0,18,0,0" Text="Saved searches" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="SavedSearchesBox"
                                  AutomationProperties.Name="Saved searches"

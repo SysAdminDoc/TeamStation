@@ -30,6 +30,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly FolderRepository _folders;
     private readonly SessionRepository _sessions;
     private readonly AuditLogRepository _auditLog;
+    private readonly Database _database;
     private readonly TeamViewerLauncher _launcher;
     private readonly AppSettings _settings;
     private readonly SettingsService _settingsService;
@@ -62,6 +63,7 @@ public sealed class MainViewModel : ViewModelBase
         SettingsService settingsService,
         SessionRepository sessions,
         AuditLogRepository auditLog,
+        Database database,
         string? tvExePath,
         string? startupVersion = null,
         string? startupDbPath = null)
@@ -70,6 +72,7 @@ public sealed class MainViewModel : ViewModelBase
         _folders = folders;
         _sessions = sessions;
         _auditLog = auditLog;
+        _database = database;
         _launcher = launcher;
         _settings = settings;
         _settingsService = settingsService;
@@ -1753,6 +1756,7 @@ public sealed class MainViewModel : ViewModelBase
             return;
 
         _settingsService.Save(_settings);
+        _database.OptimizeOnConnectionClose = _settings.OptimizeDatabaseOnClose;
         ThemeManager.Apply(_settings.Theme);
         TvExePath = !string.IsNullOrWhiteSpace(_settings.TeamViewerPathOverride)
             ? _settings.TeamViewerPathOverride

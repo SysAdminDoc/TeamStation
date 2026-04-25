@@ -16,6 +16,7 @@ public sealed class Database : ISecretStore
     private const int CurrentSchemaVersion = 3;
 
     public string Path { get; }
+    public bool OptimizeOnConnectionClose { get; set; } = true;
 
     public Database(string path)
     {
@@ -25,7 +26,7 @@ public sealed class Database : ISecretStore
 
     public SqliteConnection OpenConnection()
     {
-        var c = new SqliteConnection($"Data Source={Path};Cache=Shared");
+        var c = new OptimizingSqliteConnection($"Data Source={Path};Cache=Shared", () => OptimizeOnConnectionClose);
         c.Open();
         using var pragma = c.CreateCommand();
         pragma.CommandText = "PRAGMA foreign_keys = ON;";
@@ -339,5 +340,57 @@ CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
         cmd.CommandText = "DELETE FROM _meta WHERE key = $key;";
         cmd.Parameters.AddWithValue("$key", key);
         cmd.ExecuteNonQuery();
+    }
+
+    private sealed class OptimizingSqliteConnection : SqliteConnection
+    {
+        private readonly Func<bool> _shouldOptimize;
+        private bool _hasOptimized;
+
+        public OptimizingSqliteConnection(string connectionString, Func<bool> shouldOptimize)
+            : base(connectionString)
+        {
+            _shouldOptimize = shouldOptimize;
+        }
+
+        public override void Close()
+        {
+            OptimizeBeforeClose();
+            base.Close();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                OptimizeBeforeClose();
+
+            base.Dispose(disposing);
+        }
+
+        private void OptimizeBeforeClose()
+        {
+            if (_hasOptimized || !_shouldOptimize() || State != System.Data.ConnectionState.Open)
+                return;
+
+            _hasOptimized = true;
+            try
+            {
+                using var cmd = CreateCommand();
+                cmd.CommandText = "PRAGMA optimize;";
+                cmd.ExecuteNonQuery();
+            }
+            catch (SqliteException)
+            {
+                // Maintenance must never block app shutdown or repository disposal.
+            }
+            catch (ObjectDisposedException)
+            {
+                // Dispose can race with shutdown paths; skip maintenance rather than surfacing noise.
+            }
+            catch (InvalidOperationException)
+            {
+                // Connection state can change during shutdown; best effort is enough.
+            }
+        }
     }
 }

@@ -20,6 +20,7 @@ public sealed class AppSettings
     public bool WakeOnLanBeforeLaunch { get; set; }
     public bool PreferProtocolLaunch { get; set; }
     public bool PreferClipboardPasswordLaunch { get; set; }
+    public bool OptimizeDatabaseOnClose { get; set; } = true;
     public int HistoryRetentionDays { get; set; } = 90;
     public string? CloudSyncFolder { get; set; }
     public List<string> SavedSearches { get; set; } = new();

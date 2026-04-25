@@ -83,7 +83,10 @@ public partial class App : Application
                 settingsService.Save(settings);
             }
 
-            var db = new Database(dbPath);
+            var db = new Database(dbPath)
+            {
+                OptimizeOnConnectionClose = settings.OptimizeDatabaseOnClose,
+            };
             _crypto = CreateCrypto(db);
             var crypto = _crypto;
 
@@ -115,6 +118,7 @@ public partial class App : Application
                 settingsService: settingsService,
                 sessions: sessions,
                 auditLog: audit,
+                database: db,
                 tvExePath: tvExePath,
                 startupVersion: version,
                 startupDbPath: dbPath);

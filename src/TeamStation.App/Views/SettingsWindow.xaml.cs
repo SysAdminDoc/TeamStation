@@ -24,6 +24,7 @@ public partial class SettingsWindow : Window
         ClipboardPasswordBox.IsChecked = settings.PreferClipboardPasswordLaunch;
         CloudFolderBox.Text = settings.CloudSyncFolder ?? string.Empty;
         RetentionDaysBox.Text = settings.HistoryRetentionDays.ToString();
+        OptimizeDatabaseBox.IsChecked = settings.OptimizeDatabaseOnClose;
         SavedSearchesBox.Text = string.Join(Environment.NewLine, settings.SavedSearches);
         ExternalToolsBox.Text = string.Join(Environment.NewLine,
             settings.ExternalTools.Select(t => $"{t.Name}|{t.Command}|{t.Arguments}"));
@@ -61,6 +62,7 @@ public partial class SettingsWindow : Window
         _settings.PreferClipboardPasswordLaunch = ClipboardPasswordBox.IsChecked == true;
         _settings.CloudSyncFolder = BlankToNull(CloudFolderBox.Text);
         _settings.HistoryRetentionDays = int.Parse(RetentionDaysBox.Text.Trim());
+        _settings.OptimizeDatabaseOnClose = OptimizeDatabaseBox.IsChecked == true;
         _settings.SavedSearches = SavedSearchesBox.Text
             .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)

@@ -4,6 +4,15 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+### Changed
+
+- **SQLite maintenance upgrade.** `TeamStation.Data` now references `Microsoft.Data.Sqlite` 10.0.6. `Database.OpenConnection()` returns a small optimizing connection that runs best-effort `PRAGMA optimize` during `Close` / `Dispose`, keeping the existing raw-SQL repository shape while picking up SQLite's lightweight planner-statistics maintenance.
+- **Settings exposes database maintenance opt-out.** The Settings dialog now includes a default-on "Optimize SQLite planner statistics when database connections close" checkbox for operators diagnosing database issues.
+
+### Tests
+
+- Added focused coverage for the new settings default / persistence and a SQLite integrity smoke that disposes an optimized connection, reopens the vault, and verifies `PRAGMA integrity_check` returns `ok`.
+
 ## [0.3.5] - 2026-04-25
 
 Three-task patch on top of v0.3.4: completes the byte[] launch-path wiring v0.3.4 introduced, ships TeamViewer client-version detection + an "Update available" pill in the status bar (operator remediation guidance for CVE-2026-23572), and lays down bulk multi-select infrastructure on the connection tree with Bulk Pin / Bulk Unpin as the first commands.

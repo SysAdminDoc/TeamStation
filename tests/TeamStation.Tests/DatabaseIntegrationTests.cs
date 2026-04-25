@@ -48,6 +48,32 @@ public class DatabaseIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void Connection_dispose_runs_maintenance_without_corrupting_database()
+    {
+        using (var c = _db.OpenConnection())
+        {
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "CREATE TABLE IF NOT EXISTS optimize_smoke(id INTEGER PRIMARY KEY, value TEXT);";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var verify = _db.OpenConnection();
+        using var integrity = verify.CreateCommand();
+        integrity.CommandText = "PRAGMA integrity_check;";
+        Assert.Equal("ok", integrity.ExecuteScalar());
+    }
+
+    [Fact]
+    public void Connection_close_maintenance_can_be_disabled()
+    {
+        _db.OptimizeOnConnectionClose = false;
+        Assert.False(_db.OptimizeOnConnectionClose);
+
+        using var c = _db.OpenConnection();
+        Assert.Equal(System.Data.ConnectionState.Open, c.State);
+    }
+
+    [Fact]
     public void Upsert_and_GetAll_round_trip_a_folder()
     {
         var f = new Folder { Name = "Site A", AccentColor = "#F9E2AF", DefaultPassword = "pw" };
