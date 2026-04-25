@@ -1,7 +1,7 @@
 # TeamStation Roadmap
 
-**Last research pass:** 2026-04-25 (iter-3, post-v0.3.5).
-**Source basis:** iter-1 (38 sources, 160 harvested, 49 scored), iter-2 (24 net-new delta sources), iter-3 (94 net-new findings across community/commercial/adjacent/standards/dependencies). 156 distinct external sources total; full Appendix at the end.
+**Last research pass:** 2026-04-25 (iter-4, cross-project capability research).
+**Source basis:** iter-1 (38 sources, 160 harvested, 49 scored), iter-2 (24 net-new delta sources), iter-3 (94 net-new findings across community/commercial/adjacent/standards/dependencies), iter-4 (32 source-backed project patterns across remote-admin tools, command palettes, automation controllers, asset systems, password managers, and Windows packaging). 156 prior distinct external sources plus iter-4 source links; full Appendix at the end.
 **Cadence:** factory-loop iterations have shipped v0.3.0 → v0.3.5 with steady security + UX hardening. This document supersedes the prior v0.3.6 backlog with a unified v0.4.0 / v0.5.0 / v1.0.0 plan informed by all three research iterations.
 
 Prioritization:
@@ -68,6 +68,42 @@ Goal: reduce direct `TeamViewer.exe` launch dependence where official TeamViewer
 - [ ] **COM API detection and diagnostics.** Surface whether `TeamViewer.exe api --install` has registered `TeamViewer.Application`; use it only for supported diagnostics until a current COM control contract is verified.
 - [ ] **Command-line reference coverage.** Track support for official CLI surfaces already relevant to TeamStation: `--id`, `--PasswordB64`, `--mode`, `--quality`, `--ac`, `--ProxyIP`, `--ProxyUser`, `--ProxyPassword`, plus future-safe entries for `--control` `.tvc`, `--play` `.tvs`, and `--sendto` file-transfer handoff.
 - [ ] **Rejected boundary.** No hidden sessions, protocol reverse engineering, credential injection into third-party surfaces, browser automation against TeamViewer web UI, or background remote-control start flows without explicit official support and user-visible consent.
+
+### Cross-project capability research ledger (iter-4, 2026-04-25)
+
+Intent: make TeamStation feel like a first-class TeamViewer operations workbench, not a generic RMM clone. Adjacent projects show the strongest leverage is not another protocol; it is faster action discovery, reusable runbooks, trustworthy evidence, richer connection metadata, safer credential lookup, higher-quality import paths, and enterprise-ready deployment. All items below preserve the TeamViewer-only, local-first, Windows-WPF charter unless explicitly marked `CHARTER-REVIEW`.
+
+#### Immediate backlog promotions
+
+- [ ] **P1 - Action Center / command palette.** Build a toolbar/menu-opened searchable command surface for every selected-connection action: Launch, Launch via protocol, Web Client handoff, copy ID, open TeamViewer installed path, run external tool, add tag, bulk move, export evidence pack, verify audit chain, import preview, open settings page. Borrow the discoverability model from PowerToys Command Palette, VS Code command names, and Windows Terminal actions, but do not require keyboard chords. Each command must declare: display name, category, icon, required selection shape, disabled reason, confirmation policy, audit event name, and whether it is safe in portable mode. Sources: [PowerToys Command Palette](https://learn.microsoft.com/en-us/windows/powertoys/command-palette/overview), [VS Code Command Palette UX](https://code.visualstudio.com/api/ux-guidelines/command-palette), [Windows Terminal actions](https://learn.microsoft.com/en-us/windows/terminal/customize-settings/actions).
+- [ ] **P1 - Runbook / task template system.** Promote external tools from "launch arbitrary process" to reusable, auditable task templates. Each template gets variables, dry-run preview, confirmation policy, output capture, timeout, success/failure parsing, and per-folder inheritance. This directly adapts Royal TS Command Tasks, mRemoteNG External Tools, and AWX job templates without executing remote-control work outside TeamViewer. Sources: [Royal TS tasks](https://docs.royalapps.com/r2021/royalts/tutorials/working-with-tasks.html), [mRemoteNG External Tools](https://mremoteng.readthedocs.io/en/latest/user_interface/external_tools.html), [AWX job templates](https://docs.ansible.com/projects/awx/en/24.6.1/userguide/job_templates.html).
+- [ ] **P1 - Evidence Pack export.** One-click export for a selected connection or folder: session history, launch attempts, TeamViewer client version and CVE matches, settings snapshot with secrets redacted, audit-chain verification result, Web API sync metadata, import source lineage, and operator notes. Output both human-readable HTML and machine-readable NDJSON. Inspired by Guacamole connection history, Devolutions logs/reports/audits, MeshCentral event logs, and Boundary session accountability. TeamStation does not record or proxy live sessions; it packages the evidence it already owns. Sources: [Apache Guacamole connection history](https://guacamole.incubator.apache.org/doc/gug/administration.html), [Devolutions logs/reports/audits](https://docs.devolutions.net/rdm/concepts/advanced-concepts/logs-reports-audits/), [MeshCentral device tabs](https://docs.meshcentral.com/meshcentral/devicetabs/), [Boundary session recording](https://developer.hashicorp.com/boundary/docs/session-recording).
+- [ ] **P1 - Trust Center dashboard.** Add a calm read-only health page: TeamViewer version status, known-CVE baseline, DB backup freshness, encrypted mirror freshness, audit-chain validity, portable-mode risk notes, credential-provider connectivity, Web API token scope health, and update-manifest opt-in status. This turns hidden maintenance/security state into user-visible confidence. Sources: Devolutions reporting/auditing, Guacamole history, 1Password Connect heartbeat/API activity, Bitwarden CLI health/update patterns.
+- [ ] **P1 - Import preview and mapping report.** Every importer must show a preflight table before writing: source app, source record count, field mapping, unsupported fields, duplicate strategy, secret handling, validation errors, and redaction mode. Snipe-IT's import discipline is the key lesson: never silently create or guess schema from bad input. Sources: [Snipe-IT importing assets](https://snipe-it.readme.io/docs/importing-assets), [mRemoteNG inheritance](https://mremoteng.readthedocs.io/en/v1.77.3-dev/folders_and_inheritance.html), Devolutions/Royal TS import targets already listed in v0.5.0.
+
+#### v0.5.0 capability upgrades
+
+- [ ] **P1 - Connection custom fields, not an asset catalog.** Add typed custom fields for entries and folders: text, number, date, URL, enum, multi-select, secret-reference, and object-link. Fieldsets can be assigned per folder/profile and used in search, import mapping, task templates, evidence packs, and dashboard grouping. This is the charter-safe subset of Snipe-IT/NetBox/GLPI: TeamStation stores operational metadata for connections, not inventory scans or RMM asset management. Sources: [Snipe-IT custom fields](https://snipe-it.readme.io/docs/custom-fields), [NetBox custom fields](https://netbox.readthedocs.io/en/stable/customization/custom-fields/).
+- [ ] **P1 - Scoped variables and environment profiles.** Extend external tools/runbooks with resolution order: command-local, entry custom fields, folder fields, active environment profile, app variables, OS environment. Show a resolved-value preview before launch and mark secret-derived values as redacted. This merges Postman environment scopes, DBeaver variable resolution, and mRemoteNG variable expansion into a safer TeamStation-specific model. Sources: [Postman variables](https://learning.postman.com/docs/sending-requests/variables/variables), [DBeaver admin variables](https://dbeaver.com/docs/dbeaver/Admin-Variables/), [DBeaver preconfigured variables](https://dbeaver.com/docs/dbeaver/Pre-configured-Variables/), [mRemoteNG External Tools](https://mremoteng.readthedocs.io/en/latest/user_interface/external_tools.html).
+- [ ] **P1 - Credential-provider broker facade.** Formalize the existing v0.5 credential-provider item into a common read-only lookup contract: `CanResolve`, `ResolveSecretBytesAsync`, `ExplainHealth`, `RedactForExport`, and `ForgetSession`. Initial adapters remain KeePassXC, Bitwarden CLI, and 1Password Connect. Do not store fetched cleartext locally; cache only provider binding metadata and last-health status. Sources: [KeePassXC docs](https://keepassxc.org/docs/), [Bitwarden CLI](https://bitwarden.com/help/cli/), [1Password Connect API](https://developer.1password.com/docs/connect/api-reference/), [Boundary credential brokering](https://developer.hashicorp.com/boundary/tutorials/credential-management/hcp-vault-cred-brokering-quickstart).
+- [ ] **P1 - Online-state and stale-state model.** Make device state explicit: TeamViewer Web API `online_state` when available, last successful local launch, last Web API refresh, optional ICMP result, and "stale after" threshold. Do not imply agent-grade monitoring. MeshCentral and RustDesk prove users value live state, but TeamStation should surface confidence and data age rather than invent liveness. Sources: [MeshCentral guide](https://docs.meshcentral.com/meshcentral/), [RustDesk self-host](https://rustdesk.com/docs/en/self-host/index.html).
+- [ ] **P1 - Enterprise deployment kit.** Ship a signed MSI plus `winget`, Chocolatey, and Intune-ready install/uninstall command documentation. Include detection-rule guidance, silent install examples, optional policy file location, and air-gapped update-manifest settings. Sources: [WiX Toolset](https://docs.firegiant.com/wix/), [WinGet manifest docs](https://learn.microsoft.com/en-us/windows/package-manager/package/manifest), [Intune Win32 app docs](https://learn.microsoft.com/en-us/intune/app-management/deployment/add-win32), [Chocolatey package docs](https://docs.chocolatey.org/en-us/create/create-packages/).
+- [ ] **P2 - PowerToys Command Palette extension (optional companion).** After the in-app Action Center exists, consider a small Windows-only companion extension that exposes pinned TeamStation actions to PowerToys Command Palette. It must call TeamStation through a documented local command contract, never a listening HTTP server. Sources: [PowerToys extension guide](https://learn.microsoft.com/en-us/windows/powertoys/command-palette/creating-an-extension).
+
+#### v1.0.0 / post-1.0 differentiators
+
+- [ ] **P1 - Data portability contract.** Publish `docs/schemas/teamstation-export.v1.json`, importer mapping docs, and a round-trip test suite covering JSON export/import, mRemoteNG XML, RDM XML, Royal TS archives, and TeamViewer history CSV. Importability is a product feature, not just a migration utility.
+- [ ] **P1 - Session-review workspace.** Evolve the existing dashboard into a review surface: filter by customer/tag/operator/date, compare local launch history vs TeamViewer connection reports, export billable summaries, flag suspicious after-hours launches, and attach operator notes. Sources: Guacamole connection history, Devolutions reports/audits, and Boundary-style session accountability.
+- [ ] **P2 - Guided first-run migration wizard.** First-run should ask one question: "Where are your existing TeamViewer connections?" Then offer TeamViewer local history, CSV, mRemoteNG XML, RDM XML, Royal TS, or manual quick connect. The wizard should end with a trust summary: encrypted local DB path, backup status, and TeamViewer version status.
+- [ ] **P2 - Policy profile packs.** Add local JSON policy packs for teams: require confirmation before launch, forbid plaintext exports, require evidence pack on destructive bulk edits, hide Web Client handoff, enforce TeamViewer minimum safe version, disable third-party credential providers, or require encrypted mirror. No multitenancy; this is local policy enforcement for managed desktops.
+
+#### Charter guardrails from iter-4
+
+- **Do not import protocols from other remote-access tools.** RustDesk, MeshCentral, Guacamole, Boundary, Royal TS, and mRemoteNG are inspiration sources, not protocol targets. TeamViewer-only remains the differentiator.
+- **Do not build an agent, relay, or RMM backend.** MeshCentral/RustDesk features such as installed agents, relay infrastructure, file transfer, terminal control, registry editing, and package deployment are out of scope unless TeamViewer officially exposes a supported surface and the user explicitly invokes it.
+- **Do not add an arbitrary plugin loader.** Use curated built-in integrations and declarative templates. VS Code/PowerToys extension patterns are useful for command metadata, not a reason to load third-party code in-process.
+- **Do not record live sessions unless TeamViewer itself produces a supported `.tvs` or equivalent artifact.** TeamStation can launch playback and export local evidence, but it must not screen-capture, proxy, or MITM sessions.
+- **Do not add SaaS webhooks by default.** Evidence export and SIEM-friendly NDJSON are local-first. Any future webhook sink is `CHARTER-REVIEW` and off by default.
 
 ### Per-monitor DPI awareness (P0, [5/4/3/3/4/3 → 3.67])
 
@@ -264,7 +300,7 @@ Items that contradict the charter as currently written. Not silently dropped —
 - **Microsoft Store distribution (MSIX + AppContainer).** Would require relaxing "GitHub-only release distribution" in exchange for store auto-update. iter-3 sources B5, B12. **Decision pending:** is Store reach worth MSIX packaging + Authenticode mandatory + AppContainer side effects (TV.exe discovery may be restricted)?
 - **WinUI 3 / Windows App SDK migration from WPF.** Would require relaxing "WPF as canonical UI". iter-3 source B3. **Decision pending:** WPF is mature and stable; WinUI 3 only justified if Microsoft EOLs WPF.
 - **Native AOT compilation.** Would require relaxing "self-contained .NET 9 framework-dependent publish" — AOT may break DPAPI / SQLite / WPF reflection paths. iter-2 P2 follow-up. **Decision pending:** binary-size win (~120 MB est) vs migration risk.
-- **Snipe-IT-style asset catalog** (custom fields, REST API, host inventory). Would relax "connection manager only — not infrastructure monitoring". iter-3 source A16. **Decision pending:** does TeamStation become a managed asset catalog at v2.0?
+- **Snipe-IT-style asset catalog** (custom fields, REST API, host inventory). Would relax "connection manager only — not infrastructure monitoring". iter-3 source A16. **Decision pending:** does TeamStation become a managed asset catalog at v2.0? **iter-4 note:** the charter-safe subset, typed custom fields attached only to TeamStation entries/folders, has been promoted into the iter-4 capability ledger.
 - **Multi-monitor preset profiles for RDP-style sessions.** TeamViewer doesn't take per-monitor argv flags directly; presets would only matter if proxying multi-monitor TV sessions. iter-3 source A.19. **Decision pending:** does this fit charter? Probably no.
 - **Hidden / stealth session mode.** ConnectWise Control offers it; iter-3 flags as charter-violating "transparency by design" rule. Out of scope as currently formulated.
 
@@ -401,7 +437,7 @@ One-time scan of the three most-cited OSS / freemium alternatives. Surface exist
 
 ---
 
-## Appendix — Sources (156 distinct URLs)
+## Appendix — Sources (156 prior distinct URLs + iter-4 research links)
 
 ### iter-1 baseline (38 sources)
 
@@ -425,6 +461,45 @@ Two parallel deep-dive subagents covered five source classes prior research ligh
 - **Adjacent-domain:** KeePassXC integration features (no plugin loader), Bitwarden Agent Access SDK + Bitwarden CLI, Beekeeper Studio connection-store split, DBeaver multi-secrets pattern, Postman / Insomnia env-variable scoping, VS Code extension architecture + command palette, mRemoteNG docs, RDCMan Sysinternals resurrection, awesome-dotnet / awesome-sysadmin / awesome-wpf curation, ThemeWPF + WPF-Theme-Example + Catppuccin VS, atc-wpf MVVM library, Royal TS 7.04 release notes, Devolutions RDM April 2026, RustDesk 1.4.6, 1Password Connect, Snipe-IT custom fields, Xceed WPF .NET 9 features, Sobrii / Fahimai community signal.
 - **Standards / specs / RFCs / platform APIs:** Microsoft Trusted → Artifact Signing (459-day cert cap), WebAuthn / passkey APIs (Win 11 24H2 / 25H2), UWP .NET 9 Native AOT, WPF → WinUI 3 migration, CNG DPAPI vs classic DPAPI threat-model analysis (Sygnia), Smart App Control + AppContainer / MSIX, Windows 11 toast notifications + XAML Islands, TeamViewer CLI parameters official docs, .NET 9 `System.Threading.Lock`, .NET 9 frozen collections + IReadOnlyList params, System.Drawing.Common Windows-only, `DpapiDataProtector` purpose-string, Windows App Development CLI v0.2, EF Core 9, RFC 3986 URI syntax, CVE-2026-23572 NVD, TeamViewer security bulletins, .NET 9 System.Text.Json.
 - **Dependency changelogs:** Microsoft.Data.Sqlite 10.0.6 (April 2026), SQLite 3.45.0 release log, Konscious Argon2 1.3.1 (June 2024), `System.Security.Cryptography.ProtectedData` 9.0.3, xUnit 2.7.0 (Feb 2024) maintenance mode, xUnit v3 4.0.0-pre.81 preview, .NET April 2026 servicing updates, `System.Drawing.Common` 9.0.3, `System.Text.Json` vs Newtonsoft analysis, RFC 9106 Argon2 spec + Argon2 official, SQLite PRAGMA optimize docs, phiresky SQLite performance tuning blog.
+
+### iter-4 cross-project capability research (32 source links, 2026-04-25)
+
+Purpose: identify project patterns that can make TeamStation more capable without violating the TeamViewer-only/local-first charter. These links back the "Cross-project capability research ledger" above.
+
+| ID | Project / domain | TeamStation pattern to harvest | URL |
+|---|---|---|---|
+| D1 | Apache Guacamole | Connection history, sortable/filterable session records, recording availability indicator | https://guacamole.incubator.apache.org/doc/gug/administration.html |
+| D2 | Apache Guacamole | In-browser playback model for externally produced recordings; useful boundary for `.tvs` playback only | https://guacamole.apache.org/doc/gug/recording-playback.html |
+| D3 | MeshCentral | Device groups, node data, event/history storage, and remote-management cautionary boundary | https://docs.meshcentral.com/meshcentral/ |
+| D4 | MeshCentral | Device tabs, notes, logs, events, actions, and operator-facing state panels | https://docs.meshcentral.com/meshcentral/devicetabs/ |
+| D5 | MeshCtrl | CLI automation surface over a management product; inspiration for documented TeamStation command contracts | https://docs.meshcentral.com/meshctrl/ |
+| D6 | RustDesk | Online presence, ID/relay architecture, self-host trust story; use as inspiration, not protocol scope | https://rustdesk.com/docs/en/self-host/index.html |
+| D7 | mRemoteNG | External tools, variables, escaping rules, and selected-connection command execution | https://mremoteng.readthedocs.io/en/latest/user_interface/external_tools.html |
+| D8 | mRemoteNG | Folder inheritance as a productivity multiplier for large connection sets | https://mremoteng.readthedocs.io/en/v1.77.3-dev/folders_and_inheritance.html |
+| D9 | Royal TS | Command tasks, favorites, replacement tokens, and confirmation policy | https://docs.royalapps.com/r2021/royalts/tutorials/working-with-tasks.html |
+| D10 | Devolutions RDM | Logs, reports, audits, and evidence generation as premium trust features | https://docs.devolutions.net/rdm/concepts/advanced-concepts/logs-reports-audits/ |
+| D11 | Devolutions PAM | Session recording as accountability pattern; TeamStation boundary is playback/export of supported artifacts only | https://docs.devolutions.net/pam/concepts/session-recording/ |
+| D12 | KeePassXC | Built-in credential integrations without arbitrary plugin loading | https://keepassxc.org/docs/ |
+| D13 | Bitwarden | CLI `get` workflows for read-only launch-time secret lookup | https://bitwarden.com/help/cli/ |
+| D14 | 1Password Connect | Vault/item API, heartbeat, API activity, and token-scoped secret retrieval | https://developer.1password.com/docs/connect/api-reference/ |
+| D15 | Postman | Scoped variables, environment selection, local values, and sensitive variable handling | https://learning.postman.com/docs/sending-requests/variables/variables |
+| D16 | DBeaver | Variable resolution order and external variable files | https://dbeaver.com/docs/dbeaver/Admin-Variables/ |
+| D17 | DBeaver | Preconfigured variables such as host, port, date/time, folder, and file | https://dbeaver.com/docs/dbeaver/Pre-configured-Variables/ |
+| D18 | NetBox | Typed custom fields, visibility controls, object links, and template access | https://netbox.readthedocs.io/en/stable/customization/custom-fields/ |
+| D19 | Snipe-IT | Custom fields and fieldsets for structured operational metadata | https://snipe-it.readme.io/docs/custom-fields |
+| D20 | Snipe-IT | Import discipline: pre-create fields, avoid guessing schema from bad data | https://snipe-it.readme.io/docs/importing-assets |
+| D21 | Ansible AWX | Job templates, promptable fields, credentials, callbacks, and webhook cautions | https://docs.ansible.com/projects/awx/en/24.6.1/userguide/job_templates.html |
+| D22 | Ansible AWX | Workflow graphs that link templates into reusable operational sequences | https://docs.ansible.com/projects/awx/en/24.6.1/userguide/workflows.html |
+| D23 | PowerToys Command Palette | Fast action discovery and command/result shape for Windows power users | https://learn.microsoft.com/en-us/windows/powertoys/command-palette/overview |
+| D24 | PowerToys Command Palette | C# extension model for optional companion integrations | https://learn.microsoft.com/en-us/windows/powertoys/command-palette/creating-an-extension |
+| D25 | VS Code | Command naming, categories, and palette discoverability guidelines | https://code.visualstudio.com/api/ux-guidelines/command-palette |
+| D26 | Windows Terminal | Declarative actions, command names, icons, IDs, and palette integration | https://learn.microsoft.com/en-us/windows/terminal/customize-settings/actions |
+| D27 | WiX Toolset | MSI/package authoring model for enterprise deployment | https://docs.firegiant.com/wix/ |
+| D28 | WinGet | Manifest creation and community repository submission path | https://learn.microsoft.com/en-us/windows/package-manager/package/manifest |
+| D29 | Microsoft Intune | Win32 app install/uninstall command requirements and script deployment cautions | https://learn.microsoft.com/en-us/intune/app-management/deployment/add-win32 |
+| D30 | Chocolatey | Package scripts, upgrade/uninstall hooks, naming, and package maintenance expectations | https://docs.chocolatey.org/en-us/create/create-packages/ |
+| D31 | HashiCorp Boundary | Session recording/accountability model for privileged access products | https://developer.hashicorp.com/boundary/docs/session-recording |
+| D32 | HashiCorp Boundary | Credential brokering pattern; TeamStation can borrow lookup semantics without becoming an access proxy | https://developer.hashicorp.com/boundary/tutorials/credential-management/hcp-vault-cred-brokering-quickstart |
 
 ### Hot links (most actionable for v0.4.0+)
 
