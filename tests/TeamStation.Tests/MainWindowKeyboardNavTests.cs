@@ -193,4 +193,34 @@ public class MainWindowKeyboardNavTests
         Assert.Equal("Once", (string?)tree!.Attribute("KeyboardNavigation.TabNavigation"));
         Assert.Equal(expectedName, (string?)tree.Attribute("AutomationProperties.Name"));
     }
+
+    [Theory]
+    [InlineData("EntryEditorWindow.xaml", "NameBox", "Friendly name")]
+    [InlineData("EntryEditorWindow.xaml", "IdBox", "TeamViewer ID")]
+    [InlineData("EntryEditorWindow.xaml", "PasswordBox", "Connection password")]
+    [InlineData("EntryEditorWindow.xaml", "ModeBox", "Connection mode")]
+    [InlineData("EntryEditorWindow.xaml", "PathOverrideBox", "TeamViewer executable override")]
+    [InlineData("FolderEditorWindow.xaml", "NameBox", "Folder name")]
+    [InlineData("FolderEditorWindow.xaml", "DefaultPasswordBox", "Default password")]
+    [InlineData("FolderEditorWindow.xaml", "DefaultPathBox", "Default TeamViewer executable path")]
+    public void Editor_form_fields_expose_accessible_names(string xamlFile, string controlName, string expectedName)
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", xamlFile);
+        var doc = XDocument.Load(path);
+        var control = doc.Descendants()
+            .FirstOrDefault(e => ((string?)e.Attribute(Xaml + "Name")) == controlName);
+
+        Assert.NotNull(control);
+        Assert.Equal(expectedName, (string?)control!.Attribute("AutomationProperties.Name"));
+    }
+
+    [Fact]
+    public void Folder_editor_validates_default_TeamViewer_path_before_saving()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "FolderEditorWindow.xaml.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("File.Exists(defaultPath)", source);
+        Assert.Contains("Default TeamViewer.exe path does not exist.", source);
+    }
 }

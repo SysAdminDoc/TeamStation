@@ -81,24 +81,31 @@
 
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Friendly name" Style="{StaticResource FieldLabelText}" />
-                                <TextBox x:Name="NameBox" />
+                                <TextBox x:Name="NameBox"
+                                         AutomationProperties.Name="Friendly name"
+                                         AutomationProperties.HelpText="Required display name for this connection." />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="TeamViewer ID" Style="{StaticResource FieldLabelText}" />
-                                <TextBox x:Name="IdBox" />
+                                <TextBox x:Name="IdBox"
+                                         AutomationProperties.Name="TeamViewer ID"
+                                         AutomationProperties.HelpText="Required numeric TeamViewer peer ID, 8 to 12 digits." />
                                 <TextBlock Margin="0,6,0,0" Text="Numeric peer ID, 8 to 12 digits." Style="{StaticResource BodyMutedText}" />
                             </StackPanel>
                         </Grid>
 
                         <TextBlock Margin="0,18,0,0" Text="Launch profile" Style="{StaticResource FieldLabelText}" />
-                        <TextBox x:Name="ProfileBox" />
+                        <TextBox x:Name="ProfileBox"
+                                 AutomationProperties.Name="Launch profile" />
                         <TextBlock Margin="0,6,0,0"
                                    Text="Use profiles when the same TeamViewer ID needs separate behaviors such as Control, File Transfer, or Chat."
                                    Style="{StaticResource BodyMutedText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="Password" Style="{StaticResource FieldLabelText}" />
-                        <PasswordBox x:Name="PasswordBox" />
+                        <PasswordBox x:Name="PasswordBox"
+                                     AutomationProperties.Name="Connection password"
+                                     AutomationProperties.HelpText="Optional saved password encrypted at rest." />
                         <TextBlock Margin="0,6,0,0"
                                    Text="Saved locally and encrypted at rest. TeamViewer still receives it when a launch starts."
                                    Style="{StaticResource BodyMutedText}" />
@@ -121,7 +128,8 @@
 
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Connection mode" Style="{StaticResource FieldLabelText}" />
-                                <ComboBox x:Name="ModeBox">
+                                <ComboBox x:Name="ModeBox"
+                                          AutomationProperties.Name="Connection mode">
                                     <ComboBoxItem Tag="{x:Null}" Content="Inherit from folder" />
                                     <ComboBoxItem Tag="{x:Static models:ConnectionMode.RemoteControl}" Content="Remote Control" />
                                     <ComboBoxItem Tag="{x:Static models:ConnectionMode.FileTransfer}" Content="File Transfer" />
@@ -134,7 +142,8 @@
 
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Quality" Style="{StaticResource FieldLabelText}" />
-                                <ComboBox x:Name="QualityBox">
+                                <ComboBox x:Name="QualityBox"
+                                          AutomationProperties.Name="Connection quality">
                                     <ComboBoxItem Tag="{x:Null}" Content="Inherit from folder" />
                                     <ComboBoxItem Tag="{x:Static models:ConnectionQuality.AutoSelect}" Content="Auto" />
                                     <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeQuality}" Content="Optimize quality" />
@@ -146,7 +155,8 @@
                         </Grid>
 
                         <TextBlock Margin="0,18,0,0" Text="Access control" Style="{StaticResource FieldLabelText}" />
-                        <ComboBox x:Name="AcBox">
+                        <ComboBox x:Name="AcBox"
+                                  AutomationProperties.Name="Access control">
                             <ComboBoxItem Tag="{x:Null}" Content="Inherit from folder" />
                             <ComboBoxItem Tag="{x:Static models:AccessControl.Undefined}" Content="Undefined (use TeamViewer default)" />
                             <ComboBoxItem Tag="{x:Static models:AccessControl.FullAccess}" Content="Full access" />
@@ -160,7 +170,9 @@
                                    Style="{StaticResource BodyMutedText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="TeamViewer.exe override" Style="{StaticResource FieldLabelText}" />
-                        <TextBox x:Name="PathOverrideBox" />
+                        <TextBox x:Name="PathOverrideBox"
+                                 AutomationProperties.Name="TeamViewer executable override"
+                                 AutomationProperties.HelpText="Optional path to an existing TeamViewer executable for this connection." />
                         <TextBlock Margin="0,6,0,0"
                                    Text="Optional. Use when this entry must launch a specific TeamViewer Host, Portable, or Full client path."
                                    Style="{StaticResource BodyMutedText}" />
@@ -174,12 +186,14 @@
 
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Wake-on-LAN MAC" Style="{StaticResource FieldLabelText}" />
-                                <TextBox x:Name="WakeMacBox" />
+                                <TextBox x:Name="WakeMacBox"
+                                         AutomationProperties.Name="Wake-on-LAN MAC address" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Wake broadcast address" Style="{StaticResource FieldLabelText}" />
-                                <TextBox x:Name="WakeBroadcastBox" />
+                                <TextBox x:Name="WakeBroadcastBox"
+                                         AutomationProperties.Name="Wake broadcast address" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -201,12 +215,14 @@
 
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Host" Style="{StaticResource FieldLabelText}" />
-                                <TextBox x:Name="ProxyHostBox" />
+                                <TextBox x:Name="ProxyHostBox"
+                                         AutomationProperties.Name="Proxy host" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Port" Style="{StaticResource FieldLabelText}" />
-                                <TextBox x:Name="ProxyPortBox" />
+                                <TextBox x:Name="ProxyPortBox"
+                                         AutomationProperties.Name="Proxy port" />
                             </StackPanel>
                         </Grid>
 
@@ -219,12 +235,14 @@
 
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Username" Style="{StaticResource FieldLabelText}" />
-                                <TextBox x:Name="ProxyUserBox" />
+                                <TextBox x:Name="ProxyUserBox"
+                                         AutomationProperties.Name="Proxy username" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Password" Style="{StaticResource FieldLabelText}" />
-                                <PasswordBox x:Name="ProxyPasswordBox" />
+                                <PasswordBox x:Name="ProxyPasswordBox"
+                                             AutomationProperties.Name="Proxy password" />
                             </StackPanel>
                         </Grid>
 
@@ -243,6 +261,7 @@
 
                         <TextBlock Margin="0,18,0,0" Text="Notes" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="NotesBox"
+                                 AutomationProperties.Name="Connection notes"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  Height="120"
@@ -250,11 +269,13 @@
                                  VerticalContentAlignment="Top" />
 
                         <TextBlock Margin="0,18,0,0" Text="Tags" Style="{StaticResource FieldLabelText}" />
-                        <TextBox x:Name="TagsBox" />
+                        <TextBox x:Name="TagsBox"
+                                 AutomationProperties.Name="Tags" />
                         <TextBlock Margin="0,6,0,0" Text="Comma-separated. Example: billing, warehouse, reception." Style="{StaticResource BodyMutedText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="Pre-launch script" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="PreLaunchScriptBox"
+                                 AutomationProperties.Name="Pre-launch script"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  Height="90"
@@ -263,6 +284,7 @@
 
                         <TextBlock Margin="0,18,0,0" Text="Post-launch script" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="PostLaunchScriptBox"
+                                 AutomationProperties.Name="Post-launch script"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  Height="90"

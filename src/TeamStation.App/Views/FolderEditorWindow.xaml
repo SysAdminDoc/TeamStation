@@ -72,7 +72,9 @@
                                    Style="{StaticResource SectionSubtitleText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="Folder name" Style="{StaticResource FieldLabelText}" />
-                        <TextBox x:Name="NameBox" />
+                        <TextBox x:Name="NameBox"
+                                 AutomationProperties.Name="Folder name"
+                                 AutomationProperties.HelpText="Required folder display name." />
 
                         <TextBlock Margin="0,18,0,0" Text="Accent color" Style="{StaticResource FieldLabelText}" />
                         <Grid>
@@ -82,7 +84,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <TextBox x:Name="AccentBox" Grid.Column="0" TextChanged="AccentBox_TextChanged" />
+                            <TextBox x:Name="AccentBox"
+                                     Grid.Column="0"
+                                     AutomationProperties.Name="Accent color"
+                                     AutomationProperties.HelpText="Optional six-digit hex color, for example #7CB8FF."
+                                     TextChanged="AccentBox_TextChanged" />
 
                             <Border x:Name="AccentPreview"
                                     Grid.Column="2"
@@ -142,7 +148,9 @@
                                    Style="{StaticResource SectionSubtitleText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="Default password" Style="{StaticResource FieldLabelText}" />
-                        <PasswordBox x:Name="DefaultPasswordBox" />
+                        <PasswordBox x:Name="DefaultPasswordBox"
+                                     AutomationProperties.Name="Default password"
+                                     AutomationProperties.HelpText="Optional inherited password for connections in this folder." />
                         <TextBlock Margin="0,6,0,0"
                                    Text="Useful when a whole site shares unattended credentials. Individual connections can still override it."
                                    Style="{StaticResource BodyMutedText}" />
@@ -156,7 +164,8 @@
 
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Default mode" Style="{StaticResource FieldLabelText}" />
-                                <ComboBox x:Name="ModeBox">
+                                <ComboBox x:Name="ModeBox"
+                                          AutomationProperties.Name="Default connection mode">
                                     <ComboBoxItem Tag="{x:Null}" Content="Entry decides" />
                                     <ComboBoxItem Tag="{x:Static models:ConnectionMode.RemoteControl}" Content="Remote Control" />
                                     <ComboBoxItem Tag="{x:Static models:ConnectionMode.FileTransfer}" Content="File Transfer" />
@@ -169,7 +178,8 @@
 
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Default quality" Style="{StaticResource FieldLabelText}" />
-                                <ComboBox x:Name="QualityBox">
+                                <ComboBox x:Name="QualityBox"
+                                          AutomationProperties.Name="Default connection quality">
                                     <ComboBoxItem Tag="{x:Null}" Content="Entry decides" />
                                     <ComboBoxItem Tag="{x:Static models:ConnectionQuality.AutoSelect}" Content="Auto" />
                                     <ComboBoxItem Tag="{x:Static models:ConnectionQuality.OptimizeQuality}" Content="Optimize quality" />
@@ -181,7 +191,8 @@
                         </Grid>
 
                         <TextBlock Margin="0,18,0,0" Text="Default access control" Style="{StaticResource FieldLabelText}" />
-                        <ComboBox x:Name="AcBox">
+                        <ComboBox x:Name="AcBox"
+                                  AutomationProperties.Name="Default access control">
                             <ComboBoxItem Tag="{x:Null}" Content="Entry decides" />
                             <ComboBoxItem Tag="{x:Static models:AccessControl.Undefined}" Content="Undefined" />
                             <ComboBoxItem Tag="{x:Static models:AccessControl.FullAccess}" Content="Full access" />
@@ -191,13 +202,20 @@
                         </ComboBox>
 
                         <TextBlock Margin="0,18,0,0" Text="Default TeamViewer.exe path" Style="{StaticResource FieldLabelText}" />
-                        <TextBox x:Name="DefaultPathBox" />
+                        <TextBox x:Name="DefaultPathBox"
+                                 AutomationProperties.Name="Default TeamViewer executable path"
+                                 AutomationProperties.HelpText="Optional path to an existing TeamViewer executable inherited by folder connections." />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="Leave blank to use the detected TeamViewer install. If set, the path must point to an existing executable."
+                                   Style="{StaticResource BodyMutedText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="Default Wake-on-LAN broadcast address" Style="{StaticResource FieldLabelText}" />
-                        <TextBox x:Name="DefaultWakeBroadcastBox" />
+                        <TextBox x:Name="DefaultWakeBroadcastBox"
+                                 AutomationProperties.Name="Default Wake-on-LAN broadcast address" />
 
                         <TextBlock Margin="0,18,0,0" Text="Inherited pre-launch script" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="PreLaunchScriptBox"
+                                 AutomationProperties.Name="Inherited pre-launch script"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  Height="90"
@@ -206,6 +224,7 @@
 
                         <TextBlock Margin="0,18,0,0" Text="Inherited post-launch script" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="PostLaunchScriptBox"
+                                 AutomationProperties.Name="Inherited post-launch script"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  Height="90"

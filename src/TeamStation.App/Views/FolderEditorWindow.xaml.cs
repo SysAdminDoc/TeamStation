@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -91,7 +92,15 @@ public partial class FolderEditorWindow : Window
         _folder.DefaultMode = GetNullableEnum<ConnectionMode>(ModeBox);
         _folder.DefaultQuality = GetNullableEnum<ConnectionQuality>(QualityBox);
         _folder.DefaultAccessControl = GetNullableEnum<AccessControl>(AcBox);
-        _folder.DefaultTeamViewerPath = string.IsNullOrWhiteSpace(DefaultPathBox.Text) ? null : DefaultPathBox.Text.Trim();
+        var defaultPath = DefaultPathBox.Text.Trim();
+        if (!string.IsNullOrEmpty(defaultPath) && !File.Exists(defaultPath))
+        {
+            ShowValidation("Default TeamViewer.exe path does not exist.");
+            DefaultPathBox.Focus();
+            return;
+        }
+
+        _folder.DefaultTeamViewerPath = string.IsNullOrEmpty(defaultPath) ? null : defaultPath;
         _folder.DefaultWakeBroadcastAddress = string.IsNullOrWhiteSpace(DefaultWakeBroadcastBox.Text) ? null : DefaultWakeBroadcastBox.Text.Trim();
         _folder.PreLaunchScript = string.IsNullOrWhiteSpace(PreLaunchScriptBox.Text) ? null : PreLaunchScriptBox.Text.Trim();
         _folder.PostLaunchScript = string.IsNullOrWhiteSpace(PostLaunchScriptBox.Text) ? null : PostLaunchScriptBox.Text.Trim();
