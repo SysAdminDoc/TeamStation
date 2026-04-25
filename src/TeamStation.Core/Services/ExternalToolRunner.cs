@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 using TeamStation.Core.Models;
 
@@ -8,30 +9,45 @@ public static partial class ExternalToolRunner
 {
     public static Process? Run(ExternalToolDefinition tool, ConnectionEntry entry)
     {
+        return Process.Start(CreateToolStartInfo(tool, entry));
+    }
+
+    public static ProcessStartInfo CreateToolStartInfo(ExternalToolDefinition tool, ConnectionEntry entry)
+    {
         ArgumentNullException.ThrowIfNull(tool);
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (string.IsNullOrWhiteSpace(tool.Command))
-            throw new InvalidOperationException("External tool command is empty.");
-
         var psi = new ProcessStartInfo
         {
-            FileName = Expand(tool.Command, entry),
+            FileName = NormalizeCommandFileName(Expand(tool.Command, entry)),
             UseShellExecute = false,
         };
 
         foreach (var arg in SplitArguments(Expand(tool.Arguments, entry)))
             psi.ArgumentList.Add(arg);
 
-        return Process.Start(psi);
+        return psi;
     }
 
-    public static void RunScript(string script, ConnectionEntry entry)
+    public static void RunScript(string? script, ConnectionEntry entry)
     {
-        if (string.IsNullOrWhiteSpace(script))
+        var psi = CreateScriptStartInfo(script, entry);
+        if (psi is null)
             return;
 
+        Process.Start(psi);
+    }
+
+    public static ProcessStartInfo? CreateScriptStartInfo(string? script, ConnectionEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (string.IsNullOrWhiteSpace(script))
+            return null;
+
         var expanded = Expand(script, entry);
+        if (string.IsNullOrWhiteSpace(expanded))
+            return null;
+
         var psi = new ProcessStartInfo
         {
             FileName = "powershell.exe",
@@ -39,26 +55,35 @@ public static partial class ExternalToolRunner
             CreateNoWindow = true,
         };
         psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
         psi.ArgumentList.Add("-ExecutionPolicy");
         psi.ArgumentList.Add("Bypass");
         psi.ArgumentList.Add("-Command");
         psi.ArgumentList.Add(expanded);
-        Process.Start(psi);
+        return psi;
     }
 
-    public static string Expand(string value, ConnectionEntry entry)
+    public static string Expand(string? value, ConnectionEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (value is null)
+            return string.Empty;
+
         var result = value
-            .Replace("%ID%", entry.TeamViewerId, StringComparison.OrdinalIgnoreCase)
-            .Replace("%NAME%", entry.Name, StringComparison.OrdinalIgnoreCase)
+            .Replace("%ID%", entry.TeamViewerId ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("%NAME%", entry.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase)
             .Replace("%PASSWORD%", entry.Password ?? string.Empty, StringComparison.OrdinalIgnoreCase)
-            .Replace("%PROFILE%", entry.ProfileName, StringComparison.OrdinalIgnoreCase);
+            .Replace("%PROFILE%", entry.ProfileName ?? string.Empty, StringComparison.OrdinalIgnoreCase);
 
         result = TagRegex().Replace(result, match =>
         {
-            var key = match.Groups[1].Value;
+            var key = match.Groups[1].Value.Trim();
+            if (key.Length == 0 || key.Contains('='))
+                return string.Empty;
+
             var prefix = $"{key}=";
-            return entry.Tags.FirstOrDefault(t => t.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))?[prefix.Length..] ?? string.Empty;
+            return (entry.Tags ?? [])
+                .FirstOrDefault(t => t.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))?[prefix.Length..] ?? string.Empty;
         });
 
         result = EnvRegex().Replace(result, match =>
@@ -67,15 +92,94 @@ public static partial class ExternalToolRunner
         return result;
     }
 
-    private static IEnumerable<string> SplitArguments(string value)
+    public static IReadOnlyList<string> SplitArguments(string? value)
     {
+        var arguments = new List<string>();
         if (string.IsNullOrWhiteSpace(value))
-            yield break;
+            return arguments;
 
-        foreach (Match match in ArgumentRegex().Matches(value))
-            yield return match.Groups["quoted"].Success
-                ? match.Groups["quoted"].Value
-                : match.Groups["bare"].Value;
+        var current = new StringBuilder();
+        var inQuotes = false;
+        var hasToken = false;
+        for (var i = 0; i < value.Length; i++)
+        {
+            var ch = value[i];
+            if (ch == '\\' && i + 1 < value.Length && value[i + 1] == '"')
+            {
+                current.Append('"');
+                hasToken = true;
+                i++;
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                inQuotes = !inQuotes;
+                hasToken = true;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(ch) && !inQuotes)
+            {
+                if (hasToken)
+                {
+                    arguments.Add(current.ToString());
+                    current.Clear();
+                    hasToken = false;
+                }
+
+                continue;
+            }
+
+            current.Append(ch);
+            hasToken = true;
+        }
+
+        if (inQuotes)
+            throw new InvalidOperationException("External tool arguments contain an unterminated quoted value.");
+
+        if (hasToken)
+            arguments.Add(current.ToString());
+
+        return arguments;
+    }
+
+    private static string NormalizeCommandFileName(string value)
+    {
+        var command = value.Trim();
+        if (command.Length == 0)
+            throw new InvalidOperationException("External tool command is empty.");
+
+        if (command[0] != '"')
+            return command;
+
+        var fileName = new StringBuilder();
+        for (var i = 1; i < command.Length; i++)
+        {
+            var ch = command[i];
+            if (ch == '\\' && i + 1 < command.Length && command[i + 1] == '"')
+            {
+                fileName.Append('"');
+                i++;
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                if (!string.IsNullOrWhiteSpace(command[(i + 1)..]))
+                    throw new InvalidOperationException("External tool command must contain only the executable path. Put arguments in the Arguments field.");
+
+                var normalized = fileName.ToString();
+                if (string.IsNullOrWhiteSpace(normalized))
+                    throw new InvalidOperationException("External tool command is empty.");
+
+                return normalized;
+            }
+
+            fileName.Append(ch);
+        }
+
+        throw new InvalidOperationException("External tool command contains an unterminated quoted path.");
     }
 
     [GeneratedRegex("%TAG:([^%]+)%", RegexOptions.IgnoreCase)]
@@ -83,7 +187,4 @@ public static partial class ExternalToolRunner
 
     [GeneratedRegex("\\$\\{([^}]+)\\}")]
     private static partial Regex EnvRegex();
-
-    [GeneratedRegex("\"(?<quoted>[^\"]*)\"|(?<bare>\\S+)")]
-    private static partial Regex ArgumentRegex();
 }
