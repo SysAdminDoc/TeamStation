@@ -602,18 +602,31 @@ public sealed class CryptoService : IDisposable
         return newSvc;
     }
 
-    public byte[]? EncryptString(string? plaintext)
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> bytes directly under the DEK,
+    /// returning the same nonce|tag|ciphertext wire format
+    /// <see cref="EncryptString"/> produces. Caller-owned buffer — this
+    /// method does NOT zero <paramref name="plaintext"/>; the caller decides
+    /// when the cleartext can go away.
+    /// </summary>
+    /// <remarks>
+    /// New in v0.3.4. The launch hot path uses this overload so the password
+    /// stays in a zeroable byte buffer instead of a CLR-interned
+    /// <see cref="string"/>. UI bindings keep using <see cref="EncryptString"/>
+    /// — the binding layer can't zero CLR strings, so refactoring those
+    /// surfaces is performative.
+    /// </remarks>
+    public byte[]? EncryptBytes(byte[]? plaintext)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (plaintext is null) return null;
-        var plain = Encoding.UTF8.GetBytes(plaintext);
         var nonce = RandomNumberGenerator.GetBytes(NonceSize);
-        var cipher = new byte[plain.Length];
+        var cipher = new byte[plaintext.Length];
         var tag = new byte[TagSize];
 
         using var aes = new AesGcm(_dek, TagSize);
-        aes.Encrypt(nonce, plain, cipher, tag);
+        aes.Encrypt(nonce, plaintext, cipher, tag);
 
         var output = new byte[NonceSize + TagSize + cipher.Length];
         Buffer.BlockCopy(nonce, 0, output, 0, NonceSize);
@@ -622,7 +635,15 @@ public sealed class CryptoService : IDisposable
         return output;
     }
 
-    public string? DecryptString(byte[]? ciphertext)
+    /// <summary>
+    /// Decrypts <paramref name="ciphertext"/> into a fresh <see cref="byte"/>
+    /// array of UTF-8 plaintext. The caller owns the returned buffer and is
+    /// expected to zero it via
+    /// <see cref="CryptographicOperations.ZeroMemory(Span{byte})"/> as soon
+    /// as the cleartext is no longer needed. New in v0.3.4 — the legacy
+    /// <see cref="DecryptString"/> shim now routes through this method.
+    /// </summary>
+    public byte[]? DecryptToBytes(byte[]? ciphertext)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -640,7 +661,41 @@ public sealed class CryptoService : IDisposable
         var plain = new byte[cipher.Length];
         using var aes = new AesGcm(_dek, TagSize);
         aes.Decrypt(nonce, cipher, tag, plain);
-        return Encoding.UTF8.GetString(plain);
+        return plain;
+    }
+
+    public byte[]? EncryptString(string? plaintext)
+    {
+        if (plaintext is null) return null;
+        var bytes = Encoding.UTF8.GetBytes(plaintext);
+        try
+        {
+            return EncryptBytes(bytes);
+        }
+        finally
+        {
+            // The intermediate UTF-8 buffer we allocated is ours to zero —
+            // the source string itself is CLR-interned and unzeroable, but
+            // we don't need to leak the byte[] copy on top of that.
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
+    public string? DecryptString(byte[]? ciphertext)
+    {
+        var bytes = DecryptToBytes(ciphertext);
+        if (bytes is null) return null;
+        try
+        {
+            return Encoding.UTF8.GetString(bytes);
+        }
+        finally
+        {
+            // Zero the intermediate UTF-8 buffer. The returned string is
+            // unavoidable on this legacy code path — callers wanting a
+            // zeroable cleartext should call DecryptToBytes directly.
+            CryptographicOperations.ZeroMemory(bytes);
+        }
     }
 
     /// <summary>

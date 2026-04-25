@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using TeamStation.Core.Models;
 
 namespace TeamStation.Launcher;
@@ -31,7 +32,7 @@ public sealed class TeamViewerLauncher
             var mode = entry.Mode ?? ConnectionMode.RemoteControl;
             return options.ForceUri || UriSchemeBuilder.IsUriOnly(mode)
                 ? LaunchViaUri(entry)
-                : LaunchViaCli(entry, options);
+                : LaunchViaCli(entry, options, passwordBytes: null, proxyPasswordBytes: null);
         }
         catch (Exception ex)
         {
@@ -39,7 +40,59 @@ public sealed class TeamViewerLauncher
         }
     }
 
-    private LaunchOutcome LaunchViaCli(ConnectionEntry entry, LaunchOptions options)
+    /// <summary>
+    /// New in v0.3.4. Launch path that takes the password (and optionally
+    /// the proxy password) as zeroable byte buffers instead of strings on
+    /// <see cref="ConnectionEntry"/>. The buffers are zeroed via
+    /// <see cref="CryptographicOperations.ZeroMemory(Span{byte})"/>
+    /// immediately after argv has been composed and handed to
+    /// <c>Process.Start</c>, so the cleartext lives in our address space
+    /// for the absolute minimum window the launch flow allows.
+    /// </summary>
+    /// <remarks>
+    /// Caller hands ownership of the byte arrays in. Even on failure paths
+    /// the buffers are zeroed (try/finally), so no caller has to second-
+    /// guess the lifecycle. URI-mode launches don't carry the password on
+    /// the URI for non-control modes (see UriSchemeBuilder), so the
+    /// proxyPasswordBytes parameter is silently ignored on those paths.
+    /// </remarks>
+    public LaunchOutcome Launch(
+        ConnectionEntry entry,
+        byte[]? passwordBytes,
+        byte[]? proxyPasswordBytes,
+        LaunchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        options ??= LaunchOptions.Default;
+
+        try
+        {
+            try
+            {
+                var mode = entry.Mode ?? ConnectionMode.RemoteControl;
+                return options.ForceUri || UriSchemeBuilder.IsUriOnly(mode)
+                    ? LaunchViaUri(entry)
+                    : LaunchViaCli(entry, options, passwordBytes, proxyPasswordBytes);
+            }
+            catch (Exception ex)
+            {
+                return LaunchOutcome.Failed(ex.Message);
+            }
+        }
+        finally
+        {
+            if (passwordBytes is { Length: > 0 })
+                CryptographicOperations.ZeroMemory(passwordBytes);
+            if (proxyPasswordBytes is { Length: > 0 })
+                CryptographicOperations.ZeroMemory(proxyPasswordBytes);
+        }
+    }
+
+    private LaunchOutcome LaunchViaCli(
+        ConnectionEntry entry,
+        LaunchOptions options,
+        byte[]? passwordBytes,
+        byte[]? proxyPasswordBytes)
     {
         var exe = string.IsNullOrWhiteSpace(entry.TeamViewerPathOverride)
             ? _pathResolver()
@@ -48,7 +101,10 @@ public sealed class TeamViewerLauncher
             throw new FileNotFoundException(
             "TeamViewer.exe not found. Install TeamViewer and make sure the full client is available in its normal install location.");
 
-        var argv = CliArgvBuilder.Build(entry, base64Password: options.UseBase64Password);
+        var argv = passwordBytes is null && proxyPasswordBytes is null
+            ? CliArgvBuilder.Build(entry, base64Password: options.UseBase64Password)
+            : CliArgvBuilder.Build(entry, passwordBytes, proxyPasswordBytes, base64Password: options.UseBase64Password);
+
         var psi = new ProcessStartInfo
         {
             FileName = exe,

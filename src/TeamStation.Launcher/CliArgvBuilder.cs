@@ -16,6 +16,66 @@ namespace TeamStation.Launcher;
 /// </remarks>
 public static class CliArgvBuilder
 {
+    /// <summary>
+    /// New in v0.3.4. Build argv from explicit byte[] password buffers
+    /// supplied by a credential-aware caller. When non-null, the byte[]
+    /// arrays override <see cref="ConnectionEntry.Password"/> and
+    /// <see cref="ProxySettings.Password"/> respectively. The byte[] arrays
+    /// are NOT zeroed inside this method — caller (e.g.
+    /// <see cref="TeamViewerLauncher"/>) owns lifecycle and is expected to
+    /// zero immediately after argv has been handed to <c>Process.Start</c>.
+    /// </summary>
+    public static IReadOnlyList<string> Build(
+        ConnectionEntry entry,
+        byte[]? passwordBytes,
+        byte[]? proxyPasswordBytes,
+        bool base64Password = true)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        LaunchInputValidator.ValidateTeamViewerId(entry.TeamViewerId);
+
+        var argv = new List<string>(16) { "--id", entry.TeamViewerId };
+
+        if (passwordBytes is { Length: > 0 })
+        {
+            // Validation reuses the existing string-based path. The transient
+            // string is method-local and will be GC'd; what made the
+            // System.String credential leak meaningful was long-lived field
+            // references (settings.TeamViewerApiToken / entry.Password), not
+            // microsecond-scope locals.
+            var pw = Encoding.UTF8.GetString(passwordBytes);
+            LaunchInputValidator.ValidatePassword(pw);
+            if (base64Password)
+            {
+                argv.Add("--PasswordB64");
+                argv.Add(Convert.ToBase64String(passwordBytes));
+            }
+            else
+            {
+                argv.Add("--Password");
+                argv.Add(pw);
+            }
+        }
+        else if (!string.IsNullOrEmpty(entry.Password))
+        {
+            LaunchInputValidator.ValidatePassword(entry.Password);
+            if (base64Password)
+            {
+                var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.Password));
+                argv.Add("--PasswordB64");
+                argv.Add(b64);
+            }
+            else
+            {
+                argv.Add("--Password");
+                argv.Add(entry.Password);
+            }
+        }
+
+        AppendModeQualityAccessAndProxy(argv, entry, proxyPasswordBytes);
+        return argv;
+    }
+
     public static IReadOnlyList<string> Build(ConnectionEntry entry, bool base64Password = true)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -39,6 +99,15 @@ public static class CliArgvBuilder
             }
         }
 
+        AppendModeQualityAccessAndProxy(argv, entry, proxyPasswordBytes: null);
+        return argv;
+    }
+
+    private static void AppendModeQualityAccessAndProxy(
+        List<string> argv,
+        ConnectionEntry entry,
+        byte[]? proxyPasswordBytes)
+    {
         switch (entry.Mode)
         {
             case ConnectionMode.FileTransfer:
@@ -86,7 +155,14 @@ public static class CliArgvBuilder
                 argv.Add(proxy.Username);
             }
 
-            if (!string.IsNullOrEmpty(proxy.Password))
+            if (proxyPasswordBytes is { Length: > 0 })
+            {
+                var pw = Encoding.UTF8.GetString(proxyPasswordBytes);
+                LaunchInputValidator.ValidatePassword(pw);
+                argv.Add("--ProxyPassword");
+                argv.Add(Convert.ToBase64String(proxyPasswordBytes));
+            }
+            else if (!string.IsNullOrEmpty(proxy.Password))
             {
                 LaunchInputValidator.ValidatePassword(proxy.Password);
                 var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(proxy.Password));
@@ -94,7 +170,5 @@ public static class CliArgvBuilder
                 argv.Add(b64);
             }
         }
-
-        return argv;
     }
 }

@@ -29,6 +29,50 @@ public sealed class EntryRepository
         return list;
     }
 
+    /// <summary>
+    /// Loads ONLY the encrypted password column for an entry and returns
+    /// the cleartext as a fresh <see cref="byte"/> array of UTF-8. The
+    /// caller owns the buffer and is expected to zero it via
+    /// <see cref="System.Security.Cryptography.CryptographicOperations.ZeroMemory(System.Span{byte})"/>
+    /// once the password is no longer needed. Returns <c>null</c> when the
+    /// entry has no stored password or the entry id does not exist.
+    /// </summary>
+    /// <remarks>
+    /// New in v0.3.4. Used by the launch hot path so the password lives as
+    /// a zeroable byte buffer instead of a CLR-interned string. Does NOT
+    /// touch <see cref="ConnectionEntry.Password"/>; the caller is
+    /// responsible for any string-typed cache it keeps for the UI layer.
+    /// </remarks>
+    public byte[]? LoadEntryPasswordBytes(Guid entryId)
+    {
+        using var c = _db.OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT password_enc FROM entries WHERE id = $id;";
+        cmd.Parameters.AddWithValue("$id", entryId.ToString("D"));
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read() || reader.IsDBNull(0)) return null;
+        var ciphertext = (byte[])reader["password_enc"];
+        return _crypto.DecryptToBytes(ciphertext);
+    }
+
+    /// <summary>
+    /// Loads ONLY the encrypted proxy-password column for an entry and
+    /// returns the cleartext as a fresh zeroable byte buffer. Returns
+    /// <c>null</c> when the entry has no proxy or the proxy has no stored
+    /// password.
+    /// </summary>
+    public byte[]? LoadEntryProxyPasswordBytes(Guid entryId)
+    {
+        using var c = _db.OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT proxy_pass_enc FROM entries WHERE id = $id;";
+        cmd.Parameters.AddWithValue("$id", entryId.ToString("D"));
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read() || reader.IsDBNull(0)) return null;
+        var ciphertext = (byte[])reader["proxy_pass_enc"];
+        return _crypto.DecryptToBytes(ciphertext);
+    }
+
     public ConnectionEntry? Get(Guid id)
     {
         using var c = _db.OpenConnection();
