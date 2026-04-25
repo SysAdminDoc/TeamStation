@@ -158,6 +158,14 @@
                                   Content="Send Wake-on-LAN before launch when a connection has a MAC address"
                                   Margin="0,18,0,12" />
 
+                        <CheckBox x:Name="ProtocolLaunchBox"
+                                  AutomationProperties.Name="Prefer TeamViewer protocol links"
+                                  Content="Prefer TeamViewer protocol links before launching TeamViewer.exe"
+                                  Margin="0,0,0,4" />
+                        <TextBlock Margin="0,0,0,12"
+                                   Text="Uses registered TeamViewer protocol handlers for remote control, file transfer, and VPN when proxy, quality, or access-control overrides do not require command-line flags."
+                                   Style="{StaticResource BodyMutedText}" />
+
                         <CheckBox x:Name="ClipboardPasswordBox"
                                   AutomationProperties.Name="Stage password on clipboard"
                                   Content="Stage password on the clipboard instead of the command line (auto-clears in 30 s)"

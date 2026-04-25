@@ -1091,9 +1091,9 @@ public sealed class MainViewModel : ViewModelBase
     private static IReadOnlyList<ChoiceDialogOption> CreateModeOptions() =>
     [
         new("Inherit from folder", "Resolve the launch mode from the parent folder at launch time.", null),
-        new("Remote control", "Start a standard remote-control session through TeamViewer.exe.", ConnectionMode.RemoteControl),
-        new("File transfer", "Open TeamViewer directly in file-transfer mode.", ConnectionMode.FileTransfer),
-        new("VPN", "Open TeamViewer in VPN mode when supported by the installed client.", ConnectionMode.Vpn),
+        new("Remote control", "Start a standard remote-control session.", ConnectionMode.RemoteControl),
+        new("File transfer", "Start a file-transfer session for the selected connection.", ConnectionMode.FileTransfer),
+        new("VPN", "Start a VPN session when supported by the installed client.", ConnectionMode.Vpn),
         new("Chat", "Open the TeamViewer chat URI handler for the selected connection.", ConnectionMode.Chat),
         new("Video call", "Open the TeamViewer video-call URI handler for the selected connection.", ConnectionMode.VideoCall),
         new("Presentation", "Open the TeamViewer presentation URI handler for the selected connection.", ConnectionMode.Presentation),
@@ -2200,6 +2200,14 @@ public sealed class MainViewModel : ViewModelBase
             }
         }
 
+        var launchOptions = overrideOptions ?? new LaunchOptions(
+            UseBase64Password: true,
+            ForceUri: false,
+            PreferProtocolHandler: _settings.PreferProtocolLaunch);
+        var launchPlan = LaunchRoutePlanner.Plan(launchTarget, launchOptions);
+        if (launchPlan.FellBackToExecutable)
+            AppendLog(LogLevel.Info, launchPlan.Description);
+
         LaunchOutcome outcome;
         try
         {
@@ -2221,10 +2229,10 @@ public sealed class MainViewModel : ViewModelBase
             }
 
             outcome = pwBytes is not null || proxyPwBytes is not null
-                ? _launcher.Launch(launchTarget, pwBytes, proxyPwBytes, overrideOptions ?? LaunchOptions.Default)
-                : (overrideOptions is null
+                ? _launcher.Launch(launchTarget, pwBytes, proxyPwBytes, launchOptions)
+                : (launchOptions == LaunchOptions.Default
                     ? _launcher.Launch(launchTarget)
-                    : _launcher.Launch(launchTarget, overrideOptions));
+                    : _launcher.Launch(launchTarget, launchOptions));
         }
         catch (Exception ex)
         {

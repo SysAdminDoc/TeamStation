@@ -6,9 +6,10 @@ using TeamStation.Core.Models;
 namespace TeamStation.Launcher;
 
 /// <summary>
-/// Front-door launch API. Routes to CLI or URI handler based on mode,
-/// returning a <see cref="LaunchOutcome"/> rather than throwing for
-/// predictable caller control flow.
+/// Front-door launch API. Routes to TeamViewer.exe or the registered
+/// TeamViewer protocol handler based on mode and user preference, returning
+/// a <see cref="LaunchOutcome"/> rather than throwing for predictable caller
+/// control flow.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class TeamViewerLauncher
@@ -29,8 +30,8 @@ public sealed class TeamViewerLauncher
 
         try
         {
-            var mode = entry.Mode ?? ConnectionMode.RemoteControl;
-            return options.ForceUri || UriSchemeBuilder.IsUriOnly(mode)
+            var plan = LaunchRoutePlanner.Plan(entry, options);
+            return plan.Route == LaunchRoute.ProtocolHandler
                 ? LaunchViaUri(entry)
                 : LaunchViaCli(entry, options, passwordBytes: null, proxyPasswordBytes: null);
         }
@@ -69,8 +70,8 @@ public sealed class TeamViewerLauncher
         {
             try
             {
-                var mode = entry.Mode ?? ConnectionMode.RemoteControl;
-                return options.ForceUri || UriSchemeBuilder.IsUriOnly(mode)
+                var plan = LaunchRoutePlanner.Plan(entry, options);
+                return plan.Route == LaunchRoute.ProtocolHandler
                     ? LaunchViaUri(entry)
                     : LaunchViaCli(entry, options, passwordBytes, proxyPasswordBytes);
             }
@@ -131,9 +132,9 @@ public sealed class TeamViewerLauncher
     }
 }
 
-public sealed record LaunchOptions(bool UseBase64Password, bool ForceUri)
+public sealed record LaunchOptions(bool UseBase64Password, bool ForceUri, bool PreferProtocolHandler = false)
 {
-    public static readonly LaunchOptions Default = new(UseBase64Password: true, ForceUri: false);
+    public static readonly LaunchOptions Default = new(UseBase64Password: true, ForceUri: false, PreferProtocolHandler: false);
 }
 
 public sealed record LaunchOutcome(bool Success, int? ProcessId, string? ExePath, IReadOnlyList<string> Argv, string? Uri, string? Error)

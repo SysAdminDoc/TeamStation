@@ -20,6 +20,7 @@ public partial class SettingsWindow : Window
         TeamViewerPathBox.Text = settings.TeamViewerPathOverride ?? string.Empty;
         ApiTokenBox.Password = settings.TeamViewerApiToken ?? string.Empty;
         WakeBox.IsChecked = settings.WakeOnLanBeforeLaunch;
+        ProtocolLaunchBox.IsChecked = settings.PreferProtocolLaunch;
         ClipboardPasswordBox.IsChecked = settings.PreferClipboardPasswordLaunch;
         CloudFolderBox.Text = settings.CloudSyncFolder ?? string.Empty;
         RetentionDaysBox.Text = settings.HistoryRetentionDays.ToString();
@@ -56,6 +57,7 @@ public partial class SettingsWindow : Window
         _settings.Theme = ThemeBox.SelectedValue as string ?? "Dark";
         _settings.TeamViewerApiToken = BlankToNull(ApiTokenBox.Password);
         _settings.WakeOnLanBeforeLaunch = WakeBox.IsChecked == true;
+        _settings.PreferProtocolLaunch = ProtocolLaunchBox.IsChecked == true;
         _settings.PreferClipboardPasswordLaunch = ClipboardPasswordBox.IsChecked == true;
         _settings.CloudSyncFolder = BlankToNull(CloudFolderBox.Text);
         _settings.HistoryRetentionDays = int.Parse(RetentionDaysBox.Text.Trim());

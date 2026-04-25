@@ -38,6 +38,7 @@ public class SettingsServiceTests : IDisposable
         {
             HasAcceptedLaunchNotice = true,
             WakeOnLanBeforeLaunch = true,
+            PreferProtocolLaunch = true,
             PreferClipboardPasswordLaunch = true,
             HistoryRetentionDays = 14,
             Theme = "Light",
@@ -48,6 +49,7 @@ public class SettingsServiceTests : IDisposable
 
         Assert.True(loaded.HasAcceptedLaunchNotice);
         Assert.True(loaded.WakeOnLanBeforeLaunch);
+        Assert.True(loaded.PreferProtocolLaunch);
         Assert.True(loaded.PreferClipboardPasswordLaunch);
         Assert.Equal(14, loaded.HistoryRetentionDays);
         Assert.Equal("Light", loaded.Theme);

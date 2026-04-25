@@ -454,6 +454,7 @@ public class MainWindowKeyboardNavTests
     [InlineData("ThemeBox", "Theme")]
     [InlineData("TeamViewerPathBox", "TeamViewer executable")]
     [InlineData("ApiTokenBox", "TeamViewer Web API token")]
+    [InlineData("ProtocolLaunchBox", "Prefer TeamViewer protocol links")]
     [InlineData("CloudFolderBox", "Cloud sync folder")]
     [InlineData("RetentionDaysBox", "History retention days")]
     [InlineData("SavedSearchesBox", "Saved searches")]
