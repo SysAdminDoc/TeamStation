@@ -81,6 +81,6 @@ public static partial class TeamViewerHistoryImport
         return string.IsNullOrWhiteSpace(cleaned) ? $"TeamViewer {id}" : cleaned;
     }
 
-    [GeneratedRegex("\\b\\d{8,12}\\b")]
+    [GeneratedRegex("(?<![A-Za-z0-9])[0-9]{8,12}(?![A-Za-z0-9])", RegexOptions.CultureInvariant)]
     private static partial Regex TeamViewerIdRegex();
 }

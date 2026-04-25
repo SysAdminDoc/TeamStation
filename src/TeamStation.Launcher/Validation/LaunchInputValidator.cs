@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using TeamStation.Core.Models;
 
 namespace TeamStation.Launcher.Validation;
 
@@ -9,16 +9,9 @@ namespace TeamStation.Launcher.Validation;
 /// </summary>
 public static partial class LaunchInputValidator
 {
-    public const int MaxIdLength = 12;
+    public const int MaxIdLength = TeamViewerIdFormat.MaxLength;
     public const int MaxPasswordLength = 256;
     public const int MaxProxyUserLength = 128;
-
-    // ASCII-only digit class. .NET's `\d` matches any Unicode Nd category
-    // character (Arabic-Indic, full-width, Bengali, etc.), which would let
-    // a device ID written in non-ASCII digits slip past the regex even
-    // though the TeamViewer CLI only accepts ASCII decimal IDs.
-    [GeneratedRegex(@"^[0-9]{8,12}$", RegexOptions.CultureInvariant)]
-    private static partial Regex IdPattern();
 
     private static readonly char[] ForbiddenInPassword =
     [
@@ -37,7 +30,7 @@ public static partial class LaunchInputValidator
             throw new LaunchValidationException("TeamViewer ID is required.");
         if (id.Length > MaxIdLength)
             throw new LaunchValidationException($"TeamViewer ID exceeds {MaxIdLength} characters.");
-        if (!IdPattern().IsMatch(id))
+        if (!TeamViewerIdFormat.IsValid(id))
             throw new LaunchValidationException("TeamViewer ID must be 8-12 digits.");
     }
 

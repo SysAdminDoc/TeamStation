@@ -76,13 +76,14 @@ public sealed class TeamViewerCloudSyncService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var id = ReadString(device, "remotecontrol_id", "teamviewer_id", "device_id", "id");
-                if (string.IsNullOrWhiteSpace(id))
+                var teamViewerId = TeamViewerIdFormat.ExtractAsciiDigits(id);
+                if (!TeamViewerIdFormat.IsValid(teamViewerId))
                     continue;
 
                 entries.Add(new ConnectionEntry
                 {
-                    Name = ReadString(device, "alias", "name", "description") ?? $"TeamViewer {id}",
-                    TeamViewerId = new string(id.Where(char.IsDigit).ToArray()),
+                    Name = ReadString(device, "alias", "name", "description") ?? $"TeamViewer {teamViewerId}",
+                    TeamViewerId = teamViewerId,
                     ProfileName = "TV Cloud",
                     ParentFolderId = folder.Id,
                     Mode = ConnectionMode.RemoteControl,
@@ -104,9 +105,9 @@ public sealed class TeamViewerCloudSyncService
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (document.RootElement.ValueKind == JsonValueKind.Array)
-            return document.RootElement.EnumerateArray().ToList();
+            return document.RootElement.EnumerateArray().Select(element => element.Clone()).ToList();
         if (document.RootElement.TryGetProperty(propertyName, out var array) && array.ValueKind == JsonValueKind.Array)
-            return array.EnumerateArray().ToList();
+            return array.EnumerateArray().Select(element => element.Clone()).ToList();
         return [];
     }
 

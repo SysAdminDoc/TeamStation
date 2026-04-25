@@ -161,6 +161,62 @@ public class JsonBackupTests
         Assert.Contains("999", ex.Message);
     }
 
+    [Fact]
+    public void Parse_regenerates_empty_or_duplicate_entity_ids_before_import()
+    {
+        var duplicateFolderId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+        var duplicateEntryId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+        var json = $$"""
+                     {
+                       "formatVersion": 2,
+                       "exportedAtUtc": "2026-04-23T00:00:00+00:00",
+                       "folders": [
+                         { "id": "00000000-0000-0000-0000-000000000000", "name": "Missing folder id", "sortOrder": 0 },
+                         { "id": "{{duplicateFolderId}}", "name": "Folder A", "sortOrder": 1 },
+                         { "id": "{{duplicateFolderId}}", "name": "Folder B", "sortOrder": 2 }
+                       ],
+                       "entries": [
+                         { "id": "00000000-0000-0000-0000-000000000000", "name": "Missing entry id", "teamViewerId": "123456789" },
+                         { "id": "{{duplicateEntryId}}", "name": "Entry A", "teamViewerId": "223456789" },
+                         { "id": "{{duplicateEntryId}}", "name": "Entry B", "teamViewerId": "323456789" }
+                       ]
+                     }
+                     """;
+
+        var (folders, entries) = JsonBackup.Parse(json);
+
+        Assert.Equal(3, folders.Count);
+        Assert.Equal(3, entries.Count);
+        Assert.All(folders, folder => Assert.NotEqual(Guid.Empty, folder.Id));
+        Assert.All(entries, entry => Assert.NotEqual(Guid.Empty, entry.Id));
+        Assert.Equal(3, folders.Select(folder => folder.Id).Distinct().Count());
+        Assert.Equal(3, entries.Select(entry => entry.Id).Distinct().Count());
+    }
+
+    [Fact]
+    public void Parse_rejects_backup_entries_with_non_ascii_TeamViewer_ids()
+    {
+        var json = """
+                   {
+                     "formatVersion": 2,
+                     "exportedAtUtc": "2026-04-23T00:00:00+00:00",
+                     "folders": [],
+                     "entries": [
+                       {
+                         "id": "22222222-2222-2222-2222-222222222222",
+                         "name": "Looks numeric",
+                         "teamViewerId": "\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669"
+                       }
+                     ]
+                   }
+                   """;
+
+        var ex = Assert.Throws<InvalidDataException>(() => JsonBackup.Parse(json));
+
+        Assert.Contains("invalid TeamViewer ID", ex.Message);
+        Assert.Contains("ASCII", ex.Message);
+    }
+
     // Covers the v0.1.1 fix: dangling ParentFolderId references should be
     // re-homed to root rather than tripping a FK violation at import time.
     [Fact]

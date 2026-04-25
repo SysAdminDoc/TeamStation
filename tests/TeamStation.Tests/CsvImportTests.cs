@@ -97,6 +97,21 @@ public class CsvImportTests
     }
 
     [Fact]
+    public void Parse_rejects_unicode_decimal_digits_that_launcher_would_refuse()
+    {
+        var arabicIndicDigits = "\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669";
+        var csv = $"Id,Alias\n123456789,Good\n{arabicIndicDigits},Looks numeric\n";
+
+        var result = CsvImport.Parse(csv, NoExistingFolders);
+
+        Assert.Empty(result.Errors);
+        Assert.Single(result.Entries);
+        Assert.Equal("123456789", result.Entries[0].TeamViewerId);
+        var skipped = Assert.Single(result.Skipped);
+        Assert.Contains("non-numeric TeamViewer ID", skipped.reason);
+    }
+
+    [Fact]
     public void Parse_deduplicates_folders_within_and_against_existing()
     {
         var existing = new List<Folder> { new Folder { Name = "Customer A" } };

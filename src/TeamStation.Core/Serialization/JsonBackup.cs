@@ -65,8 +65,14 @@ public static class JsonBackup
             throw new InvalidDataException(
                 $"Backup format version {dto.FormatVersion} is newer than this build supports (max {FormatVersion}). Upgrade TeamStation and retry.");
 
-        var folders = (dto.Folders ?? new()).Select(f => f.ToFolder()).ToList();
-        var entries = (dto.Entries ?? new()).Select(e => e.ToEntry()).ToList();
+        var folderDtos = dto.Folders ?? new();
+        var entryDtos = dto.Entries ?? new();
+        EnsureUniqueIds(folderDtos, static folder => folder.Id, static (folder, id) => folder.Id = id);
+        EnsureUniqueIds(entryDtos, static entry => entry.Id, static (entry, id) => entry.Id = id);
+        ValidateEntries(entryDtos);
+
+        var folders = folderDtos.Select(f => f.ToFolder()).ToList();
+        var entries = entryDtos.Select(e => e.ToEntry()).ToList();
 
         // Null-out parent references that don't resolve within the import set.
         // Without this, inserting an entry whose ParentFolderId points at a folder
@@ -81,6 +87,38 @@ public static class JsonBackup
                 e.ParentFolderId = null;
 
         return (folders, entries);
+    }
+
+    private static void EnsureUniqueIds<T>(IEnumerable<T> items, Func<T, Guid> getId, Action<T, Guid> setId)
+    {
+        var seen = new HashSet<Guid>();
+        foreach (var item in items)
+        {
+            var id = getId(item);
+            if (id != Guid.Empty && seen.Add(id))
+                continue;
+
+            Guid replacement;
+            do
+            {
+                replacement = Guid.NewGuid();
+            } while (!seen.Add(replacement));
+
+            setId(item, replacement);
+        }
+    }
+
+    private static void ValidateEntries(IEnumerable<EntryDto> entries)
+    {
+        foreach (var entry in entries)
+        {
+            if (TeamViewerIdFormat.IsValid(entry.TeamViewerId))
+                continue;
+
+            var label = string.IsNullOrWhiteSpace(entry.Name) ? entry.Id.ToString("D") : entry.Name;
+            throw new InvalidDataException(
+                $"Backup entry \"{label}\" has an invalid TeamViewer ID. IDs must be 8-12 ASCII digits.");
+        }
     }
 
     private sealed class BackupDto

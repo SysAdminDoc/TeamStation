@@ -119,7 +119,7 @@ public static class CsvImport
                  .ToList();
 
     private static bool IsNumericId(string s) =>
-        !string.IsNullOrEmpty(s) && s.Length is >= 8 and <= 12 && s.All(char.IsDigit);
+        TeamViewerIdFormat.IsValid(s);
 
     /// <summary>
     /// Normalises a column header or alias to lowercase alphanumerics only.

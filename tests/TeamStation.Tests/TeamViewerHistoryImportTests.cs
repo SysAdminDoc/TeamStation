@@ -35,6 +35,29 @@ public class TeamViewerHistoryImportTests
     }
 
     [Fact]
+    public void ParseFiles_ignores_unicode_decimal_digits()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ts-history-{Guid.NewGuid():N}.txt");
+        File.WriteAllLines(path,
+        [
+            "Valid 123456789",
+            "Looks numeric \u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669",
+        ]);
+
+        try
+        {
+            var imported = TeamViewerHistoryImport.ParseFiles([path], []);
+
+            var entry = Assert.Single(imported);
+            Assert.Equal("123456789", entry.TeamViewerId);
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
     public void ParseFiles_skips_existing_ids()
     {
         var path = Path.Combine(Path.GetTempPath(), $"ts-history-{Guid.NewGuid():N}.txt");
