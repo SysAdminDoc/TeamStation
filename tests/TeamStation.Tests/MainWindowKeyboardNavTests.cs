@@ -145,6 +145,26 @@ public class MainWindowKeyboardNavTests
     }
 
     [Fact]
+    public void Database_folder_action_is_available_from_tools_menu_and_status_bar()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var menuItem = doc.Descendants(Wpf + "MenuItem")
+            .FirstOrDefault(mi => ((string?)mi.Attribute("Command")) == "{Binding OpenDatabaseFolderCommand}");
+        var button = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute("Command")) == "{Binding OpenDatabaseFolderCommand}");
+
+        Assert.NotNull(menuItem);
+        Assert.Equal("Open database folder", (string?)menuItem!.Attribute("Header"));
+        Assert.Equal("{Binding OpenDatabaseFolderTooltip}", (string?)menuItem.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)menuItem.Attribute("ToolTipService.ShowOnDisabled"));
+
+        Assert.NotNull(button);
+        Assert.Equal("{Binding OpenDatabaseFolderTooltip}", (string?)button!.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)button.Attribute("ToolTipService.ShowOnDisabled"));
+        Assert.Equal("Open database folder", (string?)button.Attribute("AutomationProperties.Name"));
+    }
+
+    [Fact]
     public void Single_selection_surface_exposes_duplicate_action()
     {
         var doc = XDocument.Load(MainWindowXamlPath);
@@ -293,6 +313,25 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("\"bulk_copy_ids\"", source);
         Assert.Contains("Copied TeamViewer ID to the clipboard.", source);
         Assert.Contains("Selected connection does not have a TeamViewer ID to copy.", source);
+    }
+
+    [Fact]
+    public void Main_view_model_database_folder_command_opens_a_resolved_database_directory()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("OpenDatabaseFolderCommand = new RelayCommand(OpenDatabaseFolder", source);
+        Assert.Contains("CanOpenDatabaseFolder => TryGetOpenableDatabaseFolder", source);
+        Assert.Contains("OpenDatabaseFolderTooltip", source);
+        Assert.Contains("private void OpenDatabaseFolder()", source);
+        Assert.Contains("Process.Start(new ProcessStartInfo", source);
+        Assert.Contains("FileName = folder", source);
+        Assert.Contains("UseShellExecute = true", source);
+        Assert.Contains("\"database-folder\"", source);
+        Assert.Contains("TryResolveDatabaseFolder", source);
+        Assert.Contains("Path.GetFullPath(_startupDbPath)", source);
+        Assert.Contains("Directory.Exists(folder)", source);
     }
 
     [Fact]

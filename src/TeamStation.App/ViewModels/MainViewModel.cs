@@ -128,6 +128,7 @@ public sealed class MainViewModel : ViewModelBase
         BulkClearProxyCommand = new RelayCommand(BulkClearProxy, () => SelectedNodes.OfType<EntryNode>().Any());
         ClearMultiSelectionCommand = new RelayCommand(ClearMultiSelection, () => IsBulkSelectionActive);
         OpenSettingsCommand = new RelayCommand(OpenSettings);
+        OpenDatabaseFolderCommand = new RelayCommand(OpenDatabaseFolder, () => CanOpenDatabaseFolder);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
         SyncTeamViewerCloudCommand = new RelayCommand(() => _ = SyncTeamViewerCloudAsync(), () => CanSyncTeamViewerCloud);
         ExportSessionsCommand = new RelayCommand(ExportSessions, () => CanExportSessions);
@@ -369,9 +370,11 @@ public sealed class MainViewModel : ViewModelBase
             ? TryBrush("GreenBrush", Brushes.LightGreen)
             : TryBrush("Overlay0Brush", Brushes.Gray);
     public string DatabasePathDisplay => _startupDbPath ?? "Database path unavailable";
-    public string DatabaseLocationDisplay => _startupDbPath is null
-        ? "Portable mode"
-        : Path.GetDirectoryName(_startupDbPath) ?? _startupDbPath;
+    public string DatabaseLocationDisplay => TryResolveDatabaseFolder(out var folder)
+        ? folder
+        : _startupDbPath is null
+            ? "Portable mode"
+            : _startupDbPath;
     public int FolderCount { get => _folderCount; private set => SetField(ref _folderCount, value); }
     public int EntryCount { get => _entryCount; private set => SetField(ref _entryCount, value); }
     public int VisibleFolderCount { get => _visibleFolderCount; private set => SetField(ref _visibleFolderCount, value); }
@@ -1149,10 +1152,15 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand ImportCsvCommand { get; }
     public System.Windows.Input.ICommand TogglePinCommand { get; }
     public System.Windows.Input.ICommand OpenSettingsCommand { get; }
+    public System.Windows.Input.ICommand OpenDatabaseFolderCommand { get; }
     public System.Windows.Input.ICommand ImportTeamViewerHistoryCommand { get; }
     public System.Windows.Input.ICommand SyncTeamViewerCloudCommand { get; }
     public System.Windows.Input.ICommand ExportSessionsCommand { get; }
     public System.Windows.Input.ICommand RunExternalToolCommand { get; }
+    public bool CanOpenDatabaseFolder => TryGetOpenableDatabaseFolder(out _);
+    public string OpenDatabaseFolderTooltip => CanOpenDatabaseFolder
+        ? $"Open database folder: {DatabaseLocationDisplay}"
+        : "Database folder is unavailable until TeamStation has an open database path.";
     public bool CanExportSessions => !string.IsNullOrWhiteSpace(_startupDbPath);
     public string SessionExportTooltip => CanExportSessions
         ? "Export session launch history as CSV beside the current database."
@@ -1749,6 +1757,65 @@ public sealed class MainViewModel : ViewModelBase
         {
             ReportStatus(LogLevel.Error, $"Session export failed: {ex.Message}");
             _dialogs.ShowError(Application.Current?.MainWindow, "Session export failed", ex.ToString());
+        }
+    }
+
+    private void OpenDatabaseFolder()
+    {
+        if (!TryGetOpenableDatabaseFolder(out var folder))
+        {
+            ReportStatus(LogLevel.Warning, "Database folder is unavailable.");
+            _dialogs.ShowError(
+                Application.Current?.MainWindow,
+                "Database folder unavailable",
+                "TeamStation does not have an open database folder to show.");
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = folder,
+                UseShellExecute = true,
+            });
+            Audit("open", "database-folder", null, $"Opened database folder {folder}.");
+            ReportStatus(LogLevel.Success, $"Opened database folder {folder}.");
+        }
+        catch (Exception ex)
+        {
+            ReportStatus(LogLevel.Error, $"Could not open database folder: {ex.Message}");
+            _dialogs.ShowError(Application.Current?.MainWindow, "Open database folder failed", ex.ToString());
+        }
+    }
+
+    private bool TryGetOpenableDatabaseFolder(out string folder)
+    {
+        if (!TryResolveDatabaseFolder(out folder))
+            return false;
+
+        return Directory.Exists(folder);
+    }
+
+    private bool TryResolveDatabaseFolder(out string folder)
+    {
+        folder = string.Empty;
+        if (string.IsNullOrWhiteSpace(_startupDbPath))
+            return false;
+
+        try
+        {
+            var fullPath = Path.GetFullPath(_startupDbPath);
+            var directory = Path.GetDirectoryName(fullPath);
+            if (string.IsNullOrWhiteSpace(directory))
+                return false;
+
+            folder = directory;
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
