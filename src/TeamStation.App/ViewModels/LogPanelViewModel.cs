@@ -23,6 +23,7 @@ public sealed class LogPanelViewModel : ViewModelBase
     }
 
     public ObservableCollection<LogEntry> Entries { get; } = new();
+    public bool HasEntries => Entries.Count > 0;
 
     public bool IsVisible
     {
@@ -40,6 +41,10 @@ public sealed class LogPanelViewModel : ViewModelBase
         ? "No activity yet."
         : $"Showing the latest {Entries.Count} event{(Entries.Count == 1 ? string.Empty : "s")}.";
 
+    public string ClearTooltip => HasEntries
+        ? "Clear activity log"
+        : "No activity to clear";
+
     public RelayCommand ClearCommand { get; }
     public RelayCommand ToggleCommand { get; }
 
@@ -48,6 +53,8 @@ public sealed class LogPanelViewModel : ViewModelBase
         Entries.Add(new LogEntry(DateTimeOffset.Now, level, message));
         while (Entries.Count > MaxLogEntries) Entries.RemoveAt(0);
         OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(HasEntries));
+        OnPropertyChanged(nameof(ClearTooltip));
         ClearCommand.RaiseCanExecuteChanged();
     }
 
@@ -55,6 +62,8 @@ public sealed class LogPanelViewModel : ViewModelBase
     {
         Entries.Clear();
         OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(HasEntries));
+        OnPropertyChanged(nameof(ClearTooltip));
         ClearCommand.RaiseCanExecuteChanged();
     }
 }

@@ -1402,7 +1402,14 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Style="{StaticResource GhostButton}" MinWidth="0" Padding="10,6" Content="Clear" Margin="0,0,6,0" Command="{Binding ClearLogCommand}" />
+                            <Button Style="{StaticResource GhostButton}"
+                                    MinWidth="0"
+                                    Padding="10,6"
+                                    Content="Clear"
+                                    Margin="0,0,6,0"
+                                    Command="{Binding ClearLogCommand}"
+                                    ToolTip="{Binding LogClearTooltip}"
+                                    ToolTipService.ShowOnDisabled="True" />
                             <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" ToolTip="Hide activity log" Command="{Binding ToggleLogCommand}" />
                         </StackPanel>
                     </Grid>
@@ -1413,6 +1420,7 @@
                          ItemsSource="{Binding Log}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          behaviors:AutoScrollBehavior.AutoScrollToEnd="True"
+                         Visibility="{Binding LogHasEntries, Converter={StaticResource BoolToVis}}"
                          AutomationProperties.Name="Activity log">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
@@ -1465,6 +1473,29 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
+
+                <Border Grid.Row="1"
+                        Padding="24"
+                        Visibility="{Binding ShowLogEmptyState, Converter={StaticResource BoolToVis}}">
+                    <StackPanel VerticalAlignment="Center"
+                                HorizontalAlignment="Center"
+                                MaxWidth="360"
+                                AutomationProperties.Name="Empty activity log">
+                        <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                                   FontSize="32"
+                                   Text="&#xE81E;"
+                                   Foreground="{StaticResource Overlay0Brush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,12" />
+                        <TextBlock Text="No activity yet"
+                                   Style="{StaticResource SectionTitleText}"
+                                   TextAlignment="Center" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Launches, imports, sync results, and warnings will appear here."
+                                   Style="{StaticResource SectionSubtitleText}"
+                                   TextAlignment="Center" />
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 

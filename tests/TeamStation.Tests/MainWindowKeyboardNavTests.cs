@@ -310,4 +310,40 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("CancelButton.IsDefault = true", source);
         Assert.Contains("This changes saved TeamStation data.", source);
     }
+
+    [Fact]
+    public void Activity_log_exposes_empty_state_and_disabled_clear_tooltip()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+
+        var log = doc.Descendants(Wpf + "ListBox")
+            .FirstOrDefault(lb => ((string?)lb.Attribute("AutomationProperties.Name")) == "Activity log");
+        Assert.NotNull(log);
+        Assert.Equal("{Binding LogHasEntries, Converter={StaticResource BoolToVis}}", (string?)log!.Attribute("Visibility"));
+
+        var emptyState = doc.Descendants(Wpf + "StackPanel")
+            .FirstOrDefault(sp => ((string?)sp.Attribute("AutomationProperties.Name")) == "Empty activity log");
+        Assert.NotNull(emptyState);
+
+        var clearButton = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute("Command")) == "{Binding ClearLogCommand}");
+        Assert.NotNull(clearButton);
+        Assert.Equal("{Binding LogClearTooltip}", (string?)clearButton!.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)clearButton.Attribute("ToolTipService.ShowOnDisabled"));
+    }
+
+    [Fact]
+    public void Log_panel_view_model_rebroadcasts_empty_state_properties()
+    {
+        var logPanelPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "LogPanelViewModel.cs");
+        var mainViewModelPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var logPanelSource = File.ReadAllText(logPanelPath);
+        var mainViewModelSource = File.ReadAllText(mainViewModelPath);
+
+        Assert.Contains("public bool HasEntries => Entries.Count > 0;", logPanelSource);
+        Assert.Contains("public string ClearTooltip", logPanelSource);
+        Assert.Contains("OnPropertyChanged(nameof(HasEntries))", logPanelSource);
+        Assert.Contains("public bool ShowLogEmptyState => !LogHasEntries;", mainViewModelSource);
+        Assert.Contains("nameof(LogPanelViewModel.HasEntries)", mainViewModelSource);
+    }
 }

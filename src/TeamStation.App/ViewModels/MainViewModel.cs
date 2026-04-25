@@ -170,6 +170,9 @@ public sealed class MainViewModel : ViewModelBase
     public bool IsLogVisible { get => LogPanel.IsVisible; set => LogPanel.IsVisible = value; }
     public string LogSummary => LogPanel.Summary;
     public string ActivityButtonText => LogPanel.ButtonText;
+    public bool LogHasEntries => LogPanel.HasEntries;
+    public bool ShowLogEmptyState => !LogHasEntries;
+    public string LogClearTooltip => LogPanel.ClearTooltip;
     public System.Windows.Input.ICommand ClearLogCommand => LogPanel.ClearCommand;
     public System.Windows.Input.ICommand ToggleLogCommand => LogPanel.ToggleCommand;
 
@@ -196,6 +199,11 @@ public sealed class MainViewModel : ViewModelBase
             case nameof(LogPanelViewModel.IsVisible): OnPropertyChanged(nameof(IsLogVisible)); break;
             case nameof(LogPanelViewModel.Summary): OnPropertyChanged(nameof(LogSummary)); break;
             case nameof(LogPanelViewModel.ButtonText): OnPropertyChanged(nameof(ActivityButtonText)); break;
+            case nameof(LogPanelViewModel.HasEntries):
+                OnPropertyChanged(nameof(LogHasEntries));
+                OnPropertyChanged(nameof(ShowLogEmptyState));
+                break;
+            case nameof(LogPanelViewModel.ClearTooltip): OnPropertyChanged(nameof(LogClearTooltip)); break;
         }
     }
 
