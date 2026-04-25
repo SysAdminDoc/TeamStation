@@ -1,3 +1,5 @@
+using System.IO;
+using System.Reflection;
 using System.ComponentModel;
 using TeamStation.App.ViewModels;
 using TeamStation.Core.Models;
@@ -19,6 +21,18 @@ namespace TeamStation.Tests;
 /// </summary>
 public class BulkMultiSelectTests
 {
+    private static string RepoRoot
+    {
+        get
+        {
+            var dir = new DirectoryInfo(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!);
+            while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "TeamStation.sln")))
+                dir = dir.Parent;
+            Assert.NotNull(dir);
+            return dir!.FullName;
+        }
+    }
+
     [Fact]
     public void IsMultiSelected_default_is_false()
     {
@@ -139,5 +153,35 @@ public class BulkMultiSelectTests
             if (node is FolderNode folder)
                 foreach (var c in folder.Children) Walk(c, sink);
         }
+    }
+
+    [Fact]
+    public void Main_window_supports_ctrl_shift_range_selection_for_bulk_tree_selection()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "MainWindow.xaml.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("ModifierKeys.Control", source);
+        Assert.Contains("ModifierKeys.Shift", source);
+        Assert.Contains("SelectMultiSelectionRange(node, append: ctrl)", source);
+        Assert.Contains("ToggleMultiSelection(node)", source);
+        Assert.Contains("SetMultiSelectionAnchor(node)", source);
+        Assert.DoesNotContain("Shift-range-select is", source);
+    }
+
+    [Fact]
+    public void Main_view_model_range_selection_uses_visible_expanded_display_order()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("private TreeNode? _multiSelectionAnchor", source);
+        Assert.Contains("public void SelectMultiSelectionRange(TreeNode target, bool append = false)", source);
+        Assert.Contains("DisplayOrderedNodes()", source);
+        Assert.Contains("CollectDisplayNodes", source);
+        Assert.Contains("if (!node.IsVisible)", source);
+        Assert.Contains("FolderNode { IsExpanded: true }", source);
+        Assert.Contains("ClearMultiSelectionCore()", source);
+        Assert.Contains("_multiSelectionAnchor = displayNodes[anchorIndex]", source);
     }
 }

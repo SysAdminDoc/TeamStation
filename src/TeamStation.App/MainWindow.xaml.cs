@@ -27,7 +27,11 @@ public partial class MainWindow : Window
     private void Tree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (DataContext is MainViewModel vm)
+        {
             vm.Selected = e.NewValue as TreeNode;
+            if (Keyboard.Modifiers == ModifierKeys.None && e.NewValue is TreeNode node)
+                vm.SetMultiSelectionAnchor(node);
+        }
     }
 
     private void Tree_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -58,13 +62,13 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// v0.3.5: Bulk multi-select accumulator. Plain left-click clears
+    /// Bulk multi-select accumulator. Plain left-click clears
     /// multi-selection and lets WPF's default TreeView selection take
     /// over (single-select, double-click-launch, arrow-key nav unchanged).
     /// Ctrl+left-click toggles the clicked item's
-    /// <see cref="ViewModels.TreeNode.IsMultiSelected"/> flag and is the
-    /// ONLY entry point for bulk-selection state — Shift-range-select is
-    /// out of scope for v0.3.5 and tracked in ROADMAP for v0.3.6.
+    /// <see cref="ViewModels.TreeNode.IsMultiSelected"/> flag. Shift+click
+    /// selects a contiguous visible range; Ctrl+Shift adds that range to the
+    /// existing bulk selection.
     /// </summary>
     private void Tree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -78,19 +82,27 @@ public partial class MainWindow : Window
         if (item.DataContext is not ViewModels.TreeNode node) return;
 
         var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
-        if (ctrl)
+        var shift = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+        if (shift)
+        {
+            vm.SelectMultiSelectionRange(node, append: ctrl);
+            item.Focus();
+            item.IsSelected = true;
+            e.Handled = true;
+        }
+        else if (ctrl)
         {
             vm.ToggleMultiSelection(node);
-            // Keep the clicked item focused so context-menu still anchors to
-            // it. Don't mark e.Handled — the standard click should still
-            // run so single-select / focus / scrolling all behave as users
-            // expect.
+            // Keep the clicked item focused so context-menu and the detail
+            // pane still anchor to the row the user just acted on.
             item.Focus();
+            item.IsSelected = true;
             e.Handled = true;
         }
         else
         {
             vm.ClearMultiSelection();
+            vm.SetMultiSelectionAnchor(node);
             // Don't set Handled — the default click runs and selects this
             // item via the existing Tree_SelectedItemChanged path.
         }

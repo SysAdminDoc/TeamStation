@@ -51,6 +51,7 @@ public sealed class MainViewModel : ViewModelBase
     private int _entryCount;
     private int _visibleFolderCount;
     private int _visibleEntryCount;
+    private TreeNode? _multiSelectionAnchor;
 
     public MainViewModel(
         EntryRepository entries,
@@ -540,6 +541,15 @@ public sealed class MainViewModel : ViewModelBase
     public string MultiSelectionSummary => $"{DisplayText.Count(MultiSelectedEntryCount, "connection")} selected";
 
     /// <summary>
+    /// Remembers the node range selection should start from.
+    /// </summary>
+    public void SetMultiSelectionAnchor(TreeNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        _multiSelectionAnchor = node;
+    }
+
+    /// <summary>
     /// Toggles <see cref="TreeNode.IsMultiSelected"/> on <paramref name="node"/>.
     /// Called by the Ctrl-click handler in MainWindow.xaml.cs. Refreshes the
     /// dependent properties and CanExecute state on the bulk commands.
@@ -547,7 +557,50 @@ public sealed class MainViewModel : ViewModelBase
     public void ToggleMultiSelection(TreeNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
+        _multiSelectionAnchor = node;
         node.IsMultiSelected = !node.IsMultiSelected;
+        RaiseBulkSelectionChanged();
+    }
+
+    /// <summary>
+    /// Selects a contiguous range in the visible tree order. Collapsed and
+    /// filtered-out descendants are intentionally skipped so Shift-click
+    /// matches the rows the user can actually see.
+    /// </summary>
+    public void SelectMultiSelectionRange(TreeNode target, bool append = false)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        var displayNodes = DisplayOrderedNodes();
+        var targetIndex = displayNodes.IndexOf(target);
+        if (targetIndex < 0)
+        {
+            if (!append)
+                ClearMultiSelectionCore();
+
+            target.IsMultiSelected = true;
+            _multiSelectionAnchor = target;
+            RaiseBulkSelectionChanged();
+            return;
+        }
+
+        var anchorIndex = _multiSelectionAnchor is not null
+            ? displayNodes.IndexOf(_multiSelectionAnchor)
+            : -1;
+        if (anchorIndex < 0 && Selected is not null)
+            anchorIndex = displayNodes.IndexOf(Selected);
+        if (anchorIndex < 0)
+            anchorIndex = targetIndex;
+
+        if (!append)
+            ClearMultiSelectionCore();
+
+        var start = Math.Min(anchorIndex, targetIndex);
+        var end = Math.Max(anchorIndex, targetIndex);
+        for (var i = start; i <= end; i++)
+            displayNodes[i].IsMultiSelected = true;
+
+        _multiSelectionAnchor = displayNodes[anchorIndex];
         RaiseBulkSelectionChanged();
     }
 
@@ -558,15 +611,38 @@ public sealed class MainViewModel : ViewModelBase
     /// </summary>
     public void ClearMultiSelection()
     {
-        foreach (var root in RootNodes) Walk(root);
+        _multiSelectionAnchor = null;
+        ClearMultiSelectionCore();
         RaiseBulkSelectionChanged();
+    }
 
-        static void Walk(TreeNode node)
+    private void ClearMultiSelectionCore()
+    {
+        foreach (var root in RootNodes) Clear(root);
+
+        static void Clear(TreeNode node)
         {
             node.IsMultiSelected = false;
             if (node is FolderNode folder)
-                foreach (var child in folder.Children) Walk(child);
+                foreach (var child in folder.Children) Clear(child);
         }
+    }
+
+    private List<TreeNode> DisplayOrderedNodes()
+    {
+        var nodes = new List<TreeNode>();
+        foreach (var root in RootNodes) CollectDisplayNodes(root, nodes);
+        return nodes;
+    }
+
+    private static void CollectDisplayNodes(TreeNode node, List<TreeNode> sink)
+    {
+        if (!node.IsVisible)
+            return;
+
+        sink.Add(node);
+        if (node is FolderNode { IsExpanded: true } folder)
+            foreach (var child in folder.Children) CollectDisplayNodes(child, sink);
     }
 
     private void RaiseBulkSelectionChanged()
