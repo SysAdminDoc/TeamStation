@@ -32,6 +32,19 @@ public sealed class WpfDialogService : IDialogService
         return sfd.ShowDialog(owner) == true ? sfd.FileName : null;
     }
 
+    public string? ChooseActivityLogExportPath(Window? owner)
+    {
+        var sfd = new SaveFileDialog
+        {
+            Title = "Export activity log",
+            Filter = "Newline-delimited JSON (*.ndjson)|*.ndjson|JSON Lines (*.jsonl)|*.jsonl|All files (*.*)|*.*",
+            DefaultExt = ".ndjson",
+            FileName = $"teamstation-activity-{DateTime.Now:yyyyMMdd-HHmmss}.ndjson",
+            OverwritePrompt = true,
+        };
+        return sfd.ShowDialog(owner) == true ? sfd.FileName : null;
+    }
+
     public string? ChooseImportPath(Window? owner)
     {
         var ofd = new OpenFileDialog

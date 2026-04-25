@@ -67,7 +67,7 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 - External tools with `%ID%`, `%NAME%`, `%PASSWORD%`, `%TAG:key%`, and `${ENV_VAR}` expansion
 - Session history with CSV export and persistent audit-log storage
 - Optional encrypted database mirror to a user-selected cloud sync folder
-- Embedded 500-entry log panel with auto-scroll, severity-coloured
+- Embedded 500-entry log panel with auto-scroll, severity-coloured rows, and NDJSON export
 - System tray with minimize-to-tray, pinned connections, recent connections, Show, Settings, and Exit
 - Single-instance enforcement so two launches don't race on one SQLite file
 - Portable mode via a marker file next to the exe

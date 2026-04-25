@@ -13,6 +13,7 @@ public interface IDialogService
     bool EditEntry(ConnectionEntry entry, Window? owner);
     bool EditFolder(Folder folder, Window? owner);
     string? ChooseExportPath(Window? owner);
+    string? ChooseActivityLogExportPath(Window? owner);
     string? ChooseImportPath(Window? owner);
     string? ChooseImportCsvPath(Window? owner);
     bool Confirm(

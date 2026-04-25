@@ -45,6 +45,10 @@ public sealed class LogPanelViewModel : ViewModelBase
         ? "Clear activity log"
         : "No activity to clear";
 
+    public string ExportTooltip => HasEntries
+        ? "Export activity log as newline-delimited JSON."
+        : "No activity to export";
+
     public RelayCommand ClearCommand { get; }
     public RelayCommand ToggleCommand { get; }
 
@@ -55,6 +59,7 @@ public sealed class LogPanelViewModel : ViewModelBase
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(HasEntries));
         OnPropertyChanged(nameof(ClearTooltip));
+        OnPropertyChanged(nameof(ExportTooltip));
         ClearCommand.RaiseCanExecuteChanged();
     }
 
@@ -64,6 +69,7 @@ public sealed class LogPanelViewModel : ViewModelBase
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(HasEntries));
         OnPropertyChanged(nameof(ClearTooltip));
+        OnPropertyChanged(nameof(ExportTooltip));
         ClearCommand.RaiseCanExecuteChanged();
     }
 }

@@ -119,6 +119,7 @@ public sealed class MainViewModel : ViewModelBase
         ExportCommand = new RelayCommand(Export);
         ImportCommand = new RelayCommand(Import);
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
+        ExportActivityLogCommand = new RelayCommand(ExportActivityLog, () => LogPanel.HasEntries);
         TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
         BulkCopyIdsCommand = new RelayCommand(BulkCopyIds, () => SelectedNodes.OfType<EntryNode>().Any());
         BulkMoveCommand = new RelayCommand(BulkMove, () => SelectedNodes.OfType<EntryNode>().Any());
@@ -210,6 +211,7 @@ public sealed class MainViewModel : ViewModelBase
     public bool LogHasEntries => LogPanel.HasEntries;
     public bool ShowLogEmptyState => !LogHasEntries;
     public string LogClearTooltip => LogPanel.ClearTooltip;
+    public string LogExportTooltip => LogPanel.ExportTooltip;
     public System.Windows.Input.ICommand ClearLogCommand => LogPanel.ClearCommand;
     public System.Windows.Input.ICommand ToggleLogCommand => LogPanel.ToggleCommand;
 
@@ -244,8 +246,10 @@ public sealed class MainViewModel : ViewModelBase
             case nameof(LogPanelViewModel.HasEntries):
                 OnPropertyChanged(nameof(LogHasEntries));
                 OnPropertyChanged(nameof(ShowLogEmptyState));
+                ((RelayCommand)ExportActivityLogCommand).RaiseCanExecuteChanged();
                 break;
             case nameof(LogPanelViewModel.ClearTooltip): OnPropertyChanged(nameof(LogClearTooltip)); break;
+            case nameof(LogPanelViewModel.ExportTooltip): OnPropertyChanged(nameof(LogExportTooltip)); break;
         }
     }
 
@@ -1305,6 +1309,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand ExportCommand { get; }
     public System.Windows.Input.ICommand ImportCommand { get; }
     public System.Windows.Input.ICommand ImportCsvCommand { get; }
+    public System.Windows.Input.ICommand ExportActivityLogCommand { get; }
     public System.Windows.Input.ICommand TogglePinCommand { get; }
     public System.Windows.Input.ICommand OpenSettingsCommand { get; }
     public System.Windows.Input.ICommand OpenTrustCenterCommand { get; }
@@ -1713,6 +1718,32 @@ public sealed class MainViewModel : ViewModelBase
         {
             ReportStatus(LogLevel.Error, $"Backup failed: {ex.Message}");
             _dialogs.ShowError(Application.Current?.MainWindow, "Backup failed", ex.ToString());
+        }
+    }
+
+    private void ExportActivityLog()
+    {
+        var entries = LogPanel.Entries.ToList();
+        if (entries.Count == 0)
+        {
+            ReportStatus(LogLevel.Warning, "Activity log export skipped because there are no events.");
+            return;
+        }
+
+        var path = _dialogs.ChooseActivityLogExportPath(Application.Current?.MainWindow);
+        if (path is null) return;
+
+        try
+        {
+            var ndjson = ActivityLogJsonExporter.BuildNdjson(entries);
+            AtomicFile.WriteAllText(path, ndjson);
+            Audit("export", "activity-log", null, $"Wrote {entries.Count} activity log events to {path}.");
+            ReportStatus(LogLevel.Success, $"Activity log exported to {path}.");
+        }
+        catch (Exception ex)
+        {
+            ReportStatus(LogLevel.Error, $"Activity log export failed: {ex.Message}");
+            _dialogs.ShowError(Application.Current?.MainWindow, "Activity log export failed", ex.ToString());
         }
     }
 

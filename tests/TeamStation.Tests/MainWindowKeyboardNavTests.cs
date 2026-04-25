@@ -145,6 +145,20 @@ public class MainWindowKeyboardNavTests
     }
 
     [Fact]
+    public void Activity_log_header_exposes_structured_export_action()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var button = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute("Command")) == "{Binding ExportActivityLogCommand}");
+
+        Assert.NotNull(button);
+        Assert.Equal("Export", (string?)button!.Attribute("Content"));
+        Assert.Equal("{Binding LogExportTooltip}", (string?)button.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)button.Attribute("ToolTipService.ShowOnDisabled"));
+        Assert.Equal("Export activity log", (string?)button.Attribute("AutomationProperties.Name"));
+    }
+
+    [Fact]
     public void Database_folder_action_is_available_from_tools_menu_and_status_bar()
     {
         var doc = XDocument.Load(MainWindowXamlPath);
