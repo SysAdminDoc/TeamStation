@@ -3,37 +3,64 @@ using TeamStation.Core.Models;
 
 namespace TeamStation.Core.Serialization;
 
+public sealed record TeamViewerHistoryImportResult(
+    IReadOnlyList<ConnectionEntry> Entries,
+    IReadOnlyList<string> ReadPaths,
+    IReadOnlyList<string> MissingPaths,
+    IReadOnlyList<string> ReadErrors);
+
 public static partial class TeamViewerHistoryImport
 {
-    public static IReadOnlyList<ConnectionEntry> ParseFiles(IEnumerable<string> paths, IEnumerable<ConnectionEntry> existing)
+    public static IReadOnlyList<ConnectionEntry> ParseFiles(IEnumerable<string> paths, IEnumerable<ConnectionEntry> existing) =>
+        ScanFiles(paths, existing).Entries;
+
+    public static TeamViewerHistoryImportResult ScanFiles(IEnumerable<string> paths, IEnumerable<ConnectionEntry> existing)
     {
         var knownIds = existing.Select(e => e.TeamViewerId).ToHashSet(StringComparer.Ordinal);
         var created = new List<ConnectionEntry>();
+        var readPaths = new List<string>();
+        var missingPaths = new List<string>();
+        var readErrors = new List<string>();
 
-        foreach (var path in paths.Where(File.Exists))
+        foreach (var path in paths.Where(p => !string.IsNullOrWhiteSpace(p)))
         {
-            foreach (var line in File.ReadLines(path))
+            if (!File.Exists(path))
             {
-                var match = TeamViewerIdRegex().Match(line);
-                if (!match.Success || knownIds.Contains(match.Value))
-                    continue;
+                missingPaths.Add(path);
+                continue;
+            }
 
-                knownIds.Add(match.Value);
-                created.Add(new ConnectionEntry
+            try
+            {
+                foreach (var line in File.ReadLines(path))
                 {
-                    Name = GuessName(line, match.Value),
-                    TeamViewerId = match.Value,
-                    ProfileName = "Imported history",
-                    Mode = ConnectionMode.RemoteControl,
-                    Quality = ConnectionQuality.AutoSelect,
-                    AccessControl = AccessControl.Undefined,
-                    Tags = ["teamviewer-history"],
-                    Notes = $"Imported from {Path.GetFileName(path)}.",
-                });
+                    var match = TeamViewerIdRegex().Match(line);
+                    if (!match.Success || knownIds.Contains(match.Value))
+                        continue;
+
+                    knownIds.Add(match.Value);
+                    created.Add(new ConnectionEntry
+                    {
+                        Name = GuessName(line, match.Value),
+                        TeamViewerId = match.Value,
+                        ProfileName = "Imported history",
+                        Mode = ConnectionMode.RemoteControl,
+                        Quality = ConnectionQuality.AutoSelect,
+                        AccessControl = AccessControl.Undefined,
+                        Tags = ["teamviewer-history"],
+                        Notes = $"Imported from {Path.GetFileName(path)}.",
+                    });
+                }
+
+                readPaths.Add(path);
+            }
+            catch (Exception ex)
+            {
+                readErrors.Add($"{path}: {ex.Message}");
             }
         }
 
-        return created;
+        return new TeamViewerHistoryImportResult(created, readPaths, missingPaths, readErrors);
     }
 
     public static IReadOnlyList<string> DefaultPaths()

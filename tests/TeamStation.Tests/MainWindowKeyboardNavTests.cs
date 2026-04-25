@@ -363,6 +363,33 @@ public class MainWindowKeyboardNavTests
         Assert.Equal("True", (string?)item.Attribute("ToolTipService.ShowOnDisabled"));
     }
 
+    [Theory]
+    [InlineData("{Binding ImportCsvCommand}", "Import a header-based CSV. Common aliases such as name, TeamViewer ID, folder, password, notes, and tags are auto-detected.")]
+    [InlineData("{Binding ImportTeamViewerHistoryCommand}", "Scan local TeamViewer history files and import IDs that are not already saved.")]
+    [InlineData("{Binding ImportCommand}", "Restore folders and connections from a TeamStation JSON backup. Matching IDs can be overwritten after confirmation.")]
+    [InlineData("{Binding ExportCommand}", "Create a JSON backup of folders and connections. Plaintext password exports require confirmation.")]
+    public void File_data_commands_explain_import_export_consequences(string command, string tooltip)
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var item = doc.Descendants(Wpf + "MenuItem")
+            .FirstOrDefault(mi => ((string?)mi.Attribute("Command")) == command);
+
+        Assert.NotNull(item);
+        Assert.Equal(tooltip, (string?)item!.Attribute("ToolTip"));
+    }
+
+    [Fact]
+    public void Session_export_menu_explains_disabled_state()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var item = doc.Descendants(Wpf + "MenuItem")
+            .FirstOrDefault(mi => ((string?)mi.Attribute("Command")) == "{Binding ExportSessionsCommand}");
+
+        Assert.NotNull(item);
+        Assert.Equal("{Binding SessionExportTooltip}", (string?)item!.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)item.Attribute("ToolTipService.ShowOnDisabled"));
+    }
+
     [Fact]
     public void Log_panel_view_model_rebroadcasts_empty_state_properties()
     {
@@ -481,6 +508,25 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("Restore backup", source);
         Assert.Contains("Existing items with matching IDs will be overwritten. Review the file source before continuing.", source);
         Assert.Contains("isDestructive: true", source);
+    }
+
+    [Fact]
+    public void History_import_and_session_export_surface_resilient_feedback()
+    {
+        var mainPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var historyPath = Path.Combine(RepoRoot, "src", "TeamStation.Core", "Serialization", "TeamViewerHistoryImport.cs");
+        var mainSource = File.ReadAllText(mainPath);
+        var historySource = File.ReadAllText(historyPath);
+
+        Assert.Contains("public static TeamViewerHistoryImportResult ScanFiles", historySource);
+        Assert.Contains("ReadErrors", historySource);
+        Assert.Contains("TeamViewerHistoryImport.ScanFiles", mainSource);
+        Assert.Contains("TeamViewer history import failed. Review the activity panel for file access details.", mainSource);
+        Assert.Contains("No readable TeamViewer history files were found.", mainSource);
+        Assert.Contains("ExportSessionsCommand = new RelayCommand(ExportSessions, () => CanExportSessions)", mainSource);
+        Assert.Contains("public bool CanExportSessions", mainSource);
+        Assert.Contains("public string SessionExportTooltip", mainSource);
+        Assert.Contains("Session export failed", mainSource);
     }
 
     [Theory]

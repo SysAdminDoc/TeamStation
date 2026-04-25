@@ -666,12 +666,23 @@
                 <MenuItem Header="New connection..." Command="{Binding AddEntryCommand}" InputGestureText="Ctrl+N" />
                 <MenuItem Header="New folder..." Command="{Binding AddFolderCommand}" />
                 <Separator />
-                <MenuItem Header="Import CSV..." Command="{Binding ImportCsvCommand}" />
-                <MenuItem Header="Import TeamViewer history..." Command="{Binding ImportTeamViewerHistoryCommand}" />
-                <MenuItem Header="Restore from JSON backup..." Command="{Binding ImportCommand}" />
+                <MenuItem Header="Import CSV..."
+                          Command="{Binding ImportCsvCommand}"
+                          ToolTip="Import a header-based CSV. Common aliases such as name, TeamViewer ID, folder, password, notes, and tags are auto-detected." />
+                <MenuItem Header="Import TeamViewer history..."
+                          Command="{Binding ImportTeamViewerHistoryCommand}"
+                          ToolTip="Scan local TeamViewer history files and import IDs that are not already saved." />
+                <MenuItem Header="Restore from JSON backup..."
+                          Command="{Binding ImportCommand}"
+                          ToolTip="Restore folders and connections from a TeamStation JSON backup. Matching IDs can be overwritten after confirmation." />
                 <Separator />
-                <MenuItem Header="Back up to JSON..." Command="{Binding ExportCommand}" />
-                <MenuItem Header="Export session history..." Command="{Binding ExportSessionsCommand}" />
+                <MenuItem Header="Back up to JSON..."
+                          Command="{Binding ExportCommand}"
+                          ToolTip="Create a JSON backup of folders and connections. Plaintext password exports require confirmation." />
+                <MenuItem Header="Export session history..."
+                          Command="{Binding ExportSessionsCommand}"
+                          ToolTip="{Binding SessionExportTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
             </MenuItem>
 
             <MenuItem Header="_Edit">
@@ -885,19 +896,19 @@
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="CSV" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding ImportTeamViewerHistoryCommand}" ToolTip="Import TeamViewer's local Connections.txt history">
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding ImportTeamViewerHistoryCommand}" ToolTip="Scan local TeamViewer history files and import IDs that are not already saved.">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xEDE3;" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="TV history" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding ImportCommand}" ToolTip="Restore from a JSON backup">
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding ImportCommand}" ToolTip="Restore folders and connections from a TeamStation JSON backup. Matching IDs can be overwritten after confirmation.">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE728;" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Restore" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding ExportCommand}" ToolTip="Back up to a JSON file">
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding ExportCommand}" ToolTip="Create a JSON backup of folders and connections. Plaintext password exports require confirmation.">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xEDE1;" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Back up" />

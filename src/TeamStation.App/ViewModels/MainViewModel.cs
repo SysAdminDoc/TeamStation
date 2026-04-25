@@ -110,7 +110,7 @@ public sealed class MainViewModel : ViewModelBase
         OpenSettingsCommand = new RelayCommand(OpenSettings);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
         SyncTeamViewerCloudCommand = new RelayCommand(() => _ = SyncTeamViewerCloudAsync(), () => CanSyncTeamViewerCloud);
-        ExportSessionsCommand = new RelayCommand(ExportSessions);
+        ExportSessionsCommand = new RelayCommand(ExportSessions, () => CanExportSessions);
         RunExternalToolCommand = new RelayCommand(RunExternalTool,
             parameter => Selected is EntryNode && parameter is ExternalToolDefinition);
 
@@ -567,6 +567,10 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand SyncTeamViewerCloudCommand { get; }
     public System.Windows.Input.ICommand ExportSessionsCommand { get; }
     public System.Windows.Input.ICommand RunExternalToolCommand { get; }
+    public bool CanExportSessions => !string.IsNullOrWhiteSpace(_startupDbPath);
+    public string SessionExportTooltip => CanExportSessions
+        ? "Export session launch history as CSV beside the current database."
+        : "Session export is unavailable until TeamStation has an open database path.";
 
     public void Reload()
     {
@@ -966,21 +970,50 @@ public sealed class MainViewModel : ViewModelBase
 
     private void ImportTeamViewerHistory()
     {
-        var paths = TeamViewerHistoryImport.DefaultPaths();
-        var entries = TeamViewerHistoryImport.ParseFiles(paths, _entries.GetAll());
-        if (entries.Count == 0)
+        try
         {
-            ReportStatus(LogLevel.Warning, "No new TeamViewer history entries were found.");
-            return;
+            var paths = TeamViewerHistoryImport.DefaultPaths();
+            var result = TeamViewerHistoryImport.ScanFiles(paths, _entries.GetAll());
+
+            foreach (var missingPath in result.MissingPaths)
+                AppendLog(LogLevel.Info, $"TeamViewer history file not found: {missingPath}");
+            foreach (var readError in result.ReadErrors)
+                AppendLog(LogLevel.Warning, $"TeamViewer history file could not be read: {readError}");
+
+            if (result.ReadErrors.Count > 0 && result.Entries.Count == 0)
+            {
+                ReportStatus(LogLevel.Error, "TeamViewer history import failed. Review the activity panel for file access details.");
+                _dialogs.ShowError(
+                    Application.Current?.MainWindow,
+                    "TeamViewer history import failed",
+                    "TeamStation could not read TeamViewer's local history files.\n\n" + string.Join('\n', result.ReadErrors));
+                return;
+            }
+
+            if (result.Entries.Count == 0)
+            {
+                ReportStatus(LogLevel.Warning, result.ReadPaths.Count == 0
+                    ? "No readable TeamViewer history files were found."
+                    : $"No new TeamViewer history entries were found in {DisplayText.Count(result.ReadPaths.Count, "history file")}.");
+                return;
+            }
+
+            foreach (var entry in result.Entries)
+                _entries.Upsert(entry);
+
+            Reload();
+            Audit("import", "teamviewer-history", null, $"Imported {DisplayText.Count(result.Entries.Count, "connection")} from TeamViewer history.");
+            MirrorDatabase();
+            ReportStatus(result.ReadErrors.Count > 0 ? LogLevel.Warning : LogLevel.Success,
+                result.ReadErrors.Count > 0
+                    ? $"Imported {DisplayText.Count(result.Entries.Count, "connection")}; {DisplayText.Count(result.ReadErrors.Count, "history file")} could not be read."
+                    : $"Imported {DisplayText.Count(result.Entries.Count, "connection")} from {DisplayText.Count(result.ReadPaths.Count, "history file")}.");
         }
-
-        foreach (var entry in entries)
-            _entries.Upsert(entry);
-
-        Reload();
-        Audit("import", "teamviewer-history", null, $"Imported {DisplayText.Count(entries.Count, "connection")} from TeamViewer history.");
-        MirrorDatabase();
-        ReportStatus(LogLevel.Success, $"Imported {DisplayText.Count(entries.Count, "connection")} from TeamViewer history.");
+        catch (Exception ex)
+        {
+            ReportStatus(LogLevel.Error, $"TeamViewer history import failed: {ex.Message}");
+            _dialogs.ShowError(Application.Current?.MainWindow, "TeamViewer history import failed", ex.ToString());
+        }
     }
 
     private async Task SyncTeamViewerCloudAsync()
@@ -1039,16 +1072,28 @@ public sealed class MainViewModel : ViewModelBase
 
     private void ExportSessions()
     {
-        if (string.IsNullOrWhiteSpace(_startupDbPath))
+        if (!CanExportSessions)
         {
             ReportStatus(LogLevel.Error, "Session export path is unavailable.");
+            _dialogs.ShowError(
+                Application.Current?.MainWindow,
+                "Session export unavailable",
+                "TeamStation does not have an open database path to place the session CSV beside.");
             return;
         }
 
-        var path = Path.Combine(Path.GetDirectoryName(_startupDbPath) ?? ".", $"teamstation-sessions-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
-        _sessions.ExportCsv(path);
-        Audit("export", "sessions", null, $"Exported session history to {path}.");
-        ReportStatus(LogLevel.Success, $"Session history exported to {path}.");
+        try
+        {
+            var path = Path.Combine(Path.GetDirectoryName(_startupDbPath!) ?? ".", $"teamstation-sessions-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+            _sessions.ExportCsv(path);
+            Audit("export", "sessions", null, $"Exported session history to {path}.");
+            ReportStatus(LogLevel.Success, $"Session history exported to {path}.");
+        }
+        catch (Exception ex)
+        {
+            ReportStatus(LogLevel.Error, $"Session export failed: {ex.Message}");
+            _dialogs.ShowError(Application.Current?.MainWindow, "Session export failed", ex.ToString());
+        }
     }
 
     private void RunExternalTool(object? parameter)

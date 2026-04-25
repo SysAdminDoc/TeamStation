@@ -52,4 +52,26 @@ public class TeamViewerHistoryImportTests
             try { File.Delete(path); } catch { /* best-effort */ }
         }
     }
+
+    [Fact]
+    public void ScanFiles_reports_read_and_missing_sources()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ts-history-{Guid.NewGuid():N}.txt");
+        var missingPath = Path.Combine(Path.GetTempPath(), $"ts-history-missing-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(path, "Ops jump host 123456789");
+
+        try
+        {
+            var result = TeamViewerHistoryImport.ScanFiles([path, missingPath], []);
+
+            Assert.Single(result.Entries);
+            Assert.Contains(path, result.ReadPaths);
+            Assert.Contains(missingPath, result.MissingPaths);
+            Assert.Empty(result.ReadErrors);
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { /* best-effort */ }
+        }
+    }
 }
