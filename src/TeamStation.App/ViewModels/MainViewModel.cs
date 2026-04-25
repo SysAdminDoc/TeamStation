@@ -103,6 +103,8 @@ public sealed class MainViewModel : ViewModelBase
         ImportCommand = new RelayCommand(Import);
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
         TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
+        BulkPinCommand = new RelayCommand(() => BulkSetPinned(true), () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkUnpinCommand = new RelayCommand(() => BulkSetPinned(false), () => SelectedNodes.OfType<EntryNode>().Any());
         OpenSettingsCommand = new RelayCommand(OpenSettings);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
         SyncTeamViewerCloudCommand = new RelayCommand(() => _ = SyncTeamViewerCloudAsync());
@@ -113,12 +115,17 @@ public sealed class MainViewModel : ViewModelBase
         System.Windows.Data.BindingOperations.EnableCollectionSynchronization(RootNodes, _rootsLock);
 
         Reload();
+        RefreshTeamViewerVersion();
         LogPanel.Append(LogLevel.Info, $"TeamStation v{_startupVersion} started.");
         if (!string.IsNullOrEmpty(_startupDbPath))
             LogPanel.Append(LogLevel.Info, $"Database: {_startupDbPath}");
         LogPanel.Append(LogLevel.Info, tvExePath is null
             ? "TeamViewer.exe not found — launches will be disabled until TeamViewer is installed."
             : $"TeamViewer.exe: {tvExePath}");
+        if (TeamViewerNeedsUpdate)
+            LogPanel.Append(LogLevel.Warning,
+                $"{TeamViewerClientVersion} is below the recommended baseline ({TeamViewerVersionDetector.MinimumSafeVersion}). " +
+                "CVE-2026-23572 (auth-bypass) is fixed in TeamViewer 15.74.5+ — update the installed client when convenient.");
         if (!string.IsNullOrEmpty(_settingsService.LastLoadError))
             LogPanel.Append(LogLevel.Warning, _settingsService.LastLoadError!);
         PruneHistory();
@@ -328,6 +335,42 @@ public sealed class MainViewModel : ViewModelBase
 
     public string TvExePath { get => _tvExePath; private set => SetField(ref _tvExePath, value); }
 
+    private string _teamViewerClientVersion = "TeamViewer not detected";
+    private bool _teamViewerNeedsUpdate;
+
+    /// <summary>
+    /// Display string for the status-bar TeamViewer chip — "TeamViewer 15.71.5"
+    /// when detected, "TeamViewer not detected" otherwise. Refreshed on
+    /// startup and after Settings save (the resolved exe may change when
+    /// the operator overrides the TeamViewer path).
+    /// </summary>
+    public string TeamViewerClientVersion
+    {
+        get => _teamViewerClientVersion;
+        private set => SetField(ref _teamViewerClientVersion, value);
+    }
+
+    /// <summary>
+    /// True when the detected client is below
+    /// <see cref="TeamViewerVersionDetector.MinimumSafeVersion"/>
+    /// (15.74.5 — CVE-2026-23572 baseline). The status bar surfaces an
+    /// "Update available" pill when this is set.
+    /// </summary>
+    public bool TeamViewerNeedsUpdate
+    {
+        get => _teamViewerNeedsUpdate;
+        private set => SetField(ref _teamViewerNeedsUpdate, value);
+    }
+
+    private void RefreshTeamViewerVersion()
+    {
+        var detected = TeamViewerVersionDetector.Detect();
+        TeamViewerClientVersion = detected is null
+            ? "TeamViewer not detected"
+            : $"TeamViewer {detected}";
+        TeamViewerNeedsUpdate = TeamViewerVersionDetector.NeedsUpdate(detected);
+    }
+
     public System.Windows.Input.ICommand AddEntryCommand { get; }
     public System.Windows.Input.ICommand AddFolderCommand { get; }
     public System.Windows.Input.ICommand AddSubfolderCommand { get; }
@@ -336,6 +379,112 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand DeleteCommand { get; }
     public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
+    public System.Windows.Input.ICommand BulkPinCommand { get; }
+    public System.Windows.Input.ICommand BulkUnpinCommand { get; }
+
+    /// <summary>
+    /// v0.3.5: nodes with <see cref="TreeNode.IsMultiSelected"/> set,
+    /// flattened from <see cref="RootNodes"/>. When the multi-selection is
+    /// empty, callers should fall back to <see cref="Selected"/> (single-
+    /// select semantics). The status-bar / context-menu count comes from
+    /// <see cref="MultiSelectedEntryCount"/>.
+    /// </summary>
+    public IReadOnlyList<TreeNode> SelectedNodes
+    {
+        get
+        {
+            var result = new List<TreeNode>();
+            foreach (var root in RootNodes) Collect(root, result);
+            return result;
+
+            static void Collect(TreeNode node, List<TreeNode> sink)
+            {
+                if (node.IsMultiSelected) sink.Add(node);
+                if (node is FolderNode folder)
+                {
+                    foreach (var child in folder.Children) Collect(child, sink);
+                }
+            }
+        }
+    }
+
+    public int MultiSelectedEntryCount => SelectedNodes.OfType<EntryNode>().Count();
+    public bool IsBulkSelectionActive => MultiSelectedEntryCount >= 2;
+    public string BulkPinSelectionLabel => $"Pin selection ({MultiSelectedEntryCount})";
+    public string BulkUnpinSelectionLabel => $"Unpin selection ({MultiSelectedEntryCount})";
+
+    /// <summary>
+    /// Toggles <see cref="TreeNode.IsMultiSelected"/> on <paramref name="node"/>.
+    /// Called by the Ctrl-click handler in MainWindow.xaml.cs. Refreshes the
+    /// dependent properties and CanExecute state on the bulk commands.
+    /// </summary>
+    public void ToggleMultiSelection(TreeNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        node.IsMultiSelected = !node.IsMultiSelected;
+        RaiseBulkSelectionChanged();
+    }
+
+    /// <summary>
+    /// Clears <see cref="TreeNode.IsMultiSelected"/> on every node in the
+    /// tree. Called on plain (non-Ctrl) click and after Reload so stale
+    /// selection state can't survive a refresh.
+    /// </summary>
+    public void ClearMultiSelection()
+    {
+        foreach (var root in RootNodes) Walk(root);
+        RaiseBulkSelectionChanged();
+
+        static void Walk(TreeNode node)
+        {
+            node.IsMultiSelected = false;
+            if (node is FolderNode folder)
+                foreach (var child in folder.Children) Walk(child);
+        }
+    }
+
+    private void RaiseBulkSelectionChanged()
+    {
+        OnPropertyChanged(nameof(SelectedNodes));
+        OnPropertyChanged(nameof(MultiSelectedEntryCount));
+        OnPropertyChanged(nameof(IsBulkSelectionActive));
+        OnPropertyChanged(nameof(BulkPinSelectionLabel));
+        OnPropertyChanged(nameof(BulkUnpinSelectionLabel));
+        ((RelayCommand)BulkPinCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkUnpinCommand).RaiseCanExecuteChanged();
+    }
+
+    private void BulkSetPinned(bool pinned)
+    {
+        var entries = SelectedNodes.OfType<EntryNode>().ToList();
+        if (entries.Count == 0) return;
+
+        var changed = 0;
+        foreach (var entryNode in entries)
+        {
+            if (entryNode.Model.IsPinned == pinned) continue;
+            entryNode.Model.IsPinned = pinned;
+            _entries.Upsert(entryNode.Model);
+            entryNode.Refresh();
+            changed++;
+        }
+
+        if (changed == 0)
+        {
+            ReportStatus(LogLevel.Info, pinned
+                ? "All selected connections were already pinned."
+                : "All selected connections were already unpinned.");
+            return;
+        }
+
+        OnPropertyChanged(nameof(SelectedPinText));
+        NotifyRecentsChanged();
+        Audit(pinned ? "bulk_pin" : "bulk_unpin", "connection", null,
+            $"{(pinned ? "Pinned" : "Unpinned")} {changed} connection{(changed == 1 ? string.Empty : "s")} via bulk action.");
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success,
+            $"{(pinned ? "Pinned" : "Unpinned")} {changed} connection{(changed == 1 ? string.Empty : "s")}.");
+    }
     public System.Windows.Input.ICommand ExportCommand { get; }
     public System.Windows.Input.ICommand ImportCommand { get; }
     public System.Windows.Input.ICommand ImportCsvCommand { get; }
@@ -348,6 +497,11 @@ public sealed class MainViewModel : ViewModelBase
 
     public void Reload()
     {
+        // v0.3.5: clear bulk multi-selection on every Reload — node identities
+        // are about to be replaced and IsMultiSelected on stale references
+        // would silently leak references to nodes no longer in the tree.
+        ClearMultiSelection();
+
         var selectedId = Selected?.Id;
         var folders = _folders.GetAll();
         var entries = _entries.GetAll();
@@ -715,6 +869,7 @@ public sealed class MainViewModel : ViewModelBase
             ? _settings.TeamViewerPathOverride
             : TeamViewerPathResolver.Resolve() ?? "TeamViewer.exe not found - install TeamViewer before launching";
         IsTeamViewerReady = File.Exists(TvExePath);
+        RefreshTeamViewerVersion();
         OnPropertyChanged(nameof(ExternalTools));
         OnPropertyChanged(nameof(HasExternalTools));
         Search.RaiseSavedSearchesChanged();
@@ -1104,9 +1259,28 @@ public sealed class MainViewModel : ViewModelBase
         LaunchOutcome outcome;
         try
         {
-            outcome = overrideOptions is null
-                ? _launcher.Launch(launchTarget)
-                : _launcher.Launch(launchTarget, overrideOptions);
+            // v0.3.5: route through the byte[] launcher overload when the
+            // entry has its own (non-inherited) password and clipboard mode
+            // is NOT engaged. The launcher zeros the buffers via try/finally
+            // immediately after argv is composed. The folder-inheritance
+            // case (source.Password is null but effective.Password came
+            // from a folder default) keeps using the legacy string path —
+            // a byte-aware InheritanceResolver is its own task.
+            byte[]? pwBytes = null;
+            byte[]? proxyPwBytes = null;
+            if (clipboardStagedPassword is null)
+            {
+                if (!string.IsNullOrEmpty(source.Password))
+                    pwBytes = _entries.LoadEntryPasswordBytes(source.Id);
+                if (!string.IsNullOrEmpty(source.Proxy?.Password))
+                    proxyPwBytes = _entries.LoadEntryProxyPasswordBytes(source.Id);
+            }
+
+            outcome = pwBytes is not null || proxyPwBytes is not null
+                ? _launcher.Launch(launchTarget, pwBytes, proxyPwBytes, overrideOptions ?? LaunchOptions.Default)
+                : (overrideOptions is null
+                    ? _launcher.Launch(launchTarget)
+                    : _launcher.Launch(launchTarget, overrideOptions));
         }
         catch (Exception ex)
         {

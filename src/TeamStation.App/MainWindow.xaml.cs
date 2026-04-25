@@ -56,4 +56,43 @@ public partial class MainWindow : Window
             item.IsSelected = true;
         }
     }
+
+    /// <summary>
+    /// v0.3.5: Bulk multi-select accumulator. Plain left-click clears
+    /// multi-selection and lets WPF's default TreeView selection take
+    /// over (single-select, double-click-launch, arrow-key nav unchanged).
+    /// Ctrl+left-click toggles the clicked item's
+    /// <see cref="ViewModels.TreeNode.IsMultiSelected"/> flag and is the
+    /// ONLY entry point for bulk-selection state — Shift-range-select is
+    /// out of scope for v0.3.5 and tracked in ROADMAP for v0.3.6.
+    /// </summary>
+    private void Tree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var hit = e.OriginalSource as DependencyObject;
+        while (hit is not null and not TreeViewItem)
+            hit = VisualTreeHelper.GetParent(hit);
+
+        if (hit is not TreeViewItem item) return;
+        if (item.DataContext is not ViewModels.TreeNode node) return;
+
+        var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+        if (ctrl)
+        {
+            vm.ToggleMultiSelection(node);
+            // Keep the clicked item focused so context-menu still anchors to
+            // it. Don't mark e.Handled — the standard click should still
+            // run so single-select / focus / scrolling all behave as users
+            // expect.
+            item.Focus();
+            e.Handled = true;
+        }
+        else
+        {
+            vm.ClearMultiSelection();
+            // Don't set Handled — the default click runs and selects this
+            // item via the existing Tree_SelectedItemChanged path.
+        }
+    }
 }

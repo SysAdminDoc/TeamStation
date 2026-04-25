@@ -731,6 +731,36 @@
                             </TextBlock>
                             <TextBlock Text="{Binding TeamViewerStatusText}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
                     </StackPanel>
+                    <TextBlock Text="{Binding TeamViewerClientVersion}"
+                               Foreground="{StaticResource Subtext1Brush}"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="11"
+                               VerticalAlignment="Center"
+                               Margin="0,0,10,0"
+                               ToolTip="Detected installed TeamViewer client version (registry / FileVersionInfo)." />
+                    <Border CornerRadius="999"
+                            Padding="8,2"
+                            Margin="0,0,12,0"
+                            Background="{StaticResource YellowSoftBrush}"
+                            BorderBrush="{StaticResource YellowBrush}"
+                            BorderThickness="1"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding TeamViewerNeedsUpdate, Converter={StaticResource BoolToVis}}"
+                            ToolTip="The installed TeamViewer client is below 15.74.5. CVE-2026-23572 (auth-bypass) is fixed in 15.74.5+; updating the installed client is recommended.">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                                       FontSize="10"
+                                       Text="&#xE7BA;"
+                                       Foreground="{StaticResource YellowBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0" />
+                            <TextBlock Text="Update available"
+                                       Foreground="{StaticResource YellowBrush}"
+                                       FontWeight="SemiBold"
+                                       FontSize="10"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
                     <TextBlock Text="{Binding TreeSummary}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
                 </StackPanel>
 
@@ -1011,6 +1041,7 @@
                                   SelectedItemChanged="Tree_SelectedItemChanged"
                                   MouseDoubleClick="Tree_MouseDoubleClick"
                                   PreviewMouseRightButtonDown="Tree_PreviewMouseRightButtonDown"
+                                  PreviewMouseLeftButtonDown="Tree_PreviewMouseLeftButtonDown"
                                   AutomationProperties.Name="Connections tree"
                                   AutomationProperties.HelpText="Use arrow keys to navigate, Enter to launch, F2 to rename, Delete to remove."
                                   KeyboardNavigation.TabNavigation="Once"
@@ -1066,6 +1097,11 @@
                                             <Setter TargetName="FolderRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                            <Setter TargetName="FolderRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
+                                            <Setter TargetName="FolderRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
+                                        </DataTrigger>
+                                        <!-- v0.3.5: bulk multi-select highlight (same visual as IsSelected) -->
+                                        <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
                                             <Setter TargetName="FolderRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
                                             <Setter TargetName="FolderRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
                                         </DataTrigger>
@@ -1125,6 +1161,11 @@
                                             <Setter TargetName="EntryRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
                                             <Setter TargetName="EntryRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
                                         </DataTrigger>
+                                        <!-- v0.3.5: bulk multi-select highlight (same visual as IsSelected) -->
+                                        <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
+                                            <Setter TargetName="EntryRow" Property="Background" Value="{StaticResource BlueSoftBrush}" />
+                                            <Setter TargetName="EntryRow" Property="BorderBrush" Value="{StaticResource BlueBrush}" />
+                                        </DataTrigger>
                                     </DataTemplate.Triggers>
                                 </DataTemplate>
                             </TreeView.Resources>
@@ -1133,6 +1174,15 @@
                                 <ContextMenu DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                                     <MenuItem Header="Launch connection" Command="{Binding LaunchCommand}" FontWeight="SemiBold" />
                                     <MenuItem Header="{Binding SelectedPinText}" Command="{Binding TogglePinCommand}" />
+                                    <!-- v0.3.5: bulk pin / unpin appear only when 2+ entries are
+                                         multi-selected via Ctrl-click. Single-select uses the
+                                         existing Toggle Pin item above. -->
+                                    <MenuItem Header="{Binding BulkPinSelectionLabel}"
+                                              Command="{Binding BulkPinCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkUnpinSelectionLabel}"
+                                              Command="{Binding BulkUnpinCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <Separator />
                                     <MenuItem Header="New connection" Command="{Binding AddEntryCommand}" />
                                     <MenuItem Header="New folder" Command="{Binding AddFolderCommand}" />
