@@ -160,6 +160,7 @@ public class MainWindowKeyboardNavTests
 
         Assert.Contains("{Binding BulkPinCommand}", commands);
         Assert.Contains("{Binding BulkUnpinCommand}", commands);
+        Assert.Contains("{Binding BulkMoveCommand}", commands);
         Assert.Contains("{Binding BulkAddTagCommand}", commands);
         Assert.Contains("{Binding BulkRemoveTagCommand}", commands);
         Assert.Contains("{Binding BulkReplaceTagsCommand}", commands);
@@ -179,6 +180,8 @@ public class MainWindowKeyboardNavTests
             .Where(mi => ((string?)mi.Attribute("Visibility")) == "{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}")
             .ToList();
 
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkMoveCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkMoveSelectionLabel}");
         Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkAddTagCommand}"
             && (string?)mi.Attribute("Header") == "{Binding BulkAddTagSelectionLabel}");
         Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkRemoveTagCommand}"
@@ -203,6 +206,7 @@ public class MainWindowKeyboardNavTests
         var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
         var source = File.ReadAllText(path);
 
+        Assert.Contains("BulkMoveCommand = new RelayCommand(BulkMove", source);
         Assert.Contains("BulkAddTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Add)", source);
         Assert.Contains("BulkRemoveTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Remove)", source);
         Assert.Contains("BulkReplaceTagsCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Replace)", source);
@@ -213,6 +217,7 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("BulkClearProxyCommand = new RelayCommand(BulkClearProxy", source);
         Assert.Contains("ParseBulkTags", source);
         Assert.Contains("ChoiceDialog.Pick", source);
+        Assert.Contains("FolderPickerDialog.Pick", source);
         Assert.Contains("BulkProxyDialog.Prompt", source);
         Assert.Contains("TryGetCommonLaunchValue", source);
         Assert.Contains("TryGetCommonProxy", source);
@@ -221,6 +226,7 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("CreateAccessControlOptions", source);
         Assert.Contains("Distinct(StringComparer.OrdinalIgnoreCase)", source);
         Assert.Contains("validationMessage: \"Enter at least one tag before applying.\"", source);
+        Assert.Contains("bulk_move", source);
         Assert.Contains("bulk_add_tag", source);
         Assert.Contains("bulk_remove_tag", source);
         Assert.Contains("bulk_replace_tags", source);

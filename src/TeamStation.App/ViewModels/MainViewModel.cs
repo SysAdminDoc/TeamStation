@@ -111,6 +111,7 @@ public sealed class MainViewModel : ViewModelBase
         ImportCommand = new RelayCommand(Import);
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
         TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
+        BulkMoveCommand = new RelayCommand(BulkMove, () => SelectedNodes.OfType<EntryNode>().Any());
         BulkPinCommand = new RelayCommand(() => BulkSetPinned(true), () => SelectedNodes.OfType<EntryNode>().Any());
         BulkUnpinCommand = new RelayCommand(() => BulkSetPinned(false), () => SelectedNodes.OfType<EntryNode>().Any());
         BulkAddTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Add), () => SelectedNodes.OfType<EntryNode>().Any());
@@ -463,6 +464,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand DeleteCommand { get; }
     public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
+    public System.Windows.Input.ICommand BulkMoveCommand { get; }
     public System.Windows.Input.ICommand BulkPinCommand { get; }
     public System.Windows.Input.ICommand BulkUnpinCommand { get; }
     public System.Windows.Input.ICommand BulkAddTagCommand { get; }
@@ -503,6 +505,7 @@ public sealed class MainViewModel : ViewModelBase
 
     public int MultiSelectedEntryCount => SelectedNodes.OfType<EntryNode>().Count();
     public bool IsBulkSelectionActive => MultiSelectedEntryCount >= 2;
+    public string BulkMoveSelectionLabel => $"Move selection ({MultiSelectedEntryCount})";
     public string BulkPinSelectionLabel => $"Pin selection ({MultiSelectedEntryCount})";
     public string BulkUnpinSelectionLabel => $"Unpin selection ({MultiSelectedEntryCount})";
     public string BulkAddTagSelectionLabel => $"Add tag to selection ({MultiSelectedEntryCount})";
@@ -550,6 +553,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedNodes));
         OnPropertyChanged(nameof(MultiSelectedEntryCount));
         OnPropertyChanged(nameof(IsBulkSelectionActive));
+        OnPropertyChanged(nameof(BulkMoveSelectionLabel));
         OnPropertyChanged(nameof(BulkPinSelectionLabel));
         OnPropertyChanged(nameof(BulkUnpinSelectionLabel));
         OnPropertyChanged(nameof(BulkAddTagSelectionLabel));
@@ -561,6 +565,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(BulkSetProxySelectionLabel));
         OnPropertyChanged(nameof(BulkClearProxySelectionLabel));
         OnPropertyChanged(nameof(MultiSelectionSummary));
+        ((RelayCommand)BulkMoveCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkPinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkUnpinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkAddTagCommand).RaiseCanExecuteChanged();
@@ -572,6 +577,59 @@ public sealed class MainViewModel : ViewModelBase
         ((RelayCommand)BulkSetProxyCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkClearProxyCommand).RaiseCanExecuteChanged();
         ((RelayCommand)ClearMultiSelectionCommand).RaiseCanExecuteChanged();
+    }
+
+    private void BulkMove()
+    {
+        var entries = SelectedNodes.OfType<EntryNode>().ToList();
+        if (entries.Count == 0) return;
+
+        var roots = RootNodes.OfType<FolderNode>().ToList();
+        var (ok, folderId, toRoot) = FolderPickerDialog.Pick(Application.Current?.MainWindow, roots);
+        if (!ok)
+        {
+            ReportStatus(LogLevel.Warning, "Bulk move cancelled.");
+            return;
+        }
+
+        if (!toRoot && folderId is null)
+        {
+            ReportStatus(LogLevel.Warning, "Choose a destination folder before moving the selection.");
+            return;
+        }
+
+        var newParent = toRoot ? (Guid?)null : folderId;
+        var destinationName = newParent is null
+            ? "the top level"
+            : $"\"{FindById(RootNodes, newParent.Value)?.Name ?? "selected folder"}\"";
+        var destinationPreposition = newParent is null ? "at" : "in";
+        var changed = 0;
+        Guid? firstMovedId = null;
+
+        foreach (var entryNode in entries)
+        {
+            if (entryNode.Model.ParentFolderId == newParent)
+                continue;
+
+            firstMovedId ??= entryNode.Id;
+            entryNode.Model.ParentFolderId = newParent;
+            _entries.Upsert(entryNode.Model);
+            changed++;
+        }
+
+        if (changed == 0)
+        {
+            ReportStatus(LogLevel.Info, $"Selected connections are already {destinationPreposition} {destinationName}.");
+            return;
+        }
+
+        var countText = DisplayText.Count(changed, "connection");
+        Reload();
+        if (firstMovedId is { } id)
+            SelectById(id);
+        Audit("bulk_move", "connection", null, $"Moved {countText} to {destinationName} via bulk action.", newParent?.ToString());
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success, $"Moved {countText} to {destinationName}.");
     }
 
     private void BulkSetPinned(bool pinned)

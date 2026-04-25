@@ -1149,6 +1149,14 @@
                             </StackPanel>
 
                             <WrapPanel Grid.Column="1" HorizontalAlignment="Right" MaxWidth="520">
+                                <Button Content="Move"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Move every selected connection to a folder or to the top level."
+                                        Command="{Binding BulkMoveCommand}" />
                                 <Button Content="Add tag"
                                         Style="{StaticResource GhostButton}"
                                         MinWidth="0"
@@ -1219,6 +1227,7 @@
                                         Padding="8,4"
                                         Margin="0,0,6,0"
                                         FontSize="12"
+                                        ToolTip="Pin every selected connection."
                                         Command="{Binding BulkPinCommand}" />
                                 <Button Content="Unpin"
                                         Style="{StaticResource GhostButton}"
@@ -1226,12 +1235,14 @@
                                         Padding="8,4"
                                         Margin="0,0,6,0"
                                         FontSize="12"
+                                        ToolTip="Unpin every selected connection."
                                         Command="{Binding BulkUnpinCommand}" />
                                 <Button Content="Clear"
                                         Style="{StaticResource GhostButton}"
                                         MinWidth="0"
                                         Padding="8,4"
                                         FontSize="12"
+                                        ToolTip="Clear the current multi-selection."
                                         Command="{Binding ClearMultiSelectionCommand}" />
                             </WrapPanel>
                         </Grid>
@@ -1380,6 +1391,9 @@
                                     <!-- v0.3.5: bulk pin / unpin appear only when 2+ entries are
                                          multi-selected via Ctrl-click. Single-select uses the
                                          existing Toggle Pin item above. -->
+                                    <MenuItem Header="{Binding BulkMoveSelectionLabel}"
+                                              Command="{Binding BulkMoveCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <MenuItem Header="{Binding BulkPinSelectionLabel}"
                                               Command="{Binding BulkPinCommand}"
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
