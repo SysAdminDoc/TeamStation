@@ -107,6 +107,7 @@ public sealed class MainViewModel : ViewModelBase
         DeleteCommand = new RelayCommand(Delete, () => Selected is not null);
         EditCommand = new RelayCommand(EditSelected, () => Selected is not null);
         LaunchCommand = new RelayCommand(Launch, () => Selected is EntryNode && IsTeamViewerReady);
+        CopySelectedIdCommand = new RelayCommand(CopySelectedId, () => Selected is EntryNode);
         DuplicateCommand = new RelayCommand(DuplicateSelectedEntry, () => Selected is EntryNode);
         ExportCommand = new RelayCommand(Export);
         ImportCommand = new RelayCommand(Import);
@@ -282,7 +283,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetField(ref _selected, value))
             {
-                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand, DuplicateCommand, TogglePinCommand, RunExternalToolCommand })
+                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand, CopySelectedIdCommand, DuplicateCommand, TogglePinCommand, RunExternalToolCommand })
                     ((RelayCommand)cmd).RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(SelectedIsEntry));
                 OnPropertyChanged(nameof(SelectedIsFolder));
@@ -291,6 +292,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(SelectedPinText));
                 OnPropertyChanged(nameof(LaunchSelectedTooltip));
                 OnPropertyChanged(nameof(EditSelectionTooltip));
+                OnPropertyChanged(nameof(CopySelectedIdTooltip));
                 OnPropertyChanged(nameof(DuplicateSelectionTooltip));
                 OnPropertyChanged(nameof(MoveSelectionTooltip));
                 OnPropertyChanged(nameof(DeleteSelectionTooltip));
@@ -308,6 +310,9 @@ public sealed class MainViewModel : ViewModelBase
         ? (IsTeamViewerReady ? "Launch the selected connection." : "Install or configure TeamViewer before launching.")
         : "Select a connection to launch.";
     public string EditSelectionTooltip => HasSelection ? "Edit the selected item." : "Select an item to edit.";
+    public string CopySelectedIdTooltip => Selected is EntryNode
+        ? "Copy the selected TeamViewer ID to the clipboard."
+        : "Select a connection to copy its TeamViewer ID.";
     public string DuplicateSelectionTooltip => Selected is EntryNode
         ? "Duplicate the selected connection as an editable copy."
         : "Select a connection to duplicate.";
@@ -471,6 +476,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand DeleteCommand { get; }
     public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
+    public System.Windows.Input.ICommand CopySelectedIdCommand { get; }
     public System.Windows.Input.ICommand DuplicateCommand { get; }
     public System.Windows.Input.ICommand BulkCopyIdsCommand { get; }
     public System.Windows.Input.ICommand BulkMoveCommand { get; }
@@ -622,7 +628,36 @@ public sealed class MainViewModel : ViewModelBase
 
         var countText = DisplayText.Count(ids.Count, "TeamViewer ID");
         Audit("bulk_copy_ids", "connection", null, $"Copied {countText} to clipboard via bulk action.");
+        MirrorDatabase();
         ReportStatus(LogLevel.Success, $"Copied {countText} to the clipboard.");
+    }
+
+    private void CopySelectedId()
+    {
+        if (Selected is not EntryNode entry)
+            return;
+
+        var id = entry.TeamViewerId.Trim();
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            ReportStatus(LogLevel.Warning, "Selected connection does not have a TeamViewer ID to copy.");
+            return;
+        }
+
+        try
+        {
+            System.Windows.Clipboard.SetDataObject(id, copy: true);
+        }
+        catch (Exception ex)
+        {
+            AppendLog(LogLevel.Warning, $"TeamViewer ID copy failed: {ex.Message}");
+            ReportStatus(LogLevel.Error, $"Could not copy TeamViewer ID: {ex.Message}");
+            return;
+        }
+
+        Audit("copy_id", "connection", entry.Id, $"Copied TeamViewer ID for \"{entry.Name}\".");
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success, "Copied TeamViewer ID to the clipboard.");
     }
 
     private void BulkMove()

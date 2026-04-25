@@ -204,6 +204,11 @@
                                     Content="&#xE718;" />
                             <Button Style="{StaticResource IconButton}"
                                     Margin="0,0,6,0"
+                                    ToolTip="{Binding DataContext.CopySelectedIdTooltip, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Command="{Binding DataContext.CopySelectedIdCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Content="&#xE8C8;" />
+                            <Button Style="{StaticResource IconButton}"
+                                    Margin="0,0,6,0"
                                     ToolTip="Edit connection"
                                     Command="{Binding DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     Content="&#xE70F;" />
@@ -731,6 +736,10 @@
                           FontWeight="SemiBold"
                           ToolTip="{Binding LaunchSelectedTooltip}"
                           ToolTipService.ShowOnDisabled="True" />
+                <MenuItem Header="Copy TeamViewer ID"
+                          Command="{Binding CopySelectedIdCommand}"
+                          ToolTip="{Binding CopySelectedIdTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
                 <MenuItem Header="{Binding SelectedPinText}"
                           Command="{Binding TogglePinCommand}"
                           ToolTip="{Binding PinSelectionTooltip}"
@@ -850,6 +859,15 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE718;" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="{Binding SelectedPinText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding CopySelectedIdCommand}"
+                            ToolTip="{Binding CopySelectedIdTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE8C8;" />
+                            <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Copy ID" />
                         </StackPanel>
                     </Button>
 
@@ -1471,6 +1489,7 @@
                                     <Separator />
                                     <MenuItem Header="Edit" Command="{Binding EditCommand}" />
                                     <MenuItem Header="Rename" Command="{Binding RenameCommand}" />
+                                    <MenuItem Header="Copy TeamViewer ID" Command="{Binding CopySelectedIdCommand}" />
                                     <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}" />
                                     <MenuItem Header="Move" Command="{Binding MoveCommand}" />
                                     <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />

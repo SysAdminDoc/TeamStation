@@ -153,10 +153,18 @@ public class MainWindowKeyboardNavTests
             .Where(command => !string.IsNullOrWhiteSpace(command))
             .ToList();
 
+        Assert.Contains("{Binding CopySelectedIdCommand}", buttonCommands);
+        Assert.Contains("{Binding DataContext.CopySelectedIdCommand, RelativeSource={RelativeSource AncestorType=Window}}", buttonCommands);
         Assert.Contains("{Binding DuplicateCommand}", buttonCommands);
         Assert.Contains("{Binding DataContext.DuplicateCommand, RelativeSource={RelativeSource AncestorType=Window}}", buttonCommands);
 
         var menuItems = doc.Descendants(Wpf + "MenuItem").ToList();
+        Assert.Contains(menuItems, mi => (string?)mi.Attribute("Command") == "{Binding CopySelectedIdCommand}"
+            && (string?)mi.Attribute("Header") == "Copy TeamViewer ID"
+            && (string?)mi.Attribute("ToolTip") == "{Binding CopySelectedIdTooltip}"
+            && (string?)mi.Attribute("ToolTipService.ShowOnDisabled") == "True");
+        Assert.Contains(menuItems, mi => (string?)mi.Attribute("Command") == "{Binding CopySelectedIdCommand}"
+            && (string?)mi.Attribute("Header") == "Copy TeamViewer ID");
         Assert.Contains(menuItems, mi => (string?)mi.Attribute("Command") == "{Binding DuplicateCommand}"
             && (string?)mi.Attribute("Header") == "Duplicate connection..."
             && (string?)mi.Attribute("ToolTip") == "{Binding DuplicateSelectionTooltip}"
@@ -269,6 +277,22 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("bulk_set_access_control", source);
         Assert.Contains("bulk_set_proxy", source);
         Assert.Contains("bulk_clear_proxy", source);
+    }
+
+    [Fact]
+    public void Main_view_model_copy_id_commands_report_and_audit_clipboard_actions()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("CopySelectedIdCommand = new RelayCommand(CopySelectedId", source);
+        Assert.Contains("CopySelectedIdTooltip", source);
+        Assert.Contains("private void CopySelectedId()", source);
+        Assert.Contains("System.Windows.Clipboard.SetDataObject(id, copy: true)", source);
+        Assert.Contains("\"copy_id\"", source);
+        Assert.Contains("\"bulk_copy_ids\"", source);
+        Assert.Contains("Copied TeamViewer ID to the clipboard.", source);
+        Assert.Contains("Selected connection does not have a TeamViewer ID to copy.", source);
     }
 
     [Fact]
