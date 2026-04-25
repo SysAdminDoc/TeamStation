@@ -145,6 +145,27 @@ public class MainWindowKeyboardNavTests
     }
 
     [Fact]
+    public void Single_selection_surface_exposes_duplicate_action()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var buttonCommands = doc.Descendants(Wpf + "Button")
+            .Select(b => (string?)b.Attribute("Command"))
+            .Where(command => !string.IsNullOrWhiteSpace(command))
+            .ToList();
+
+        Assert.Contains("{Binding DuplicateCommand}", buttonCommands);
+        Assert.Contains("{Binding DataContext.DuplicateCommand, RelativeSource={RelativeSource AncestorType=Window}}", buttonCommands);
+
+        var menuItems = doc.Descendants(Wpf + "MenuItem").ToList();
+        Assert.Contains(menuItems, mi => (string?)mi.Attribute("Command") == "{Binding DuplicateCommand}"
+            && (string?)mi.Attribute("Header") == "Duplicate connection..."
+            && (string?)mi.Attribute("ToolTip") == "{Binding DuplicateSelectionTooltip}"
+            && (string?)mi.Attribute("ToolTipService.ShowOnDisabled") == "True");
+        Assert.Contains(menuItems, mi => (string?)mi.Attribute("Command") == "{Binding DuplicateCommand}"
+            && (string?)mi.Attribute("Header") == "Duplicate");
+    }
+
+    [Fact]
     public void Bulk_selection_surface_exposes_inline_actions()
     {
         var doc = XDocument.Load(MainWindowXamlPath);
@@ -248,6 +269,23 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("bulk_set_access_control", source);
         Assert.Contains("bulk_set_proxy", source);
         Assert.Contains("bulk_clear_proxy", source);
+    }
+
+    [Fact]
+    public void Main_view_model_duplicate_command_creates_clean_editable_copies()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("DuplicateCommand = new RelayCommand(DuplicateSelectedEntry", source);
+        Assert.Contains("CreateDuplicateEntry(entry.Model", source);
+        Assert.Contains("BuildDuplicateName(source.Name", source);
+        Assert.Contains("_dialogs.EditEntry(duplicate", source);
+        Assert.Contains("IsPinned = false", source);
+        Assert.Contains("Tags = source.Tags.ToList()", source);
+        Assert.Contains("LastConnectedUtc = null", source);
+        Assert.Contains("new ProxySettings(source.Proxy.Host, source.Proxy.Port, source.Proxy.Username, source.Proxy.Password)", source);
+        Assert.Contains("\"duplicate\"", source);
     }
 
     [Fact]

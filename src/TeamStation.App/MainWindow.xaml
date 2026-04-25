@@ -209,6 +209,11 @@
                                     Content="&#xE70F;" />
                             <Button Style="{StaticResource IconButton}"
                                     Margin="0,0,6,0"
+                                    ToolTip="{Binding DataContext.DuplicateSelectionTooltip, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Command="{Binding DataContext.DuplicateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Content="&#xE8C8;" />
+                            <Button Style="{StaticResource IconButton}"
+                                    Margin="0,0,6,0"
                                     ToolTip="Move to another folder"
                                     Command="{Binding DataContext.MoveCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     Content="&#xE8DE;" />
@@ -695,6 +700,10 @@
                           Command="{Binding RenameCommand}"
                           ToolTip="{Binding EditSelectionTooltip}"
                           ToolTipService.ShowOnDisabled="True" />
+                <MenuItem Header="Duplicate connection..."
+                          Command="{Binding DuplicateCommand}"
+                          ToolTip="{Binding DuplicateSelectionTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
                 <MenuItem Header="Move..."
                           Command="{Binding MoveCommand}"
                           ToolTip="{Binding MoveSelectionTooltip}"
@@ -866,6 +875,15 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE70F;" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Edit" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding DuplicateCommand}"
+                            ToolTip="{Binding DuplicateSelectionTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE8C8;" />
+                            <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Duplicate" />
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource ToolbarButton}"
@@ -1453,6 +1471,7 @@
                                     <Separator />
                                     <MenuItem Header="Edit" Command="{Binding EditCommand}" />
                                     <MenuItem Header="Rename" Command="{Binding RenameCommand}" />
+                                    <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}" />
                                     <MenuItem Header="Move" Command="{Binding MoveCommand}" />
                                     <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
                                 </ContextMenu>

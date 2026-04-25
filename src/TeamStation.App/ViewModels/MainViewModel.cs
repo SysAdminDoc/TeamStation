@@ -107,6 +107,7 @@ public sealed class MainViewModel : ViewModelBase
         DeleteCommand = new RelayCommand(Delete, () => Selected is not null);
         EditCommand = new RelayCommand(EditSelected, () => Selected is not null);
         LaunchCommand = new RelayCommand(Launch, () => Selected is EntryNode && IsTeamViewerReady);
+        DuplicateCommand = new RelayCommand(DuplicateSelectedEntry, () => Selected is EntryNode);
         ExportCommand = new RelayCommand(Export);
         ImportCommand = new RelayCommand(Import);
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
@@ -281,7 +282,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetField(ref _selected, value))
             {
-                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand, TogglePinCommand, RunExternalToolCommand })
+                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand, DuplicateCommand, TogglePinCommand, RunExternalToolCommand })
                     ((RelayCommand)cmd).RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(SelectedIsEntry));
                 OnPropertyChanged(nameof(SelectedIsFolder));
@@ -290,6 +291,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(SelectedPinText));
                 OnPropertyChanged(nameof(LaunchSelectedTooltip));
                 OnPropertyChanged(nameof(EditSelectionTooltip));
+                OnPropertyChanged(nameof(DuplicateSelectionTooltip));
                 OnPropertyChanged(nameof(MoveSelectionTooltip));
                 OnPropertyChanged(nameof(DeleteSelectionTooltip));
                 OnPropertyChanged(nameof(PinSelectionTooltip));
@@ -306,6 +308,9 @@ public sealed class MainViewModel : ViewModelBase
         ? (IsTeamViewerReady ? "Launch the selected connection." : "Install or configure TeamViewer before launching.")
         : "Select a connection to launch.";
     public string EditSelectionTooltip => HasSelection ? "Edit the selected item." : "Select an item to edit.";
+    public string DuplicateSelectionTooltip => Selected is EntryNode
+        ? "Duplicate the selected connection as an editable copy."
+        : "Select a connection to duplicate.";
     public string MoveSelectionTooltip => HasSelection ? "Move the selected item to another folder." : "Select an item to move.";
     public string DeleteSelectionTooltip => HasSelection ? "Delete the selected item." : "Select an item to delete.";
     public string PinSelectionTooltip => Selected is EntryNode
@@ -466,6 +471,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand DeleteCommand { get; }
     public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
+    public System.Windows.Input.ICommand DuplicateCommand { get; }
     public System.Windows.Input.ICommand BulkCopyIdsCommand { get; }
     public System.Windows.Input.ICommand BulkMoveCommand { get; }
     public System.Windows.Input.ICommand BulkDeleteCommand { get; }
@@ -1326,6 +1332,76 @@ public sealed class MainViewModel : ViewModelBase
                     ReportStatus(LogLevel.Success, $"Saved folder \"{folder.Name}\".");
                 }
                 break;
+        }
+    }
+
+    private void DuplicateSelectedEntry()
+    {
+        if (Selected is not EntryNode entry)
+            return;
+
+        var duplicate = CreateDuplicateEntry(entry.Model, _entries.GetAll().Select(existing => existing.Name));
+        if (!_dialogs.EditEntry(duplicate, Application.Current?.MainWindow))
+        {
+            ReportStatus(LogLevel.Warning, "Duplicate cancelled.");
+            return;
+        }
+
+        _entries.Upsert(duplicate);
+        Reload();
+        SelectById(duplicate.Id);
+        Audit(
+            "duplicate",
+            "connection",
+            duplicate.Id,
+            $"Duplicated \"{entry.Name}\" as \"{duplicate.Name}\".",
+            entry.Id.ToString());
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success, $"Created duplicate \"{duplicate.Name}\".");
+    }
+
+    private static ConnectionEntry CreateDuplicateEntry(ConnectionEntry source, IEnumerable<string> existingNames)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        return new ConnectionEntry
+        {
+            ParentFolderId = source.ParentFolderId,
+            Name = BuildDuplicateName(source.Name, existingNames),
+            TeamViewerId = source.TeamViewerId,
+            ProfileName = source.ProfileName,
+            Password = source.Password,
+            Mode = source.Mode,
+            Quality = source.Quality,
+            AccessControl = source.AccessControl,
+            Proxy = source.Proxy is null
+                ? null
+                : new ProxySettings(source.Proxy.Host, source.Proxy.Port, source.Proxy.Username, source.Proxy.Password),
+            TeamViewerPathOverride = source.TeamViewerPathOverride,
+            IsPinned = false,
+            WakeMacAddress = source.WakeMacAddress,
+            WakeBroadcastAddress = source.WakeBroadcastAddress,
+            PreLaunchScript = source.PreLaunchScript,
+            PostLaunchScript = source.PostLaunchScript,
+            Notes = source.Notes,
+            Tags = source.Tags.ToList(),
+            LastConnectedUtc = null,
+        };
+    }
+
+    private static string BuildDuplicateName(string sourceName, IEnumerable<string> existingNames)
+    {
+        var baseName = string.IsNullOrWhiteSpace(sourceName) ? "Connection" : sourceName.Trim();
+        var candidate = $"{baseName} copy";
+        var existing = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+        if (!existing.Contains(candidate))
+            return candidate;
+
+        for (var i = 2; ; i++)
+        {
+            var numbered = $"{candidate} {i}";
+            if (!existing.Contains(numbered))
+                return numbered;
         }
     }
 
