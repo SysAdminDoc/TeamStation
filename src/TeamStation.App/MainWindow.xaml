@@ -1197,6 +1197,22 @@
                                         FontSize="12"
                                         ToolTip="Set access control for every selected connection."
                                         Command="{Binding BulkSetAccessControlCommand}" />
+                                <Button Content="Proxy"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Set proxy routing for every selected connection."
+                                        Command="{Binding BulkSetProxyCommand}" />
+                                <Button Content="Clear proxy"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Remove proxy routing from selected connections."
+                                        Command="{Binding BulkClearProxyCommand}" />
                                 <Button Content="Pin"
                                         Style="{StaticResource GhostButton}"
                                         MinWidth="0"
@@ -1387,6 +1403,12 @@
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <MenuItem Header="{Binding BulkSetAccessControlSelectionLabel}"
                                               Command="{Binding BulkSetAccessControlCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkSetProxySelectionLabel}"
+                                              Command="{Binding BulkSetProxyCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkClearProxySelectionLabel}"
+                                              Command="{Binding BulkClearProxyCommand}"
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <Separator />
                                     <MenuItem Header="New connection" Command="{Binding AddEntryCommand}" />

@@ -119,6 +119,8 @@ public sealed class MainViewModel : ViewModelBase
         BulkSetModeCommand = new RelayCommand(BulkSetMode, () => SelectedNodes.OfType<EntryNode>().Any());
         BulkSetQualityCommand = new RelayCommand(BulkSetQuality, () => SelectedNodes.OfType<EntryNode>().Any());
         BulkSetAccessControlCommand = new RelayCommand(BulkSetAccessControl, () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkSetProxyCommand = new RelayCommand(BulkSetProxy, () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkClearProxyCommand = new RelayCommand(BulkClearProxy, () => SelectedNodes.OfType<EntryNode>().Any());
         ClearMultiSelectionCommand = new RelayCommand(ClearMultiSelection, () => IsBulkSelectionActive);
         OpenSettingsCommand = new RelayCommand(OpenSettings);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
@@ -469,6 +471,8 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand BulkSetModeCommand { get; }
     public System.Windows.Input.ICommand BulkSetQualityCommand { get; }
     public System.Windows.Input.ICommand BulkSetAccessControlCommand { get; }
+    public System.Windows.Input.ICommand BulkSetProxyCommand { get; }
+    public System.Windows.Input.ICommand BulkClearProxyCommand { get; }
     public System.Windows.Input.ICommand ClearMultiSelectionCommand { get; }
 
     /// <summary>
@@ -507,6 +511,8 @@ public sealed class MainViewModel : ViewModelBase
     public string BulkSetModeSelectionLabel => $"Set mode on selection ({MultiSelectedEntryCount})";
     public string BulkSetQualitySelectionLabel => $"Set quality on selection ({MultiSelectedEntryCount})";
     public string BulkSetAccessControlSelectionLabel => $"Set access on selection ({MultiSelectedEntryCount})";
+    public string BulkSetProxySelectionLabel => $"Set proxy on selection ({MultiSelectedEntryCount})";
+    public string BulkClearProxySelectionLabel => $"Clear proxy on selection ({MultiSelectedEntryCount})";
     public string MultiSelectionSummary => $"{DisplayText.Count(MultiSelectedEntryCount, "connection")} selected";
 
     /// <summary>
@@ -552,6 +558,8 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(BulkSetModeSelectionLabel));
         OnPropertyChanged(nameof(BulkSetQualitySelectionLabel));
         OnPropertyChanged(nameof(BulkSetAccessControlSelectionLabel));
+        OnPropertyChanged(nameof(BulkSetProxySelectionLabel));
+        OnPropertyChanged(nameof(BulkClearProxySelectionLabel));
         OnPropertyChanged(nameof(MultiSelectionSummary));
         ((RelayCommand)BulkPinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkUnpinCommand).RaiseCanExecuteChanged();
@@ -561,6 +569,8 @@ public sealed class MainViewModel : ViewModelBase
         ((RelayCommand)BulkSetModeCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkSetQualityCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkSetAccessControlCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkSetProxyCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkClearProxyCommand).RaiseCanExecuteChanged();
         ((RelayCommand)ClearMultiSelectionCommand).RaiseCanExecuteChanged();
     }
 
@@ -840,6 +850,110 @@ public sealed class MainViewModel : ViewModelBase
         new("View and show", "Limit the session to viewing and showing actions.", AccessControl.ViewAndShow),
         new("Custom settings", "Use the custom access-control settings configured in TeamViewer.", AccessControl.CustomSettings),
     ];
+
+    private void BulkSetProxy()
+    {
+        var entries = SelectedNodes.OfType<EntryNode>().ToList();
+        if (entries.Count == 0) return;
+
+        var initialProxy = TryGetCommonProxy(entries, out var commonProxy) ? commonProxy : null;
+        var proxy = BulkProxyDialog.Prompt(Application.Current?.MainWindow, initialProxy);
+        if (proxy is null)
+        {
+            ReportStatus(LogLevel.Warning, "Bulk proxy update cancelled.");
+            return;
+        }
+
+        BulkApplyProxy(
+            entries,
+            proxy,
+            "bulk_set_proxy",
+            $"Set proxy to {proxy.Endpoint} on {{0}} via bulk action.",
+            $"Set proxy to {proxy.Endpoint} on {{0}}.");
+    }
+
+    private void BulkClearProxy()
+    {
+        var entries = SelectedNodes.OfType<EntryNode>().ToList();
+        if (entries.Count == 0) return;
+
+        var proxyCount = entries.Count(entry => entry.Model.Proxy is not null);
+        if (proxyCount == 0)
+        {
+            ReportStatus(LogLevel.Info, "Selected connections do not have proxy routing configured.");
+            return;
+        }
+
+        if (!_dialogs.Confirm(
+                Application.Current?.MainWindow,
+                $"Clear proxy routing from {DisplayText.Count(proxyCount, "selected connection")}?\n\n" +
+                "Saved proxy usernames and passwords on those connections will be removed. Connections without a proxy will be left unchanged.",
+                "Clear proxy routing",
+                "Clear proxy",
+                isDestructive: true))
+        {
+            ReportStatus(LogLevel.Warning, "Bulk proxy clear cancelled.");
+            return;
+        }
+
+        BulkApplyProxy(
+            entries,
+            null,
+            "bulk_clear_proxy",
+            "Cleared proxy routing on {0} via bulk action.",
+            "Cleared proxy routing on {0}.");
+    }
+
+    private void BulkApplyProxy(
+        IReadOnlyList<EntryNode> entries,
+        ProxySettings? proxy,
+        string auditAction,
+        string auditTemplate,
+        string statusTemplate)
+    {
+        var changed = 0;
+        foreach (var entryNode in entries)
+        {
+            if (EqualityComparer<ProxySettings?>.Default.Equals(entryNode.Model.Proxy, proxy))
+                continue;
+
+            entryNode.Model.Proxy = proxy;
+            entryNode.Model.ModifiedUtc = DateTimeOffset.UtcNow;
+            _entries.Upsert(entryNode.Model);
+            entryNode.Refresh();
+            changed++;
+        }
+
+        if (changed == 0)
+        {
+            ReportStatus(LogLevel.Info, proxy is null
+                ? "Selected connections already have no proxy routing."
+                : $"Selected connections already use {proxy.Endpoint}.");
+            return;
+        }
+
+        var countText = DisplayText.Count(changed, "connection");
+        ApplyFilter();
+        NotifySurfacePropertyChanges();
+        Audit(auditAction, "connection", null, string.Format(auditTemplate, countText), proxy?.Endpoint);
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success, string.Format(statusTemplate, countText));
+    }
+
+    private static bool TryGetCommonProxy(IReadOnlyList<EntryNode> entries, out ProxySettings? commonProxy)
+    {
+        commonProxy = null;
+        if (entries.Count == 0) return false;
+
+        commonProxy = entries[0].Model.Proxy;
+        for (var i = 1; i < entries.Count; i++)
+        {
+            if (!EqualityComparer<ProxySettings?>.Default.Equals(commonProxy, entries[i].Model.Proxy))
+                return false;
+        }
+
+        return true;
+    }
 
     public System.Windows.Input.ICommand ExportCommand { get; }
     public System.Windows.Input.ICommand ImportCommand { get; }

@@ -166,6 +166,8 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("{Binding BulkSetModeCommand}", commands);
         Assert.Contains("{Binding BulkSetQualityCommand}", commands);
         Assert.Contains("{Binding BulkSetAccessControlCommand}", commands);
+        Assert.Contains("{Binding BulkSetProxyCommand}", commands);
+        Assert.Contains("{Binding BulkClearProxyCommand}", commands);
         Assert.Contains("{Binding ClearMultiSelectionCommand}", commands);
     }
 
@@ -189,6 +191,10 @@ public class MainWindowKeyboardNavTests
             && (string?)mi.Attribute("Header") == "{Binding BulkSetQualitySelectionLabel}");
         Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkSetAccessControlCommand}"
             && (string?)mi.Attribute("Header") == "{Binding BulkSetAccessControlSelectionLabel}");
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkSetProxyCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkSetProxySelectionLabel}");
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkClearProxyCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkClearProxySelectionLabel}");
     }
 
     [Fact]
@@ -203,9 +209,13 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("BulkSetModeCommand = new RelayCommand(BulkSetMode", source);
         Assert.Contains("BulkSetQualityCommand = new RelayCommand(BulkSetQuality", source);
         Assert.Contains("BulkSetAccessControlCommand = new RelayCommand(BulkSetAccessControl", source);
+        Assert.Contains("BulkSetProxyCommand = new RelayCommand(BulkSetProxy", source);
+        Assert.Contains("BulkClearProxyCommand = new RelayCommand(BulkClearProxy", source);
         Assert.Contains("ParseBulkTags", source);
         Assert.Contains("ChoiceDialog.Pick", source);
+        Assert.Contains("BulkProxyDialog.Prompt", source);
         Assert.Contains("TryGetCommonLaunchValue", source);
+        Assert.Contains("TryGetCommonProxy", source);
         Assert.Contains("CreateModeOptions", source);
         Assert.Contains("CreateQualityOptions", source);
         Assert.Contains("CreateAccessControlOptions", source);
@@ -217,6 +227,8 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("bulk_set_mode", source);
         Assert.Contains("bulk_set_quality", source);
         Assert.Contains("bulk_set_access_control", source);
+        Assert.Contains("bulk_set_proxy", source);
+        Assert.Contains("bulk_clear_proxy", source);
     }
 
     [Fact]
@@ -242,9 +254,23 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("selectedValue = dlg.SelectedValue is T typedValue ? typedValue : null;", source);
     }
 
+    [Fact]
+    public void Bulk_proxy_dialog_reuses_the_hardened_launch_validators()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "BulkProxyDialog.xaml.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("LaunchInputValidator.ValidateProxyEndpoint", source);
+        Assert.Contains("LaunchInputValidator.ValidateProxyUsername", source);
+        Assert.Contains("LaunchInputValidator.ValidatePassword", source);
+        Assert.Contains("ProxyPasswordBox.Password", source);
+        Assert.Contains("new ProxySettings", source);
+    }
+
     [Theory]
     [InlineData("InputDialog.xaml", "OkButton")]
     [InlineData("ChoiceDialog.xaml", "ApplyButton")]
+    [InlineData("BulkProxyDialog.xaml", "ApplyButton")]
     [InlineData("FolderPickerDialog.xaml", "OkButton")]
     [InlineData("FileSystemFolderDialog.xaml", "OkButton")]
     public void Workflow_dialog_disabled_primary_actions_explain_the_required_next_step(string xamlFile, string buttonName)
