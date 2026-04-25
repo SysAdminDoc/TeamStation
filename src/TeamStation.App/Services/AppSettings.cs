@@ -57,6 +57,20 @@ public sealed class SettingsService
 
     public string Path => _path;
 
+    /// <summary>
+    /// Per-database DPAPI entropy salt for the API-token wrap. Set by the
+    /// host (App.xaml.cs) AFTER the SQLite database is opened — the salt
+    /// lives in <c>_meta.dpapi_entropy_v1</c>, not in <c>settings.json</c>,
+    /// because storing the salt next to the wrap defeats the trust-boundary
+    /// move that the salt provides. Lazy <see cref="UnprotectApiToken"/> is
+    /// the architectural fix for the v0.3.3 startup-order constraint where
+    /// <see cref="Load"/> runs before <c>CryptoService.CreateOrLoad</c>:
+    /// <see cref="Load"/> no longer eagerly Unprotects the token; the host
+    /// calls <see cref="UnprotectApiToken"/> after opening the DB and
+    /// pushing the salt in via this property.
+    /// </summary>
+    public byte[]? Entropy { get; set; }
+
     public AppSettings Load()
     {
         LastLoadError = null;
@@ -67,7 +81,9 @@ public sealed class SettingsService
         {
             var text = File.ReadAllText(_path);
             var settings = JsonSerializer.Deserialize<AppSettings>(text, Options) ?? new AppSettings();
-            settings.TeamViewerApiToken = Unprotect(settings.TeamViewerApiTokenProtected);
+            // Token is NOT unprotected here — the entropy salt lives in the
+            // SQLite _meta table which has not been opened yet at first Load.
+            // The host calls UnprotectApiToken after opening the DB.
             return settings;
         }
         catch (Exception ex)
@@ -79,10 +95,25 @@ public sealed class SettingsService
         }
     }
 
+    /// <summary>
+    /// Decrypts <see cref="AppSettings.TeamViewerApiTokenProtected"/> into
+    /// <see cref="AppSettings.TeamViewerApiToken"/> using the per-database
+    /// entropy currently bound to this service. Tries the new entropy
+    /// first; on a <see cref="CryptographicException"/> retries with
+    /// <c>optionalEntropy: null</c> for legacy v0.3.0 / v0.3.1 / v0.3.2 /
+    /// v0.3.3 wraps. Idempotent — safe to call multiple times. No-op
+    /// when no protected blob is present (fresh install or token cleared).
+    /// </summary>
+    public void UnprotectApiToken(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        settings.TeamViewerApiToken = UnprotectInternal(settings.TeamViewerApiTokenProtected, Entropy);
+    }
+
     public void Save(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        settings.TeamViewerApiTokenProtected = Protect(settings.TeamViewerApiToken);
+        settings.TeamViewerApiTokenProtected = ProtectInternal(settings.TeamViewerApiToken, Entropy);
         AtomicFile.WriteAllText(_path, JsonSerializer.Serialize(settings, Options));
     }
 
@@ -99,26 +130,57 @@ public sealed class SettingsService
         }
     }
 
-    private static string? Protect(string? value)
+    private static string? ProtectInternal(string? value, byte[]? entropy)
     {
         if (string.IsNullOrWhiteSpace(value))
             return null;
 
         var bytes = Encoding.UTF8.GetBytes(value);
-        var protectedBytes = ProtectedData.Protect(bytes, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
-        return Convert.ToBase64String(protectedBytes);
+        try
+        {
+            var protectedBytes = ProtectedData.Protect(bytes, entropy, scope: DataProtectionScope.CurrentUser);
+            return Convert.ToBase64String(protectedBytes);
+        }
+        finally
+        {
+            // The cleartext UTF-8 byte buffer is ours to zero — the source
+            // String can't be (CLR-interned), but we don't need to leak the
+            // intermediate byte buffer to the heap on top of that.
+            CryptographicOperations.ZeroMemory(bytes);
+        }
     }
 
-    private static string? Unprotect(string? value)
+    private static string? UnprotectInternal(string? value, byte[]? entropy)
     {
         if (string.IsNullOrWhiteSpace(value))
             return null;
 
+        byte[] wrapped;
+        try { wrapped = Convert.FromBase64String(value); }
+        catch { return null; } // malformed base64 — token is unrecoverable
+
         try
         {
-            var bytes = Convert.FromBase64String(value);
-            var unprotected = ProtectedData.Unprotect(bytes, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(unprotected);
+            byte[] unprotected;
+            try
+            {
+                unprotected = ProtectedData.Unprotect(wrapped, entropy, scope: DataProtectionScope.CurrentUser);
+            }
+            catch (CryptographicException) when (entropy is not null)
+            {
+                // Legacy v0.3.3-and-earlier wrap (made under null entropy).
+                // Falling back lets the existing user keep their saved token
+                // across the upgrade; the next Save re-wraps under entropy.
+                unprotected = ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
+            }
+            try
+            {
+                return Encoding.UTF8.GetString(unprotected);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(unprotected);
+            }
         }
         catch
         {

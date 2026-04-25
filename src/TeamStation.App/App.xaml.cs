@@ -86,6 +86,16 @@ public partial class App : Application
             var db = new Database(dbPath);
             _crypto = CreateCrypto(db);
             var crypto = _crypto;
+
+            // Lazy Unprotect of the TeamViewer API token. The entropy salt
+            // for the AppSettings DPAPI wrap lives in the SQLite _meta table
+            // (same row CryptoService uses for the DEK wrap), which has just
+            // come into scope. SettingsService.Load left
+            // settings.TeamViewerApiToken null — fill it in now so any code
+            // path further down (cloud sync, online-state polling) sees the
+            // unwrapped token.
+            settingsService.Entropy = db.LoadValue("dpapi_entropy_v1");
+            settingsService.UnprotectApiToken(settings);
             var entries = new EntryRepository(db, crypto);
             var folders = new FolderRepository(db, crypto);
             var sessions = new SessionRepository(db);
