@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.Versioning;
 using Microsoft.Data.Sqlite;
+using TeamStation.Core.Io;
 using TeamStation.Core.Models;
 
 namespace TeamStation.Data.Storage;
@@ -23,7 +24,7 @@ public sealed class SessionRepository
 SELECT id, entry_id, entry_name, tv_id, profile_name, mode, route, process_id,
        started_utc, ended_utc, notes, outcome
 FROM session_history
-ORDER BY started_utc DESC
+ORDER BY started_utc DESC, id DESC
 LIMIT $limit;";
         cmd.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 1000));
         using var reader = cmd.ExecuteReader();
@@ -46,9 +47,17 @@ VALUES (
     $id, $entry_id, $entry_name, $tv_id, $profile, $mode, $route, $pid,
     $started, $ended, $notes, $outcome)
 ON CONFLICT(id) DO UPDATE SET
-    ended_utc = excluded.ended_utc,
-    notes     = excluded.notes,
-    outcome   = excluded.outcome;";
+    entry_id     = excluded.entry_id,
+    entry_name   = excluded.entry_name,
+    tv_id        = excluded.tv_id,
+    profile_name = excluded.profile_name,
+    mode         = excluded.mode,
+    route        = excluded.route,
+    process_id   = excluded.process_id,
+    started_utc  = excluded.started_utc,
+    ended_utc    = excluded.ended_utc,
+    notes        = excluded.notes,
+    outcome      = excluded.outcome;";
         Bind(cmd, record);
         cmd.ExecuteNonQuery();
     }
@@ -91,7 +100,7 @@ WHERE id = $id;";
                 Csv(r.Notes ?? string.Empty)));
         }
 
-        File.WriteAllLines(path, lines);
+        AtomicFile.WriteAllText(path, string.Join(Environment.NewLine, lines) + Environment.NewLine);
     }
 
     /// <summary>

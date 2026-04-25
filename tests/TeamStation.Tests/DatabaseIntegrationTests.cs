@@ -247,6 +247,106 @@ public class DatabaseIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void Session_history_returns_stable_order_for_identical_start_times()
+    {
+        var started = DateTimeOffset.UtcNow;
+        var firstId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var secondId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+
+        _sessions.Upsert(new SessionRecord
+        {
+            Id = firstId,
+            EntryName = "First",
+            TeamViewerId = "111111111",
+            Route = "CLI",
+            StartedUtc = started,
+        });
+        _sessions.Upsert(new SessionRecord
+        {
+            Id = secondId,
+            EntryName = "Second",
+            TeamViewerId = "222222222",
+            Route = "CLI",
+            StartedUtc = started,
+        });
+
+        var recent = _sessions.GetRecent();
+
+        Assert.Equal(["Second", "First"], recent.Select(s => s.EntryName).ToArray());
+    }
+
+    [Fact]
+    public void Session_history_upsert_replaces_full_record_on_conflict()
+    {
+        var id = Guid.NewGuid();
+        _sessions.Upsert(new SessionRecord
+        {
+            Id = id,
+            EntryName = "Original",
+            TeamViewerId = "111111111",
+            ProfileName = "Default",
+            Route = "CLI",
+            StartedUtc = DateTimeOffset.UtcNow.AddHours(-1),
+            Outcome = "Started",
+        });
+
+        var replacementStarted = DateTimeOffset.UtcNow;
+        _sessions.Upsert(new SessionRecord
+        {
+            Id = id,
+            EntryName = "Replacement",
+            TeamViewerId = "222222222",
+            ProfileName = "Ops",
+            Mode = ConnectionMode.FileTransfer,
+            Route = "URI",
+            ProcessId = 42,
+            StartedUtc = replacementStarted,
+            EndedUtc = replacementStarted.AddMinutes(3),
+            Outcome = "Exited 0",
+            Notes = "Updated",
+        });
+
+        var loaded = Assert.Single(_sessions.GetRecent());
+        Assert.Equal("Replacement", loaded.EntryName);
+        Assert.Equal("222222222", loaded.TeamViewerId);
+        Assert.Equal("Ops", loaded.ProfileName);
+        Assert.Equal(ConnectionMode.FileTransfer, loaded.Mode);
+        Assert.Equal("URI", loaded.Route);
+        Assert.Equal(42, loaded.ProcessId);
+        Assert.Equal(replacementStarted, loaded.StartedUtc);
+        Assert.Equal(replacementStarted.AddMinutes(3), loaded.EndedUtc);
+        Assert.Equal("Exited 0", loaded.Outcome);
+        Assert.Equal("Updated", loaded.Notes);
+    }
+
+    [Fact]
+    public void Session_history_export_creates_missing_parent_directory()
+    {
+        _sessions.Upsert(new SessionRecord
+        {
+            EntryName = "Nested Export",
+            TeamViewerId = "123456789",
+            ProfileName = "Default",
+            Route = "CLI",
+            StartedUtc = DateTimeOffset.UtcNow,
+        });
+
+        var root = Path.Combine(Path.GetTempPath(), $"ts-session-export-{Guid.NewGuid():N}");
+        var csvPath = Path.Combine(root, "nested", "sessions.csv");
+        try
+        {
+            _sessions.ExportCsv(csvPath);
+
+            Assert.True(File.Exists(csvPath));
+            Assert.Contains("Nested Export", File.ReadAllText(csvPath));
+        }
+        finally
+        {
+            try { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
     public void Audit_log_returns_recent_events_newest_first()
     {
         var target = Guid.NewGuid();
