@@ -695,7 +695,10 @@
             <MenuItem Header="_Tools">
                 <MenuItem Header="Sync TeamViewer cloud" Command="{Binding SyncTeamViewerCloudCommand}" />
                 <Separator />
-                <MenuItem Header="Save current search" Command="{Binding SaveSearchCommand}" />
+                <MenuItem Header="Save current search"
+                          Command="{Binding SaveSearchCommand}"
+                          ToolTip="{Binding SaveSearchTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
                 <MenuItem Header="Clear search" Command="{Binding ClearSearchCommand}" />
                 <Separator />
                 <MenuItem Header="Settings..." Command="{Binding OpenSettingsCommand}" />

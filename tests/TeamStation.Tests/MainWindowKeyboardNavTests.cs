@@ -380,4 +380,33 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("public string QuickConnectTooltip => QuickConnect.ConnectTooltip;", mainSource);
         Assert.Contains("nameof(QuickConnectViewModel.ConnectTooltip)", mainSource);
     }
+
+    [Fact]
+    public void Save_search_menu_explains_disabled_state()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var item = doc.Descendants(Wpf + "MenuItem")
+            .FirstOrDefault(mi => ((string?)mi.Attribute("Command")) == "{Binding SaveSearchCommand}");
+
+        Assert.NotNull(item);
+        Assert.Equal("{Binding SaveSearchTooltip}", (string?)item!.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)item.Attribute("ToolTipService.ShowOnDisabled"));
+    }
+
+    [Fact]
+    public void Search_view_model_prevents_duplicate_saved_search_feedback()
+    {
+        var searchPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "SearchViewModel.cs");
+        var mainPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var searchSource = File.ReadAllText(searchPath);
+        var mainSource = File.ReadAllText(mainPath);
+
+        Assert.Contains("public bool IsCurrentSearchSaved", searchSource);
+        Assert.Contains("public bool CanSaveCurrent", searchSource);
+        Assert.Contains("This search is already saved.", searchSource);
+        Assert.Contains("if (_settings.SavedSearches.Contains(value, StringComparer.OrdinalIgnoreCase))", searchSource);
+        Assert.Contains("return;", searchSource);
+        Assert.Contains("public string SaveSearchTooltip => Search.SaveTooltip;", mainSource);
+        Assert.Contains("nameof(SearchViewModel.SaveTooltip)", mainSource);
+    }
 }

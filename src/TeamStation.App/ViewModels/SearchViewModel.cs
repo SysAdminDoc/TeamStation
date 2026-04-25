@@ -19,7 +19,7 @@ public sealed class SearchViewModel : ViewModelBase
     {
         _settings = settings;
         _settingsService = settingsService;
-        SaveCommand = new RelayCommand(SaveCurrent, () => HasText);
+        SaveCommand = new RelayCommand(SaveCurrent, () => CanSaveCurrent);
         ApplyCommand = new RelayCommand(ApplySaved, parameter => parameter is string { Length: > 0 });
         ClearCommand = new RelayCommand(() => SearchText = string.Empty);
     }
@@ -36,6 +36,9 @@ public sealed class SearchViewModel : ViewModelBase
             if (SetField(ref _searchText, value ?? string.Empty))
             {
                 OnPropertyChanged(nameof(HasText));
+                OnPropertyChanged(nameof(IsCurrentSearchSaved));
+                OnPropertyChanged(nameof(CanSaveCurrent));
+                OnPropertyChanged(nameof(SaveTooltip));
                 SaveCommand.RaiseCanExecuteChanged();
                 SearchTextChanged?.Invoke(this, EventArgs.Empty);
             }
@@ -43,6 +46,20 @@ public sealed class SearchViewModel : ViewModelBase
     }
 
     public bool HasText => !string.IsNullOrWhiteSpace(_searchText);
+    public bool IsCurrentSearchSaved => HasText &&
+        _settings.SavedSearches.Contains(_searchText.Trim(), StringComparer.OrdinalIgnoreCase);
+    public bool CanSaveCurrent => HasText && !IsCurrentSearchSaved;
+    public string SaveTooltip
+    {
+        get
+        {
+            if (!HasText)
+                return "Enter a search before saving it.";
+            return IsCurrentSearchSaved
+                ? "This search is already saved."
+                : "Save the current search for quick reuse.";
+        }
+    }
 
     public IReadOnlyList<string> SavedSearches => _settings.SavedSearches;
 
@@ -56,6 +73,10 @@ public sealed class SearchViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(SavedSearches));
         OnPropertyChanged(nameof(HasSavedSearches));
+        OnPropertyChanged(nameof(IsCurrentSearchSaved));
+        OnPropertyChanged(nameof(CanSaveCurrent));
+        OnPropertyChanged(nameof(SaveTooltip));
+        SaveCommand.RaiseCanExecuteChanged();
     }
 
     private void SaveCurrent()
@@ -63,13 +84,12 @@ public sealed class SearchViewModel : ViewModelBase
         var value = SearchText.Trim();
         if (value.Length == 0) return;
 
-        if (!_settings.SavedSearches.Contains(value, StringComparer.OrdinalIgnoreCase))
-        {
-            _settings.SavedSearches.Add(value);
-            _settingsService.Save(_settings);
-            RaiseSavedSearchesChanged();
-        }
+        if (_settings.SavedSearches.Contains(value, StringComparer.OrdinalIgnoreCase))
+            return;
 
+        _settings.SavedSearches.Add(value);
+        _settingsService.Save(_settings);
+        RaiseSavedSearchesChanged();
         SavedSearchAdded?.Invoke(value);
     }
 
