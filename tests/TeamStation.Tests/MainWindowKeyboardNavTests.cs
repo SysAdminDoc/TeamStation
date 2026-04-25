@@ -409,4 +409,18 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("public string SaveSearchTooltip => Search.SaveTooltip;", mainSource);
         Assert.Contains("nameof(SearchViewModel.SaveTooltip)", mainSource);
     }
+
+    [Fact]
+    public void Backup_and_restore_confirmations_use_explicit_risk_copy()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("Export plaintext backup", source);
+        Assert.Contains("Export backup", source);
+        Assert.Contains("Continue with the export?", source);
+        Assert.Contains("Restore backup", source);
+        Assert.Contains("Existing items with matching IDs will be overwritten. Review the file source before continuing.", source);
+        Assert.Contains("isDestructive: true", source);
+    }
 }

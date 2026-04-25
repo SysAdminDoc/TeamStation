@@ -850,7 +850,10 @@ public sealed class MainViewModel : ViewModelBase
         if (anyPasswords && !_dialogs.Confirm(Application.Current?.MainWindow,
                 "This backup contains saved passwords in plain text.\n\n" +
                 "Anyone who can open the file can read those credentials. Store it only where you would store a password vault export.\n\n" +
-                "Continue?"))
+                "Continue with the export?",
+                "Export plaintext backup",
+                "Export backup",
+                isDestructive: true))
         {
             ReportStatus(LogLevel.Warning, "Backup cancelled.");
             return;
@@ -882,7 +885,10 @@ public sealed class MainViewModel : ViewModelBase
 
             if (!_dialogs.Confirm(Application.Current?.MainWindow,
                 $"Restore {DisplayText.Count(folders.Count, "folder")} and {DisplayText.Count(entries.Count, "connection")} from\n\n{path}\n\n" +
-                "Existing items with matching IDs will be overwritten. Continue?"))
+                "Existing items with matching IDs will be overwritten. Review the file source before continuing.",
+                "Restore backup",
+                "Restore backup",
+                isDestructive: true))
             {
                 ReportStatus(LogLevel.Warning, "Restore cancelled.");
                 return;
