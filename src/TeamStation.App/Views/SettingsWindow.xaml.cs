@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
         WakeBox.IsChecked = settings.WakeOnLanBeforeLaunch;
         ClipboardPasswordBox.IsChecked = settings.PreferClipboardPasswordLaunch;
         CloudFolderBox.Text = settings.CloudSyncFolder ?? string.Empty;
+        RetentionDaysBox.Text = settings.HistoryRetentionDays.ToString();
         SavedSearchesBox.Text = string.Join(Environment.NewLine, settings.SavedSearches);
         ExternalToolsBox.Text = string.Join(Environment.NewLine,
             settings.ExternalTools.Select(t => $"{t.Name}|{t.Command}|{t.Arguments}"));
@@ -57,6 +58,7 @@ public partial class SettingsWindow : Window
         _settings.WakeOnLanBeforeLaunch = WakeBox.IsChecked == true;
         _settings.PreferClipboardPasswordLaunch = ClipboardPasswordBox.IsChecked == true;
         _settings.CloudSyncFolder = BlankToNull(CloudFolderBox.Text);
+        _settings.HistoryRetentionDays = int.Parse(RetentionDaysBox.Text.Trim());
         _settings.SavedSearches = SavedSearchesBox.Text
             .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -87,6 +89,14 @@ public partial class SettingsWindow : Window
         {
             ShowValidation("Cloud sync folder does not exist.");
             CloudFolderBox.Focus();
+            return false;
+        }
+
+        if (!int.TryParse(RetentionDaysBox.Text.Trim(), out var retentionDays) ||
+            retentionDays is < 0 or > 3650)
+        {
+            ShowValidation("History retention must be a whole number from 0 to 3650 days.");
+            RetentionDaysBox.Focus();
             return false;
         }
 

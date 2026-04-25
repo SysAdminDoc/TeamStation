@@ -229,6 +229,7 @@ public class MainWindowKeyboardNavTests
     [InlineData("TeamViewerPathBox", "TeamViewer executable")]
     [InlineData("ApiTokenBox", "TeamViewer Web API token")]
     [InlineData("CloudFolderBox", "Cloud sync folder")]
+    [InlineData("RetentionDaysBox", "History retention days")]
     [InlineData("SavedSearchesBox", "Saved searches")]
     [InlineData("ExternalToolsBox", "External tool definitions")]
     public void Settings_fields_expose_accessible_names(string controlName, string expectedName)
@@ -252,6 +253,22 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("Directory.Exists(cloudFolder)", source);
         Assert.Contains("FindInvalidExternalToolLine", source);
         Assert.Contains("External tool line", source);
+    }
+
+    [Fact]
+    public void Settings_surface_controls_history_retention()
+    {
+        var xamlPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "SettingsWindow.xaml");
+        var sourcePath = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "SettingsWindow.xaml.cs");
+        var xaml = File.ReadAllText(xamlPath);
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("History retention", xaml);
+        Assert.Contains("Use 0 to keep history indefinitely.", xaml);
+        Assert.Contains("RetentionDaysBox.Text = settings.HistoryRetentionDays.ToString()", source);
+        Assert.Contains("_settings.HistoryRetentionDays = int.Parse(RetentionDaysBox.Text.Trim())", source);
+        Assert.Contains("retentionDays is < 0 or > 3650", source);
+        Assert.Contains("History retention must be a whole number from 0 to 3650 days.", source);
     }
 
     [Fact]

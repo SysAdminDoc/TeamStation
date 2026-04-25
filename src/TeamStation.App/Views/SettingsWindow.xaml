@@ -194,6 +194,25 @@
                         </Grid>
                         <TextBlock Margin="0,6,0,0" Text="Optional backup mirror folder. TeamStation writes an encrypted DB copy after changes." Style="{StaticResource BodyMutedText}" />
 
+                        <TextBlock Margin="0,18,0,0" Text="History retention" Style="{StaticResource FieldLabelText}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="RetentionDaysBox"
+                                     AutomationProperties.Name="History retention days"
+                                     AutomationProperties.HelpText="Number of days to keep session and audit history. Use 0 to keep history indefinitely." />
+                            <TextBlock Grid.Column="2"
+                                       Text="days"
+                                       Style="{StaticResource BodyMutedText}"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="Prunes session and audit history on startup. Use 0 to keep history indefinitely."
+                                   Style="{StaticResource BodyMutedText}" />
+
                         <TextBlock Margin="0,18,0,0" Text="Saved searches" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="SavedSearchesBox"
                                  AutomationProperties.Name="Saved searches"
