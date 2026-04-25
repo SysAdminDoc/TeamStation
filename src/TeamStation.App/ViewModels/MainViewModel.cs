@@ -19,6 +19,13 @@ namespace TeamStation.App.ViewModels;
 [SupportedOSPlatform("windows")]
 public sealed class MainViewModel : ViewModelBase
 {
+    private enum BulkTagOperation
+    {
+        Add,
+        Remove,
+        Replace,
+    }
+
     private readonly EntryRepository _entries;
     private readonly FolderRepository _folders;
     private readonly SessionRepository _sessions;
@@ -106,6 +113,9 @@ public sealed class MainViewModel : ViewModelBase
         TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
         BulkPinCommand = new RelayCommand(() => BulkSetPinned(true), () => SelectedNodes.OfType<EntryNode>().Any());
         BulkUnpinCommand = new RelayCommand(() => BulkSetPinned(false), () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkAddTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Add), () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkRemoveTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Remove), () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkReplaceTagsCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Replace), () => SelectedNodes.OfType<EntryNode>().Any());
         ClearMultiSelectionCommand = new RelayCommand(ClearMultiSelection, () => IsBulkSelectionActive);
         OpenSettingsCommand = new RelayCommand(OpenSettings);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
@@ -450,6 +460,9 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand LaunchCommand { get; }
     public System.Windows.Input.ICommand BulkPinCommand { get; }
     public System.Windows.Input.ICommand BulkUnpinCommand { get; }
+    public System.Windows.Input.ICommand BulkAddTagCommand { get; }
+    public System.Windows.Input.ICommand BulkRemoveTagCommand { get; }
+    public System.Windows.Input.ICommand BulkReplaceTagsCommand { get; }
     public System.Windows.Input.ICommand ClearMultiSelectionCommand { get; }
 
     /// <summary>
@@ -482,6 +495,9 @@ public sealed class MainViewModel : ViewModelBase
     public bool IsBulkSelectionActive => MultiSelectedEntryCount >= 2;
     public string BulkPinSelectionLabel => $"Pin selection ({MultiSelectedEntryCount})";
     public string BulkUnpinSelectionLabel => $"Unpin selection ({MultiSelectedEntryCount})";
+    public string BulkAddTagSelectionLabel => $"Add tag to selection ({MultiSelectedEntryCount})";
+    public string BulkRemoveTagSelectionLabel => $"Remove tag from selection ({MultiSelectedEntryCount})";
+    public string BulkReplaceTagsSelectionLabel => $"Replace tags on selection ({MultiSelectedEntryCount})";
     public string MultiSelectionSummary => $"{DisplayText.Count(MultiSelectedEntryCount, "connection")} selected";
 
     /// <summary>
@@ -521,9 +537,15 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsBulkSelectionActive));
         OnPropertyChanged(nameof(BulkPinSelectionLabel));
         OnPropertyChanged(nameof(BulkUnpinSelectionLabel));
+        OnPropertyChanged(nameof(BulkAddTagSelectionLabel));
+        OnPropertyChanged(nameof(BulkRemoveTagSelectionLabel));
+        OnPropertyChanged(nameof(BulkReplaceTagsSelectionLabel));
         OnPropertyChanged(nameof(MultiSelectionSummary));
         ((RelayCommand)BulkPinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkUnpinCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkAddTagCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkRemoveTagCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkReplaceTagsCommand).RaiseCanExecuteChanged();
         ((RelayCommand)ClearMultiSelectionCommand).RaiseCanExecuteChanged();
     }
 
@@ -558,6 +580,109 @@ public sealed class MainViewModel : ViewModelBase
         ReportStatus(LogLevel.Success,
             $"{(pinned ? "Pinned" : "Unpinned")} {changed} connection{(changed == 1 ? string.Empty : "s")}.");
     }
+
+    private void BulkEditTags(BulkTagOperation operation)
+    {
+        var entries = SelectedNodes.OfType<EntryNode>().ToList();
+        if (entries.Count == 0) return;
+
+        var (title, prompt, actionVerb, auditAction) = operation switch
+        {
+            BulkTagOperation.Add => (
+                "Add tag to selection",
+                "Enter one or more tags to add. Separate multiple tags with commas.",
+                "Added",
+                "bulk_add_tag"),
+            BulkTagOperation.Remove => (
+                "Remove tag from selection",
+                "Enter one or more tags to remove. Separate multiple tags with commas.",
+                "Removed",
+                "bulk_remove_tag"),
+            _ => (
+                "Replace tags on selection",
+                "Enter the complete tag list for the selected connections. Separate tags with commas.",
+                "Replaced",
+                "bulk_replace_tags"),
+        };
+
+        var input = InputDialog.Prompt(
+            Application.Current?.MainWindow,
+            title,
+            prompt,
+            validationMessage: "Enter at least one tag before applying.");
+        if (input is null)
+        {
+            ReportStatus(LogLevel.Warning, "Bulk tag update cancelled.");
+            return;
+        }
+
+        var requestedTags = ParseBulkTags(input);
+        if (requestedTags.Count == 0)
+        {
+            ReportStatus(LogLevel.Warning, "No valid tags were entered.");
+            return;
+        }
+
+        var changed = 0;
+        foreach (var entryNode in entries)
+        {
+            var updated = operation switch
+            {
+                BulkTagOperation.Add => MergeTags(entryNode.Model.Tags, requestedTags),
+                BulkTagOperation.Remove => RemoveTags(entryNode.Model.Tags, requestedTags),
+                _ => requestedTags.ToList(),
+            };
+
+            if (TagsEqual(entryNode.Model.Tags, updated))
+                continue;
+
+            entryNode.Model.Tags = updated;
+            entryNode.Model.ModifiedUtc = DateTimeOffset.UtcNow;
+            _entries.Upsert(entryNode.Model);
+            entryNode.Refresh();
+            changed++;
+        }
+
+        if (changed == 0)
+        {
+            ReportStatus(LogLevel.Info, "Selected connections already matched that tag update.");
+            return;
+        }
+
+        ApplyFilter();
+        NotifySurfacePropertyChanges();
+        Audit(auditAction, "connection", null,
+            $"{actionVerb} {DisplayText.Count(requestedTags.Count, "tag")} on {DisplayText.Count(changed, "connection")} via bulk action.",
+            string.Join(", ", requestedTags));
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success,
+            $"{actionVerb} {DisplayText.Count(requestedTags.Count, "tag")} on {DisplayText.Count(changed, "connection")}.");
+    }
+
+    private static List<string> ParseBulkTags(string input) =>
+        input.Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(tag => tag.Trim().TrimStart('#'))
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static List<string> MergeTags(IEnumerable<string> existing, IEnumerable<string> additions) =>
+        existing.Concat(additions)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static List<string> RemoveTags(IEnumerable<string> existing, IReadOnlyCollection<string> removals)
+    {
+        var removeSet = removals.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return existing
+            .Where(tag => !removeSet.Contains(tag))
+            .ToList();
+    }
+
+    private static bool TagsEqual(IReadOnlyList<string> left, IReadOnlyList<string> right) =>
+        left.Count == right.Count && left.Zip(right).All(pair => string.Equals(pair.First, pair.Second, StringComparison.OrdinalIgnoreCase));
+
     public System.Windows.Input.ICommand ExportCommand { get; }
     public System.Windows.Input.ICommand ImportCommand { get; }
     public System.Windows.Input.ICommand ImportCsvCommand { get; }

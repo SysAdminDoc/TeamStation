@@ -160,7 +160,54 @@ public class MainWindowKeyboardNavTests
 
         Assert.Contains("{Binding BulkPinCommand}", commands);
         Assert.Contains("{Binding BulkUnpinCommand}", commands);
+        Assert.Contains("{Binding BulkAddTagCommand}", commands);
+        Assert.Contains("{Binding BulkRemoveTagCommand}", commands);
+        Assert.Contains("{Binding BulkReplaceTagsCommand}", commands);
         Assert.Contains("{Binding ClearMultiSelectionCommand}", commands);
+    }
+
+    [Fact]
+    public void Bulk_tag_actions_are_available_from_the_tree_context_menu()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var items = doc.Descendants(Wpf + "MenuItem")
+            .Where(mi => ((string?)mi.Attribute("Visibility")) == "{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}")
+            .ToList();
+
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkAddTagCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkAddTagSelectionLabel}");
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkRemoveTagCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkRemoveTagSelectionLabel}");
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkReplaceTagsCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkReplaceTagsSelectionLabel}");
+    }
+
+    [Fact]
+    public void Main_view_model_bulk_tag_commands_normalize_and_audit_tag_updates()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("BulkAddTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Add)", source);
+        Assert.Contains("BulkRemoveTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Remove)", source);
+        Assert.Contains("BulkReplaceTagsCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Replace)", source);
+        Assert.Contains("ParseBulkTags", source);
+        Assert.Contains("Distinct(StringComparer.OrdinalIgnoreCase)", source);
+        Assert.Contains("validationMessage: \"Enter at least one tag before applying.\"", source);
+        Assert.Contains("bulk_add_tag", source);
+        Assert.Contains("bulk_remove_tag", source);
+        Assert.Contains("bulk_replace_tags", source);
+    }
+
+    [Fact]
+    public void Input_dialog_supports_context_specific_validation_copy()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "InputDialog.xaml.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("string validationMessage = \"Enter a name before saving.\"", source);
+        Assert.Contains("_validationMessage = validationMessage;", source);
+        Assert.Contains("ValidationText.Text = _validationMessage;", source);
     }
 
     [Theory]

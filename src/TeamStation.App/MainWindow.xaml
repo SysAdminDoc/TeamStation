@@ -1148,7 +1148,31 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
 
-                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <WrapPanel Grid.Column="1" HorizontalAlignment="Right" MaxWidth="520">
+                                <Button Content="Add tag"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Add one or more tags to every selected connection."
+                                        Command="{Binding BulkAddTagCommand}" />
+                                <Button Content="Remove tag"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Remove one or more tags from every selected connection."
+                                        Command="{Binding BulkRemoveTagCommand}" />
+                                <Button Content="Replace tags"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Replace the complete tag list on every selected connection."
+                                        Command="{Binding BulkReplaceTagsCommand}" />
                                 <Button Content="Pin"
                                         Style="{StaticResource GhostButton}"
                                         MinWidth="0"
@@ -1169,7 +1193,7 @@
                                         Padding="8,4"
                                         FontSize="12"
                                         Command="{Binding ClearMultiSelectionCommand}" />
-                            </StackPanel>
+                            </WrapPanel>
                         </Grid>
                     </Border>
 
@@ -1321,6 +1345,15 @@
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <MenuItem Header="{Binding BulkUnpinSelectionLabel}"
                                               Command="{Binding BulkUnpinCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkAddTagSelectionLabel}"
+                                              Command="{Binding BulkAddTagCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkRemoveTagSelectionLabel}"
+                                              Command="{Binding BulkRemoveTagCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkReplaceTagsSelectionLabel}"
+                                              Command="{Binding BulkReplaceTagsCommand}"
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <Separator />
                                     <MenuItem Header="New connection" Command="{Binding AddEntryCommand}" />

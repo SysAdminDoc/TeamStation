@@ -6,9 +6,12 @@ namespace TeamStation.App.Views;
 
 public partial class InputDialog : Window
 {
-    public InputDialog(string title, string prompt, string initialValue = "")
+    private readonly string _validationMessage;
+
+    public InputDialog(string title, string prompt, string initialValue = "", string validationMessage = "Enter a name before saving.")
     {
         InitializeComponent();
+        _validationMessage = validationMessage;
         ThemeManager.ConfigureWindow(this);
         Title = title;
         DialogTitleText.Text = title;
@@ -20,9 +23,9 @@ public partial class InputDialog : Window
 
     public string Value => ValueBox.Text.Trim();
 
-    public static string? Prompt(Window? owner, string title, string prompt, string initial = "")
+    public static string? Prompt(Window? owner, string title, string prompt, string initial = "", string validationMessage = "Enter a name before saving.")
     {
-        var dlg = new InputDialog(title, prompt, initial);
+        var dlg = new InputDialog(title, prompt, initial, validationMessage);
         if (owner is not null) dlg.Owner = owner;
         return dlg.ShowDialog() == true && !string.IsNullOrWhiteSpace(dlg.Value)
             ? dlg.Value
@@ -37,7 +40,7 @@ public partial class InputDialog : Window
         OkButton.IsEnabled = valid;
         ValidationBorder.Visibility = showError && !valid ? Visibility.Visible : Visibility.Collapsed;
         if (!valid)
-            ValidationText.Text = "Enter a name before saving.";
+            ValidationText.Text = _validationMessage;
         return valid;
     }
 
