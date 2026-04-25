@@ -271,4 +271,43 @@ public class MainWindowKeyboardNavTests
         Assert.NotNull(password);
         Assert.Equal("Master password", (string?)password!.Attribute("AutomationProperties.Name"));
     }
+
+    [Fact]
+    public void Themed_message_dialog_exposes_accessible_message_and_buttons()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "ThemedMessageDialog.xaml");
+        var doc = XDocument.Load(path);
+
+        var window = doc.Root;
+        Assert.NotNull(window);
+        Assert.Equal("TeamStation dialog", (string?)window!.Attribute("AutomationProperties.Name"));
+
+        var message = doc.Descendants(Wpf + "TextBlock")
+            .FirstOrDefault(tb => ((string?)tb.Attribute(Xaml + "Name")) == "MessageText");
+        Assert.NotNull(message);
+        Assert.Equal("Dialog message", (string?)message!.Attribute("AutomationProperties.Name"));
+
+        var cancel = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute(Xaml + "Name")) == "CancelButton");
+        var confirm = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute(Xaml + "Name")) == "ConfirmButton");
+
+        Assert.NotNull(cancel);
+        Assert.NotNull(confirm);
+        Assert.False(string.IsNullOrWhiteSpace((string?)cancel!.Attribute("AutomationProperties.Name")));
+        Assert.False(string.IsNullOrWhiteSpace((string?)confirm!.Attribute("AutomationProperties.Name")));
+    }
+
+    [Fact]
+    public void Destructive_message_dialog_defaults_focus_to_cancel()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "ThemedMessageDialog.xaml.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("_kind == ThemedMessageKind.Danger", source);
+        Assert.Contains("CancelButton.Focus()", source);
+        Assert.Contains("ConfirmButton.IsDefault = false", source);
+        Assert.Contains("CancelButton.IsDefault = true", source);
+        Assert.Contains("This changes saved TeamStation data.", source);
+    }
 }

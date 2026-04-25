@@ -12,7 +12,8 @@
         Background="{DynamicResource BaseBrush}"
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{StaticResource UiFont}"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        AutomationProperties.Name="TeamStation dialog">
     <Border Margin="16"
             Background="{DynamicResource MantleBrush}"
             BorderBrush="{DynamicResource PanelBorderBrush}"
@@ -53,11 +54,28 @@
                           Margin="19,18,0,0"
                           MaxHeight="360"
                           VerticalScrollBarVisibility="Auto">
-                <TextBlock x:Name="MessageText"
-                           Foreground="{DynamicResource Subtext1Brush}"
-                           FontSize="13"
-                           LineHeight="20"
-                           TextWrapping="Wrap" />
+                <StackPanel>
+                    <Border x:Name="ToneSummaryBorder"
+                            Background="{DynamicResource Surface0Brush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,10"
+                            Margin="0,0,0,14"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="ToneSummaryText"
+                                   Foreground="{DynamicResource TextBrush}"
+                                   FontSize="12"
+                                   LineHeight="18"
+                                   TextWrapping="Wrap" />
+                    </Border>
+                    <TextBlock x:Name="MessageText"
+                               AutomationProperties.Name="Dialog message"
+                               Foreground="{DynamicResource Subtext1Brush}"
+                               FontSize="13"
+                               LineHeight="20"
+                               TextWrapping="Wrap" />
+                </StackPanel>
             </ScrollViewer>
 
             <DockPanel Grid.Row="2"
@@ -68,12 +86,14 @@
                         Content="Cancel"
                         Style="{StaticResource GhostButton}"
                         Margin="8,0,0,0"
+                        AutomationProperties.Name="Cancel"
                         IsCancel="True"
                         Click="Cancel_Click" />
                 <Button x:Name="ConfirmButton"
                         DockPanel.Dock="Right"
                         Content="OK"
                         Style="{StaticResource PrimaryButton}"
+                        AutomationProperties.Name="OK"
                         IsDefault="True"
                         Click="Confirm_Click" />
             </DockPanel>
