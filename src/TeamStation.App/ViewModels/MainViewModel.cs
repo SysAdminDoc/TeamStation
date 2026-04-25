@@ -108,6 +108,8 @@ public sealed class MainViewModel : ViewModelBase
         DeleteCommand = new RelayCommand(Delete, () => Selected is not null);
         EditCommand = new RelayCommand(EditSelected, () => Selected is not null);
         LaunchCommand = new RelayCommand(Launch, () => Selected is EntryNode && IsTeamViewerReady);
+        LaunchProtocolCommand = new RelayCommand(LaunchViaProtocol, () => Selected is EntryNode);
+        OpenTeamViewerWebClientCommand = new RelayCommand(OpenTeamViewerWebClient, () => Selected is EntryNode);
         CopySelectedIdCommand = new RelayCommand(CopySelectedId, () => Selected is EntryNode);
         DuplicateCommand = new RelayCommand(DuplicateSelectedEntry, () => Selected is EntryNode);
         ExportCommand = new RelayCommand(Export);
@@ -285,7 +287,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetField(ref _selected, value))
             {
-                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand, CopySelectedIdCommand, DuplicateCommand, TogglePinCommand, RunExternalToolCommand })
+                foreach (var cmd in new[] { AddSubfolderCommand, RenameCommand, MoveCommand, DeleteCommand, EditCommand, LaunchCommand, LaunchProtocolCommand, OpenTeamViewerWebClientCommand, CopySelectedIdCommand, DuplicateCommand, TogglePinCommand, RunExternalToolCommand })
                     ((RelayCommand)cmd).RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(SelectedIsEntry));
                 OnPropertyChanged(nameof(SelectedIsFolder));
@@ -293,6 +295,8 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(ShowSelectionPlaceholder));
                 OnPropertyChanged(nameof(SelectedPinText));
                 OnPropertyChanged(nameof(LaunchSelectedTooltip));
+                OnPropertyChanged(nameof(LaunchProtocolSelectedTooltip));
+                OnPropertyChanged(nameof(OpenTeamViewerWebClientTooltip));
                 OnPropertyChanged(nameof(EditSelectionTooltip));
                 OnPropertyChanged(nameof(CopySelectedIdTooltip));
                 OnPropertyChanged(nameof(DuplicateSelectionTooltip));
@@ -311,6 +315,12 @@ public sealed class MainViewModel : ViewModelBase
     public string LaunchSelectedTooltip => Selected is EntryNode
         ? (IsTeamViewerReady ? "Launch the selected connection." : "Install or configure TeamViewer before launching.")
         : "Select a connection to launch.";
+    public string LaunchProtocolSelectedTooltip => Selected is EntryNode
+        ? "Launch through the registered TeamViewer protocol handler, bypassing TeamViewer.exe command-line flags."
+        : "Select a connection to launch through the TeamViewer protocol handler.";
+    public string OpenTeamViewerWebClientTooltip => Selected is EntryNode
+        ? "Open TeamViewer Web Client in your browser and copy the selected TeamViewer ID."
+        : "Select a connection to open in TeamViewer Web Client.";
     public string EditSelectionTooltip => HasSelection ? "Edit the selected item." : "Select an item to edit.";
     public string CopySelectedIdTooltip => Selected is EntryNode
         ? "Copy the selected TeamViewer ID to the clipboard."
@@ -480,6 +490,8 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand DeleteCommand { get; }
     public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
+    public System.Windows.Input.ICommand LaunchProtocolCommand { get; }
+    public System.Windows.Input.ICommand OpenTeamViewerWebClientCommand { get; }
     public System.Windows.Input.ICommand CopySelectedIdCommand { get; }
     public System.Windows.Input.ICommand DuplicateCommand { get; }
     public System.Windows.Input.ICommand BulkCopyIdsCommand { get; }
@@ -2131,6 +2143,54 @@ public sealed class MainViewModel : ViewModelBase
         LaunchEntry(entry.Model, persistLastConnected: true);
     }
 
+    private void LaunchViaProtocol()
+    {
+        if (Selected is not EntryNode entry)
+            return;
+
+        LaunchEntry(
+            entry.Model,
+            persistLastConnected: true,
+            new LaunchOptions(
+                UseBase64Password: true,
+                ForceUri: true,
+                PreferProtocolHandler: true));
+    }
+
+    private void OpenTeamViewerWebClient()
+    {
+        if (Selected is not EntryNode entry)
+            return;
+
+        var effective = InheritanceResolver.Resolve(entry.Model, _foldersById);
+        var teamViewerId = effective.TeamViewerId.Trim();
+        if (string.IsNullOrWhiteSpace(teamViewerId))
+        {
+            ReportStatus(LogLevel.Warning, "Selected connection does not have a TeamViewer ID for the Web Client.");
+            return;
+        }
+
+        try
+        {
+            System.Windows.Clipboard.SetDataObject(teamViewerId, copy: true);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = TeamViewerWebClient.PortalUri.ToString(),
+                UseShellExecute = true,
+            });
+
+            Audit("open_web_client", "connection", entry.Id,
+                $"Opened TeamViewer Web Client for \"{entry.Name}\".", teamViewerId);
+            ReportStatus(LogLevel.Success, $"Opened TeamViewer Web Client and copied ID {teamViewerId}.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog(LogLevel.Warning, $"TeamViewer Web Client handoff failed: {ex.Message}");
+            ReportStatus(LogLevel.Error, $"Could not open TeamViewer Web Client: {ex.Message}");
+            _dialogs.ShowError(Application.Current?.MainWindow, "TeamViewer Web Client failed", ex.ToString());
+        }
+    }
+
     public void LaunchEntryById(Guid id)
     {
         var entry = _entries.Get(id);
@@ -2169,7 +2229,7 @@ public sealed class MainViewModel : ViewModelBase
         ReportStatus(LogLevel.Success, entry.Model.IsPinned ? $"Pinned \"{entry.Name}\"." : $"Unpinned \"{entry.Name}\".");
     }
 
-    private void LaunchEntry(ConnectionEntry source, bool persistLastConnected)
+    private void LaunchEntry(ConnectionEntry source, bool persistLastConnected, LaunchOptions? forcedOptions = null)
     {
         var effective = InheritanceResolver.Resolve(source, _foldersById);
         if (_settings.WakeOnLanBeforeLaunch && !string.IsNullOrWhiteSpace(effective.WakeMacAddress))
@@ -2189,7 +2249,7 @@ public sealed class MainViewModel : ViewModelBase
         LaunchOptions? overrideOptions = null;
         ConnectionEntry launchTarget = effective;
         var clipboardStagedPassword = (string?)null;
-        if (ShouldUseClipboardPasswordMode(effective))
+        if (forcedOptions?.ForceUri != true && ShouldUseClipboardPasswordMode(effective))
         {
             if (TryStageClipboardPassword(effective.Password!))
             {
@@ -2200,7 +2260,7 @@ public sealed class MainViewModel : ViewModelBase
             }
         }
 
-        var launchOptions = overrideOptions ?? new LaunchOptions(
+        var launchOptions = overrideOptions ?? forcedOptions ?? new LaunchOptions(
             UseBase64Password: true,
             ForceUri: false,
             PreferProtocolHandler: _settings.PreferProtocolLaunch);

@@ -168,7 +168,7 @@
                         </ComboBox>
 
                         <TextBlock Margin="0,8,0,0"
-                                   Text="Chat, video call, and presentation use TeamViewer URI handlers. Remote control, file transfer, and VPN launch through TeamViewer.exe."
+                                   Text="Chat, video call, and presentation always use TeamViewer URI handlers. Remote control, file transfer, and VPN can use protocol links when global settings allow it, otherwise TeamViewer.exe command-line launch is used."
                                    Style="{StaticResource BodyMutedText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="TeamViewer.exe override" Style="{StaticResource FieldLabelText}" />

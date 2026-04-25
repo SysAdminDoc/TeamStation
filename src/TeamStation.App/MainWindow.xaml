@@ -199,6 +199,18 @@
                             </Button>
                             <Button Style="{StaticResource IconButton}"
                                     Margin="0,0,6,0"
+                                    ToolTip="{Binding DataContext.LaunchProtocolSelectedTooltip, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Command="{Binding DataContext.LaunchProtocolCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    AutomationProperties.Name="Launch via TeamViewer protocol link"
+                                    Content="&#xE774;" />
+                            <Button Style="{StaticResource IconButton}"
+                                    Margin="0,0,6,0"
+                                    ToolTip="{Binding DataContext.OpenTeamViewerWebClientTooltip, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Command="{Binding DataContext.OpenTeamViewerWebClientCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    AutomationProperties.Name="Open TeamViewer Web Client"
+                                    Content="&#xE774;" />
+                            <Button Style="{StaticResource IconButton}"
+                                    Margin="0,0,6,0"
                                     ToolTip="{Binding DataContext.SelectedPinText, RelativeSource={RelativeSource AncestorType=Window}}"
                                     Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     Content="&#xE718;" />
@@ -736,6 +748,14 @@
                           FontWeight="SemiBold"
                           ToolTip="{Binding LaunchSelectedTooltip}"
                           ToolTipService.ShowOnDisabled="True" />
+                <MenuItem Header="Launch via protocol link"
+                          Command="{Binding LaunchProtocolCommand}"
+                          ToolTip="{Binding LaunchProtocolSelectedTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
+                <MenuItem Header="Open in TeamViewer Web Client"
+                          Command="{Binding OpenTeamViewerWebClientCommand}"
+                          ToolTip="{Binding OpenTeamViewerWebClientTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
                 <MenuItem Header="Copy TeamViewer ID"
                           Command="{Binding CopySelectedIdCommand}"
                           ToolTip="{Binding CopySelectedIdTooltip}"
@@ -854,6 +874,24 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xF5B0;" Foreground="{StaticResource BlueBrush}" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Launch" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding LaunchProtocolCommand}"
+                            ToolTip="{Binding LaunchProtocolSelectedTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE774;" />
+                            <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Protocol" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding OpenTeamViewerWebClientCommand}"
+                            ToolTip="{Binding OpenTeamViewerWebClientTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE774;" />
+                            <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Web" />
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource ToolbarButton}"
@@ -1443,6 +1481,14 @@
                             <TreeView.ContextMenu>
                                 <ContextMenu DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                                     <MenuItem Header="Launch connection" Command="{Binding LaunchCommand}" FontWeight="SemiBold" />
+                                    <MenuItem Header="Launch via protocol link"
+                                              Command="{Binding LaunchProtocolCommand}"
+                                              ToolTip="{Binding LaunchProtocolSelectedTooltip}"
+                                              ToolTipService.ShowOnDisabled="True" />
+                                    <MenuItem Header="Open in TeamViewer Web Client"
+                                              Command="{Binding OpenTeamViewerWebClientCommand}"
+                                              ToolTip="{Binding OpenTeamViewerWebClientTooltip}"
+                                              ToolTipService.ShowOnDisabled="True" />
                                     <MenuItem Header="{Binding SelectedPinText}" Command="{Binding TogglePinCommand}" />
                                     <!-- v0.3.5: bulk pin / unpin appear only when 2+ entries are
                                          multi-selected via Ctrl-click. Single-select uses the

@@ -335,6 +335,32 @@ public class MainWindowKeyboardNavTests
     }
 
     [Fact]
+    public void Connection_control_surface_exposes_protocol_and_web_client_handoffs()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var commands = doc.Descendants()
+            .Select(e => (string?)e.Attribute("Command"))
+            .Where(command => !string.IsNullOrWhiteSpace(command))
+            .ToList();
+
+        Assert.Contains("{Binding LaunchProtocolCommand}", commands);
+        Assert.Contains("{Binding OpenTeamViewerWebClientCommand}", commands);
+        Assert.Contains("{Binding DataContext.LaunchProtocolCommand, RelativeSource={RelativeSource AncestorType=Window}}", commands);
+        Assert.Contains("{Binding DataContext.OpenTeamViewerWebClientCommand, RelativeSource={RelativeSource AncestorType=Window}}", commands);
+
+        var mainPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var mainSource = File.ReadAllText(mainPath);
+
+        Assert.Contains("LaunchProtocolCommand = new RelayCommand(LaunchViaProtocol", mainSource);
+        Assert.Contains("OpenTeamViewerWebClientCommand = new RelayCommand(OpenTeamViewerWebClient", mainSource);
+        Assert.Contains("ForceUri: true", mainSource);
+        Assert.Contains("TeamViewerWebClient.PortalUri.ToString()", mainSource);
+        Assert.Contains("\"open_web_client\"", mainSource);
+        Assert.Contains("OpenTeamViewerWebClientTooltip", mainSource);
+        Assert.Contains("LaunchProtocolSelectedTooltip", mainSource);
+    }
+
+    [Fact]
     public void Main_view_model_duplicate_command_creates_clean_editable_copies()
     {
         var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");

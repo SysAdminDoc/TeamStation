@@ -44,7 +44,7 @@ internal static class DisplayText
     };
 
     public static string RouteBadge(ConnectionMode? value) =>
-        value is null ? "AUTO" : UriSchemeBuilder.IsUriOnly(value.Value) ? "URI" : "CLI";
+        value is null ? "AUTO" : UriSchemeBuilder.IsUriOnly(value.Value) ? "URI" : "EXE/URI";
 
     public static string RouteDescription(ConnectionMode? value)
     {
@@ -53,7 +53,7 @@ internal static class DisplayText
 
         return UriSchemeBuilder.IsUriOnly(value.Value)
             ? "Uses the TeamViewer URI handler"
-            : "Launches through TeamViewer.exe";
+            : "Uses TeamViewer.exe or the protocol handler based on settings and required launch flags";
     }
 
     public static string FormatPath(FolderNode? folder)
