@@ -14,10 +14,11 @@
             Background="{StaticResource MantleBrush}"
             BorderBrush="{StaticResource PanelBorderBrush}"
             BorderThickness="1"
-            CornerRadius="10"
+            CornerRadius="8"
             Padding="24,22">
         <Grid>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -28,9 +29,31 @@
                 <TextBlock x:Name="PromptText" Margin="0,8,0,0" Style="{StaticResource SectionSubtitleText}" />
             </StackPanel>
 
-            <TextBox x:Name="ValueBox" Grid.Row="1" Margin="0,18,0,0" />
+            <TextBox x:Name="ValueBox"
+                     Grid.Row="1"
+                     Margin="0,18,0,0"
+                     AutomationProperties.Name="{Binding Text, ElementName=DialogTitleText}"
+                     TextChanged="ValueBox_TextChanged" />
 
-            <DockPanel Grid.Row="2" Margin="0,20,0,0" LastChildFill="False">
+            <Border x:Name="ValidationBorder"
+                    Grid.Row="2"
+                    Margin="0,14,0,0"
+                    Style="{StaticResource ValidationBanner}"
+                    Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                               FontSize="13"
+                               Text="&#xE814;"
+                               Foreground="{StaticResource RedBrush}"
+                               VerticalAlignment="Top"
+                               Margin="0,1,10,0" />
+                    <TextBlock x:Name="ValidationText"
+                               Foreground="{StaticResource RedBrush}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <DockPanel Grid.Row="3" Margin="0,20,0,0" LastChildFill="False">
                 <Button DockPanel.Dock="Right"
                         Content="Cancel"
                         Style="{StaticResource GhostButton}"
@@ -38,9 +61,12 @@
                         IsCancel="True"
                         Click="Cancel_Click" />
                 <Button DockPanel.Dock="Right"
+                        x:Name="OkButton"
                         Content="Save"
                         Style="{StaticResource PrimaryButton}"
                         IsDefault="True"
+                        ToolTip="Enter a value before saving"
+                        ToolTipService.ShowOnDisabled="True"
                         Click="Ok_Click" />
             </DockPanel>
         </Grid>

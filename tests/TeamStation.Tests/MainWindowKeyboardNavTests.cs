@@ -37,6 +37,18 @@ public class MainWindowKeyboardNavTests
         }
     }
 
+    private static string RepoRoot
+    {
+        get
+        {
+            var dir = new DirectoryInfo(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!);
+            while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "TeamStation.sln")))
+                dir = dir.Parent;
+            Assert.NotNull(dir);
+            return dir!.FullName;
+        }
+    }
+
     private static XElement TreeView()
     {
         var doc = XDocument.Load(MainWindowXamlPath);
@@ -149,5 +161,36 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("{Binding BulkPinCommand}", commands);
         Assert.Contains("{Binding BulkUnpinCommand}", commands);
         Assert.Contains("{Binding ClearMultiSelectionCommand}", commands);
+    }
+
+    [Theory]
+    [InlineData("InputDialog.xaml", "OkButton")]
+    [InlineData("FolderPickerDialog.xaml", "OkButton")]
+    [InlineData("FileSystemFolderDialog.xaml", "OkButton")]
+    public void Workflow_dialog_disabled_primary_actions_explain_the_required_next_step(string xamlFile, string buttonName)
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", xamlFile);
+        var doc = XDocument.Load(path);
+        var button = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute(Xaml + "Name")) == buttonName);
+
+        Assert.NotNull(button);
+        Assert.Equal("True", (string?)button!.Attribute("ToolTipService.ShowOnDisabled"));
+        Assert.False(string.IsNullOrWhiteSpace((string?)button.Attribute("ToolTip")));
+    }
+
+    [Theory]
+    [InlineData("FolderPickerDialog.xaml", "Tree", "Destination folders")]
+    [InlineData("FileSystemFolderDialog.xaml", "FolderTree", "Local folders")]
+    public void Picker_trees_are_single_tab_stops_with_screen_reader_names(string xamlFile, string treeName, string expectedName)
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", xamlFile);
+        var doc = XDocument.Load(path);
+        var tree = doc.Descendants(Wpf + "TreeView")
+            .FirstOrDefault(t => ((string?)t.Attribute(Xaml + "Name")) == treeName);
+
+        Assert.NotNull(tree);
+        Assert.Equal("Once", (string?)tree!.Attribute("KeyboardNavigation.TabNavigation"));
+        Assert.Equal(expectedName, (string?)tree.Attribute("AutomationProperties.Name"));
     }
 }

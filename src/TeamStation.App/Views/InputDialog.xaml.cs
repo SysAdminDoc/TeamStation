@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using TeamStation.App.Services;
 
 namespace TeamStation.App.Views;
@@ -13,6 +14,7 @@ public partial class InputDialog : Window
         DialogTitleText.Text = title;
         PromptText.Text = prompt;
         ValueBox.Text = initialValue;
+        ValidateValue(showError: false);
         Loaded += (_, _) => { ValueBox.Focus(); ValueBox.SelectAll(); };
     }
 
@@ -27,6 +29,25 @@ public partial class InputDialog : Window
             : null;
     }
 
-    private void Ok_Click(object sender, RoutedEventArgs e) { DialogResult = true; Close(); }
+    private void ValueBox_TextChanged(object sender, TextChangedEventArgs e) => ValidateValue(showError: false);
+
+    private bool ValidateValue(bool showError)
+    {
+        var valid = !string.IsNullOrWhiteSpace(Value);
+        OkButton.IsEnabled = valid;
+        ValidationBorder.Visibility = showError && !valid ? Visibility.Visible : Visibility.Collapsed;
+        if (!valid)
+            ValidationText.Text = "Enter a name before saving.";
+        return valid;
+    }
+
+    private void Ok_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ValidateValue(showError: true))
+            return;
+
+        DialogResult = true;
+        Close();
+    }
     private void Cancel_Click(object sender, RoutedEventArgs e) { DialogResult = false; Close(); }
 }

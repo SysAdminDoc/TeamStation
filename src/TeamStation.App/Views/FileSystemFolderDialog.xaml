@@ -17,7 +17,7 @@
             <Setter Property="Background" Value="{StaticResource MantleBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="10" />
         </Style>
     </Window.Resources>
@@ -53,6 +53,8 @@
         <StackPanel Grid.Row="1" Margin="0,18,0,0">
             <TextBlock Text="Folder path" Style="{StaticResource FieldLabelText}" />
             <TextBox x:Name="PathBox"
+                     AutomationProperties.Name="Folder path"
+                     AutomationProperties.HelpText="Type or paste a local folder path."
                      TextChanged="PathBox_TextChanged" />
         </StackPanel>
 
@@ -60,7 +62,10 @@
             <TreeView x:Name="FolderTree"
                       ItemsSource="{Binding RootFolders}"
                       SelectedItemChanged="FolderTree_SelectedItemChanged"
-                      MouseDoubleClick="FolderTree_MouseDoubleClick">
+                      MouseDoubleClick="FolderTree_MouseDoubleClick"
+                      AutomationProperties.Name="Local folders"
+                      AutomationProperties.HelpText="Browse available drives and folders."
+                      KeyboardNavigation.TabNavigation="Once">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type local:FileSystemFolderItem}" ItemsSource="{Binding Children}">
                         <Border x:Name="FolderRow"
@@ -146,6 +151,8 @@
                     Style="{StaticResource PrimaryButton}"
                     IsDefault="True"
                     IsEnabled="False"
+                    ToolTip="Choose an existing folder first"
+                    ToolTipService.ShowOnDisabled="True"
                     Click="Ok_Click" />
             <Button DockPanel.Dock="Right"
                     Content="Cancel"

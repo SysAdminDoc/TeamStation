@@ -17,7 +17,7 @@
             <Setter Property="Background" Value="{StaticResource MantleBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="8" />
         </Style>
     </Window.Resources>
@@ -49,7 +49,10 @@
             <TreeView x:Name="Tree"
                       ItemsSource="{Binding RootFolders}"
                       SelectedItemChanged="Tree_SelectedItemChanged"
-                      MouseDoubleClick="Tree_MouseDoubleClick">
+                      MouseDoubleClick="Tree_MouseDoubleClick"
+                      AutomationProperties.Name="Destination folders"
+                      AutomationProperties.HelpText="Choose a destination folder, or use Move to top level."
+                      KeyboardNavigation.TabNavigation="Once">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type local:PickerFolderItem}" ItemsSource="{Binding Children}">
                         <Border x:Name="PickerRow"
@@ -102,6 +105,8 @@
                     Style="{StaticResource PrimaryButton}"
                     IsDefault="True"
                     IsEnabled="False"
+                    ToolTip="Choose a destination folder first"
+                    ToolTipService.ShowOnDisabled="True"
                     Click="Ok_Click" />
             <Button DockPanel.Dock="Right"
                     Content="Cancel"
