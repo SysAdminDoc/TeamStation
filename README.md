@@ -6,7 +6,7 @@
 
 Organize TeamViewer IDs and passwords in a nested folder tree, launch any saved peer with one click, and keep credentials encrypted at rest. Think mRemoteNG, but TeamViewer-only.
 
-[![Version](https://img.shields.io/badge/version-0.3.3-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.4-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -31,6 +31,8 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 > **Prerequisite:** The full TeamViewer client must be installed on the launching machine (`TeamViewer.exe` on the `PATH` or at its default install location). TeamStation does not bundle or replace TeamViewer.
 
 ## Status
+
+`v0.3.4` — **Credential-handling patch.** Two related security hardenings ship together. (1) `AppSettings.TeamViewerApiToken` DPAPI wrap now binds to the same per-database entropy salt the DEK uses, via lazy `UnprotectApiToken` — `SettingsService.Load` no longer eagerly Unprotects the token, the host calls `UnprotectApiToken(settings)` after the SQLite database is opened and the salt is in scope. Resolves the architectural blocker that kept the v0.3.3 entropy-hardening from extending to the API-token surface. Existing v0.3.3-and-earlier null-entropy wraps fall back transparently and re-wrap under the salt on the next `Save`. (2) New byte[] credential-read API: `CryptoService.EncryptBytes` / `DecryptToBytes`, `EntryRepository.LoadEntryPasswordBytes` / `LoadEntryProxyPasswordBytes`, a `CliArgvBuilder.Build` overload that takes byte[] passwords, and a `TeamViewerLauncher.Launch` overload that zeros the input buffers via `CryptographicOperations.ZeroMemory` immediately after argv has been composed (or on the failure path, via try/finally). The launch hot path now keeps the cleartext password as a zeroable byte buffer instead of a CLR-interned `System.String` for the seconds between unwrap and `Process.Start`. The legacy `EncryptString` / `DecryptString` APIs remain as compatibility shims that internally route through the new byte[] path. Test count 378 → 398, build clean at 0 warnings / 0 errors. See [CHANGELOG.md](CHANGELOG.md).
 
 `v0.3.3` — **Security + accessibility patch.** Per-database DPAPI entropy salt for the DEK wrap — every `ProtectedData.Protect` / `Unprotect` call now binds to a 32-byte salt held in `_meta`, moving the trust boundary from "same Windows user" to "same Windows user AND has read this database file"; legacy v0.3.0/0.3.1/0.3.2 wraps are silently re-wrapped under the new salt on first launch. Keyboard navigation on the connection tree: Enter (Launch), F2 (Rename), Delete (Delete) on the focused item — single-key only, no chord shortcuts. `AutomationProperties.Name` on the tree and search box for screen readers. Test count 364 → 378, build clean at 0 warnings / 0 errors. See [CHANGELOG.md](CHANGELOG.md).
 

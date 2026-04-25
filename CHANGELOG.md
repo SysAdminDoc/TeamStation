@@ -4,6 +4,27 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-04-25
+
+Credential-handling patch closing the two related items that v0.3.3 deferred. Both extend the v0.3.3 DPAPI entropy story: the API-token surface gets the same per-database salt the DEK already uses, and the launch hot path moves to a byte[] credential-read API so the password lives in a zeroable buffer instead of a CLR-interned string.
+
+### Security
+
+- **`AppSettings.TeamViewerApiToken` DPAPI wrap binds to the per-database entropy salt** — same `_meta.dpapi_entropy_v1` row `CryptoService` already uses for the DEK. The architectural blocker noted in the v0.3.3 continuation brief was that `SettingsService.Load` runs BEFORE the `Database` is opened in `App.OnStartup`, so the salt isn't in scope at Load time. The fix is lazy `UnprotectApiToken`: `SettingsService.Load` leaves `AppSettings.TeamViewerApiTokenProtected` in place but no longer eagerly unwraps it; the host pushes the salt in via `SettingsService.Entropy` after `Database` opens, then calls `SettingsService.UnprotectApiToken(settings)`. Subsequent `Save` calls use the salt-bound wrap. Existing v0.3.3-and-earlier null-entropy wraps fall back transparently and re-wrap under the salt on the next `Save`. Closes the long-standing `AppSettings` entropy follow-up.
+- **byte[] credential-read API on the launch hot path.** `CryptoService.EncryptBytes(byte[]?)` and `CryptoService.DecryptToBytes(byte[]?)` are new public methods that route directly between byte buffers without an intermediate `System.String`. `EntryRepository.LoadEntryPasswordBytes(Guid)` and `LoadEntryProxyPasswordBytes(Guid)` return fresh zeroable byte buffers fetched directly from the encrypted columns. A new `CliArgvBuilder.Build(entry, byte[]? passwordBytes, byte[]? proxyPasswordBytes, bool base64Password)` overload uses the byte[] buffers as the source of `--PasswordB64` / `--ProxyPassword` (`Convert.ToBase64String(byte[])` skips the UTF-8 string round-trip entirely). A new `TeamViewerLauncher.Launch(entry, byte[]? passwordBytes, byte[]? proxyPasswordBytes, options)` overload zeros the input buffers via `CryptographicOperations.ZeroMemory` immediately after argv has been handed to `Process.Start` — the `try/finally` is at the public-API boundary so even validation throws and resolver failures still zero the buffers. Closes the v0.3.0 postflight `System.String credential leak` finding for the launch path; UI bindings on `PasswordBox` / `TextBox` keep using `System.String` because the binding layer cannot zero CLR-interned strings (refactoring those would be performative).
+
+### Changed
+
+- **`CryptoService.EncryptString` / `DecryptString` are now compatibility shims that internally route through the byte[] path** AND zero the intermediate UTF-8 buffer via `CryptographicOperations.ZeroMemory` once the wrap has been produced (Encrypt) or the string has been materialised (Decrypt). Behaviour is identical to v0.3.3; the only difference is the brief allocation of an extra byte buffer that's now zeroed on completion instead of left for the GC to reclaim.
+
+### Tests
+
+- **`AppSettingsEntropyTests` (6 cases).** Pins the entropy hardening: `Load` no longer eagerly unwraps the token, `UnprotectApiToken` round-trips a freshly saved token under the salt, raw `ProtectedData.Unprotect` succeeds with the salt and FAILS with null entropy (proves the new wrap is salt-bound), legacy null-entropy wraps unwrap via the fallback path, the next `Save` re-wraps under the salt, the unwrap is a no-op when no protected blob is present, and a token encrypted under different entropy returns null instead of throwing (matches the "settings file copied between machines" UX expectation).
+- **`CredentialByteApiTests` (10 cases).** Pins the byte[] credential-read API: `EncryptBytes` / `DecryptToBytes` round-trip; `EncryptBytes` and `EncryptString` produce cross-decryptable wraps (same wire format); `DecryptToBytes` returns a fresh buffer the caller can zero without affecting the wrap or other callers; null inputs handled; `EntryRepository.LoadEntryPasswordBytes` round-trips against `Upsert`; absent / unknown id returns null; `LoadEntryProxyPasswordBytes` round-trips; `CliArgvBuilder.Build` byte-overload emits `--PasswordB64` from bytes (and the string fallback is ignored when bytes are non-null); the byte path validates the password through the same `LaunchInputValidator.ValidatePassword` predicate; the proxy-password byte path emits `--ProxyPassword` correctly.
+- **`TeamViewerLauncherZeroingTests` (4 cases).** Pins the security-relevant property of the new launch path: the input byte[] buffers are zeroed even on the failure path (path-resolver returns null), only the main-password buffer is provided, both buffers are null (no NRE), and validation throws (leading-dash password) — in every case the byte[] is all-zero on return. The `try/finally` at the Launch overload boundary means callers don't have to second-guess which exception path the launcher took.
+
+Test count: 378 → 398.
+
 ## [0.3.3] - 2026-04-24
 
 Security + accessibility patch on top of the v0.3.2 visual overhaul. Two contained changes ship in this release; the System.String credential-leak refactor (P1 from v0.3.0 postflight) remains deferred to v0.3.4 because its blast radius — DecryptString, EntryRepository, FolderRepository, TeamViewerLauncher, every launch/edit UI binding — wants a release cycle of its own with explicit migration notes for downstream consumers of the credential-read surface.

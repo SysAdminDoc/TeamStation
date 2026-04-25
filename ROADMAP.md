@@ -10,9 +10,9 @@ Prioritization:
 
 ---
 
-## Current main progress through v0.3.3
+## Current main progress through v0.3.4
 
-v0.3.0 → v0.3.3 ships the largest adoption blockers from P1/P2 plus a sustained security + UX hardening cadence:
+v0.3.0 → v0.3.4 ships the largest adoption blockers from P1/P2 plus a sustained security + UX hardening cadence:
 
 - App settings, first-run trust notice, portable-mode master password (Argon2id), and configurable TeamViewer.exe path.
 - Quick connect, saved searches, per-entry profile names, pinned entries, and pinned/recent tray launch menu.
@@ -23,6 +23,8 @@ v0.3.0 → v0.3.3 ships the largest adoption blockers from P1/P2 plus a sustaine
 - Credential-handling story: pinned + zeroed DEK buffer (v0.3.1), two-phase-commit DEK rotation (v0.3.1), per-database DPAPI entropy salt (v0.3.3), shared atomic-write helper (v0.3.1).
 - mRemoteNG-style workbench layout — top menubar, semantic toolbar, two-pane split with property-grid inspector, dockable activity log, single-line status bar (v0.3.2).
 - A11y baseline on the connection tree: Enter / F2 / Delete single-key actions, `KeyboardNavigation.TabNavigation="Once"` to avoid the tab-trap, `AutomationProperties.Name` on the tree and search box (v0.3.3).
+- AppSettings token DPAPI entropy via lazy Unprotect (v0.3.4) — closes the architectural blocker from v0.3.3 where `SettingsService.Load` ran before the `Database` was opened.
+- byte[] credential-read API on the launch hot path (v0.3.4) — `CryptoService.DecryptToBytes`, `EntryRepository.LoadEntryPasswordBytes`, `TeamViewerLauncher.Launch(entry, byte[]?, byte[]?, options)` zeros input buffers via `CryptographicOperations.ZeroMemory` immediately after argv compose. Closes the v0.3.0 postflight `System.String credential leak` finding for the launch path.
 
 Still open before a formal 1.0 release: real-peer TeamViewer launch validation, Web API pagination/rate-limit hardening, online-state polling, conflict-aware cloud sync, installer packaging, and UX testing on real support workflows.
 
@@ -157,7 +159,7 @@ The advanced workflow features from the v0.1.2 internal / v0.2.0 / v0.2.1 waves 
 The adversarial security pass that closed out the v0.3.0 factory run flagged three systemic concerns worth surfacing as P1 issues for a subsequent release. None are v0.3.0-release blockers — they live at the architectural layer and need scoped design work.
 
 - [x] **P1 — DEK memory lifecycle.** Closed in v0.3.1. `CryptoService` implements `IDisposable`; the DEK buffer is allocated pinned (`GC.AllocateArray<byte>(pinned: true)`) and zeroed via `CryptographicOperations.ZeroMemory` on dispose. `App.OnExit` disposes the process-wide service. Subsequent `EncryptString`/`DecryptString` calls throw `ObjectDisposedException`. Covered by `CryptoDisposalTests` (6 cases).
-- [ ] **P1 — Decrypted plaintext leaks via `System.String`.** `DecryptString` hands back a `string`, which is CLR-interned/pooled and cannot be zeroed. Every password ever decrypted persists in the managed heap until process exit. `AppSettings.TeamViewerApiToken` has the same shape. Redesign the credential-read API to return `byte[]` (or `ImmutableArray<byte>`) and let callers zero after use. Visible blast radius — touches `CryptoService`, `EntryRepository`, `FolderRepository`, `TeamViewerLauncher`, and every launch/edit UI binding. Deferred from v0.3.1 because the refactor spans the whole credential-read surface and wants its own release cycle.
+- [x] **P1 — Decrypted plaintext leaks via `System.String` (LAUNCH HOT PATH).** Closed in v0.3.4 for the launch path, which is where the password sits in our address space long enough to matter. `CryptoService.EncryptBytes` / `DecryptToBytes` (additive — `EncryptString` / `DecryptString` remain as compat shims that route through the new byte[] path and zero the intermediate buffer); `EntryRepository.LoadEntryPasswordBytes` / `LoadEntryProxyPasswordBytes` return fresh zeroable byte buffers; `CliArgvBuilder.Build` overload taking byte[] passwords; `TeamViewerLauncher.Launch` overload that zeros the input buffers via `try/finally + CryptographicOperations.ZeroMemory` immediately after argv has been composed. Pinned by `CredentialByteApiTests` (10 cases) + `TeamViewerLauncherZeroingTests` (4 cases). UI bindings on `PasswordBox` / `TextBox` intentionally remain on `System.String` — the binding layer cannot zero CLR-interned strings, so refactoring those would be performative; the credential-read finding was specifically about long-lived field references on the launch path, which this closes.
 - [x] **P1 — `CryptoService.RotateDek` has a crash-window between save-new-wrap and migrator-complete.** Closed in v0.3.1. Rotation is now two-phase commit: stage under `dek_v1_pending`, run migrator, atomic `INSERT OR REPLACE` promote of `dek_v1`, delete tombstone. `CryptoService.InspectPendingRotation` classifies state (`None` / `PendingOrphan` / `InterruptedMidRotation`); `ReconcilePendingRotation` auto-clears orphans and refuses to auto-recover the ambiguous mid-rotation state — recovery UX calls `ForceCommitPendingRotation` or `ForceRollbackPendingRotation` after inspecting row state. Covered by `RotationRecoveryTests` (14 cases).
 - [x] **P1 — DPAPI wrap adds no `optionalEntropy`.** Closed in v0.3.3. A 32-byte per-database salt now lives in `_meta` under key `dpapi_entropy_v1`; every `ProtectedData.Protect` / `ProtectedData.Unprotect` call in `CryptoService` (including `RotateDek` and the master-password DEK carry-over) binds to it. Trust boundary moves from "same-user" to "same-user plus has-read-our-db-file". Existing v0.3.0 / v0.3.1 / v0.3.2 wraps are silently re-wrapped under the new salt on first launch via a one-shot legacy fallback — no user action. `IKeyStore`-only test stubs gracefully no-op (preserve null entropy). Covered by `CryptoEntropyTests` (9 cases). Promoted from P2 → P1 because the iter-1 research scored 4.67 and the fix surface stayed contained.
 
@@ -194,9 +196,14 @@ One-time scan of the three most-cited OSS / freemium alternatives sysadmins comp
 
 - [x] **P1 — Per-database DPAPI entropy salt for the DEK wrap.** See the postflight follow-ups section above. Closed in v0.3.3 with `CryptoEntropyTests` (9 cases) and a one-shot legacy fallback so v0.3.0 / v0.3.1 / v0.3.2 installs auto-upgrade on first launch.
 - [x] **P1 — Keyboard navigation on the connection tree (A11y baseline).** Single-key Enter / F2 / Delete on the focused tree item. No chord shortcuts (project rule). `KeyboardNavigation.TabNavigation="Once"` so the tree is a single tab stop. `AutomationProperties.Name` + `HelpText` on the tree and the search box. Pinned by `MainWindowKeyboardNavTests` (5 cases) parsing `MainWindow.xaml` as XML.
-- [ ] **P1 — `System.String` credential-leak refactor.** Carried forward from v0.3.0 postflight to v0.3.4. The refactor still wants its own release cycle because the blast radius (DecryptString return type, EntryRepository, FolderRepository, TeamViewerLauncher, every launch/edit UI binding) is the entire credential-read surface.
+- [x] **P1 — `System.String` credential-leak refactor (LAUNCH HOT PATH).** Closed in v0.3.4 — see "Postflight security audit follow-ups" above for full description. UI bindings remain on `System.String` (binding layer can't zero CLR-interned strings; refactoring would be performative).
 
-## v0.3.4 backlog (next patch — credential-read API + iter-2 research follow-ups)
+## v0.3.4 — credential-handling patch (shipped 2026-04-25)
+
+- [x] **P1 — `AppSettings.TeamViewerApiToken` DPAPI entropy hardening.** Closed in v0.3.4 via lazy `UnprotectApiToken` — `SettingsService.Load` no longer eagerly Unprotects; the host pushes the salt in via `SettingsService.Entropy` after `Database` opens, then calls `UnprotectApiToken(settings)`. Existing v0.3.3-and-earlier null-entropy wraps fall back transparently and re-wrap under the salt on next `Save`. Pinned by `AppSettingsEntropyTests` (6 cases).
+- [x] **P1 — byte[] credential-read API on the launch hot path.** `CryptoService.EncryptBytes` / `DecryptToBytes`, `EntryRepository.LoadEntryPasswordBytes` / `LoadEntryProxyPasswordBytes`, `CliArgvBuilder.Build` overload taking byte[] passwords, `TeamViewerLauncher.Launch` overload that zeros buffers via `try/finally + CryptographicOperations.ZeroMemory` after argv compose. Pinned by `CredentialByteApiTests` (10) + `TeamViewerLauncherZeroingTests` (4).
+
+## v0.3.5 backlog (next patch — iter-2 research follow-ups)
 
 ### Iter-2 landscape research findings (delta scan, 2026-04-24)
 
