@@ -923,22 +923,29 @@
                 <TextBox Grid.Column="1"
                          VerticalAlignment="Center"
                          Text="{Binding QuickTeamViewerId, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="Quick connect TeamViewer ID"
+                         AutomationProperties.HelpText="Enter the TeamViewer peer ID to launch a one-off session."
                          ToolTip="TeamViewer peer ID (8-12 digits)" />
 
                 <TextBox Grid.Column="3"
                          VerticalAlignment="Center"
                          Text="{Binding QuickName, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="Quick connect name"
+                         AutomationProperties.HelpText="Optional friendly name used when saving this quick connection."
                          ToolTip="Optional friendly name" />
 
                 <PasswordBox Grid.Column="5"
                              VerticalAlignment="Center"
                              behaviors:PasswordBoxBinding.BoundPassword="{Binding QuickPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="Quick connect password"
+                             AutomationProperties.HelpText="Optional password for this launch. It is not saved unless Save is enabled."
                              ToolTip="Optional — stays on this machine if 'Save' is off" />
 
                 <CheckBox Grid.Column="7"
                           Content="Save"
                           IsChecked="{Binding QuickSaveConnection}"
                           VerticalAlignment="Center"
+                          AutomationProperties.Name="Save quick connection"
                           ToolTip="Save this connection to the library after a successful launch" />
 
                 <Button Grid.Column="9"
@@ -946,7 +953,9 @@
                         MinWidth="0"
                         Padding="14,8"
                         Command="{Binding QuickConnectCommand}"
-                        ToolTip="Launch this TeamViewer ID now">
+                        AutomationProperties.Name="Connect quick TeamViewer session"
+                        ToolTip="{Binding QuickConnectTooltip}"
+                        ToolTipService.ShowOnDisabled="True">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol" FontSize="13" Text="&#xF5B0;" Margin="0,0,6,0" VerticalAlignment="Center" />
                         <TextBlock Text="Connect" VerticalAlignment="Center" FontWeight="SemiBold" />

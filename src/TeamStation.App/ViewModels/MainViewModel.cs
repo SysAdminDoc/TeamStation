@@ -180,6 +180,8 @@ public sealed class MainViewModel : ViewModelBase
     public string QuickTeamViewerId { get => QuickConnect.TeamViewerId; set => QuickConnect.TeamViewerId = value; }
     public string QuickPassword { get => QuickConnect.Password; set => QuickConnect.Password = value; }
     public bool QuickSaveConnection { get => QuickConnect.SaveConnection; set => QuickConnect.SaveConnection = value; }
+    public bool QuickHasTeamViewerId => QuickConnect.HasTeamViewerId;
+    public string QuickConnectTooltip => QuickConnect.ConnectTooltip;
     public System.Windows.Input.ICommand QuickConnectCommand => QuickConnect.ConnectCommand;
 
     public string SearchText { get => Search.SearchText; set => Search.SearchText = value; }
@@ -213,6 +215,8 @@ public sealed class MainViewModel : ViewModelBase
         {
             case nameof(QuickConnectViewModel.Name): OnPropertyChanged(nameof(QuickName)); break;
             case nameof(QuickConnectViewModel.TeamViewerId): OnPropertyChanged(nameof(QuickTeamViewerId)); break;
+            case nameof(QuickConnectViewModel.HasTeamViewerId): OnPropertyChanged(nameof(QuickHasTeamViewerId)); break;
+            case nameof(QuickConnectViewModel.ConnectTooltip): OnPropertyChanged(nameof(QuickConnectTooltip)); break;
             case nameof(QuickConnectViewModel.Password): OnPropertyChanged(nameof(QuickPassword)); break;
             case nameof(QuickConnectViewModel.SaveConnection): OnPropertyChanged(nameof(QuickSaveConnection)); break;
         }

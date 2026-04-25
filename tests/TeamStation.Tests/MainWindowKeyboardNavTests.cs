@@ -346,4 +346,38 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("public bool ShowLogEmptyState => !LogHasEntries;", mainViewModelSource);
         Assert.Contains("nameof(LogPanelViewModel.HasEntries)", mainViewModelSource);
     }
+
+    [Fact]
+    public void Quick_connect_surface_explains_disabled_connect_state()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+
+        var idBox = doc.Descendants(Wpf + "TextBox")
+            .FirstOrDefault(tb => ((string?)tb.Attribute("Text"))?.Contains("QuickTeamViewerId") == true);
+        Assert.NotNull(idBox);
+        Assert.Equal("Quick connect TeamViewer ID", (string?)idBox!.Attribute("AutomationProperties.Name"));
+
+        var connectButton = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute("Command")) == "{Binding QuickConnectCommand}");
+        Assert.NotNull(connectButton);
+        Assert.Equal("{Binding QuickConnectTooltip}", (string?)connectButton!.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)connectButton.Attribute("ToolTipService.ShowOnDisabled"));
+        Assert.Equal("Connect quick TeamViewer session", (string?)connectButton.Attribute("AutomationProperties.Name"));
+    }
+
+    [Fact]
+    public void Quick_connect_view_model_surfaces_readiness_copy()
+    {
+        var quickPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "QuickConnectViewModel.cs");
+        var mainPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var quickSource = File.ReadAllText(quickPath);
+        var mainSource = File.ReadAllText(mainPath);
+
+        Assert.Contains("public bool HasTeamViewerId", quickSource);
+        Assert.Contains("public string ConnectTooltip", quickSource);
+        Assert.Contains("Install or configure TeamViewer before launching.", quickSource);
+        Assert.Contains("Enter a TeamViewer ID to connect.", quickSource);
+        Assert.Contains("public string QuickConnectTooltip => QuickConnect.ConnectTooltip;", mainSource);
+        Assert.Contains("nameof(QuickConnectViewModel.ConnectTooltip)", mainSource);
+    }
 }

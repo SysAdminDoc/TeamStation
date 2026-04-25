@@ -35,7 +35,11 @@ public sealed class QuickConnectViewModel : ViewModelBase
         set
         {
             if (SetField(ref _teamViewerId, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(HasTeamViewerId));
+                OnPropertyChanged(nameof(ConnectTooltip));
                 ConnectCommand.RaiseCanExecuteChanged();
+            }
         }
     }
 
@@ -52,8 +56,24 @@ public sealed class QuickConnectViewModel : ViewModelBase
     }
 
     public RelayCommand ConnectCommand { get; }
+    public bool HasTeamViewerId => !string.IsNullOrWhiteSpace(TeamViewerId);
+    public string ConnectTooltip
+    {
+        get
+        {
+            if (!_canLaunch())
+                return "Install or configure TeamViewer before launching.";
+            return HasTeamViewerId
+                ? "Launch this TeamViewer ID now."
+                : "Enter a TeamViewer ID to connect.";
+        }
+    }
 
-    public void RaiseCanLaunchChanged() => ConnectCommand.RaiseCanExecuteChanged();
+    public void RaiseCanLaunchChanged()
+    {
+        OnPropertyChanged(nameof(ConnectTooltip));
+        ConnectCommand.RaiseCanExecuteChanged();
+    }
 
     private void Connect()
     {
