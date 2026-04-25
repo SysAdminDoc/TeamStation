@@ -11,18 +11,29 @@ public sealed record TeamViewerHistoryImportResult(
 
 public static partial class TeamViewerHistoryImport
 {
+    private const int MaxImportedNameLength = 96;
+
     public static IReadOnlyList<ConnectionEntry> ParseFiles(IEnumerable<string> paths, IEnumerable<ConnectionEntry> existing) =>
         ScanFiles(paths, existing).Entries;
 
     public static TeamViewerHistoryImportResult ScanFiles(IEnumerable<string> paths, IEnumerable<ConnectionEntry> existing)
     {
-        var knownIds = existing.Select(e => e.TeamViewerId).ToHashSet(StringComparer.Ordinal);
+        ArgumentNullException.ThrowIfNull(paths);
+        ArgumentNullException.ThrowIfNull(existing);
+
+        var knownIds = existing
+            .Select(e => e.TeamViewerId)
+            .Where(TeamViewerIdFormat.IsValid)
+            .ToHashSet(StringComparer.Ordinal);
         var created = new List<ConnectionEntry>();
         var readPaths = new List<string>();
         var missingPaths = new List<string>();
         var readErrors = new List<string>();
 
-        foreach (var path in paths.Where(p => !string.IsNullOrWhiteSpace(p)))
+        foreach (var path in paths
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!File.Exists(path))
             {
@@ -78,9 +89,23 @@ public static partial class TeamViewerHistoryImport
     {
         var cleaned = line.Replace(id, string.Empty, StringComparison.Ordinal)
             .Trim(' ', '\t', ',', ';', '|', '-', ':', '"');
+
+        cleaned = CleanImportedName(cleaned);
         return string.IsNullOrWhiteSpace(cleaned) ? $"TeamViewer {id}" : cleaned;
+    }
+
+    private static string CleanImportedName(string value)
+    {
+        var name = WhitespaceRegex().Replace(value, " ").Trim();
+        if (name.Length > MaxImportedNameLength)
+            name = name[..MaxImportedNameLength].TrimEnd();
+
+        return name;
     }
 
     [GeneratedRegex("(?<![A-Za-z0-9])[0-9]{8,12}(?![A-Za-z0-9])", RegexOptions.CultureInvariant)]
     private static partial Regex TeamViewerIdRegex();
+
+    [GeneratedRegex("[\\p{C}\\s]+", RegexOptions.CultureInvariant)]
+    private static partial Regex WhitespaceRegex();
 }

@@ -97,4 +97,64 @@ public class TeamViewerHistoryImportTests
             try { File.Delete(path); } catch { /* best-effort */ }
         }
     }
+
+    [Fact]
+    public void ScanFiles_trims_and_deduplicates_source_paths()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ts-history-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(path, "Ops jump host 123456789");
+
+        try
+        {
+            var result = TeamViewerHistoryImport.ScanFiles([$"  {path}  ", path], []);
+
+            Assert.Single(result.Entries);
+            Assert.Equal([path], result.ReadPaths);
+            Assert.Empty(result.MissingPaths);
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public void ParseFiles_sanitizes_control_characters_and_caps_imported_names()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ts-history-{Guid.NewGuid():N}.txt");
+        var noisyName = "Front\tDesk\u0001" + new string('x', 200);
+        File.WriteAllText(path, $"{noisyName} 123456789");
+
+        try
+        {
+            var entry = Assert.Single(TeamViewerHistoryImport.ParseFiles([path], []));
+
+            Assert.DoesNotContain(entry.Name, char.IsControl);
+            Assert.DoesNotContain('\t', entry.Name);
+            Assert.True(entry.Name.Length <= 96);
+            Assert.StartsWith("Front Desk", entry.Name, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public void ParseFiles_uses_clear_fallback_name_when_history_line_has_no_label()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"ts-history-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(path, "--- 123456789 :::");
+
+        try
+        {
+            var entry = Assert.Single(TeamViewerHistoryImport.ParseFiles([path], []));
+
+            Assert.Equal("TeamViewer 123456789", entry.Name);
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { /* best-effort */ }
+        }
+    }
 }
