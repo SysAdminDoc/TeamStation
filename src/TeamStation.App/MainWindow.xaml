@@ -1237,6 +1237,14 @@
                                         FontSize="12"
                                         ToolTip="Unpin every selected connection."
                                         Command="{Binding BulkUnpinCommand}" />
+                                <Button Content="Delete"
+                                        Style="{StaticResource DangerButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Delete every selected connection after confirmation."
+                                        Command="{Binding BulkDeleteCommand}" />
                                 <Button Content="Clear"
                                         Style="{StaticResource GhostButton}"
                                         MinWidth="0"
@@ -1423,6 +1431,9 @@
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <MenuItem Header="{Binding BulkClearProxySelectionLabel}"
                                               Command="{Binding BulkClearProxyCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkDeleteSelectionLabel}"
+                                              Command="{Binding BulkDeleteCommand}"
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <Separator />
                                     <MenuItem Header="New connection" Command="{Binding AddEntryCommand}" />

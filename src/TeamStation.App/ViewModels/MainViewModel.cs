@@ -112,6 +112,7 @@ public sealed class MainViewModel : ViewModelBase
         ImportCsvCommand = new RelayCommand(ImportCsvFile);
         TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
         BulkMoveCommand = new RelayCommand(BulkMove, () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkDeleteCommand = new RelayCommand(BulkDelete, () => SelectedNodes.OfType<EntryNode>().Any());
         BulkPinCommand = new RelayCommand(() => BulkSetPinned(true), () => SelectedNodes.OfType<EntryNode>().Any());
         BulkUnpinCommand = new RelayCommand(() => BulkSetPinned(false), () => SelectedNodes.OfType<EntryNode>().Any());
         BulkAddTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Add), () => SelectedNodes.OfType<EntryNode>().Any());
@@ -465,6 +466,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand EditCommand { get; }
     public System.Windows.Input.ICommand LaunchCommand { get; }
     public System.Windows.Input.ICommand BulkMoveCommand { get; }
+    public System.Windows.Input.ICommand BulkDeleteCommand { get; }
     public System.Windows.Input.ICommand BulkPinCommand { get; }
     public System.Windows.Input.ICommand BulkUnpinCommand { get; }
     public System.Windows.Input.ICommand BulkAddTagCommand { get; }
@@ -506,6 +508,7 @@ public sealed class MainViewModel : ViewModelBase
     public int MultiSelectedEntryCount => SelectedNodes.OfType<EntryNode>().Count();
     public bool IsBulkSelectionActive => MultiSelectedEntryCount >= 2;
     public string BulkMoveSelectionLabel => $"Move selection ({MultiSelectedEntryCount})";
+    public string BulkDeleteSelectionLabel => $"Delete selection ({MultiSelectedEntryCount})";
     public string BulkPinSelectionLabel => $"Pin selection ({MultiSelectedEntryCount})";
     public string BulkUnpinSelectionLabel => $"Unpin selection ({MultiSelectedEntryCount})";
     public string BulkAddTagSelectionLabel => $"Add tag to selection ({MultiSelectedEntryCount})";
@@ -554,6 +557,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(MultiSelectedEntryCount));
         OnPropertyChanged(nameof(IsBulkSelectionActive));
         OnPropertyChanged(nameof(BulkMoveSelectionLabel));
+        OnPropertyChanged(nameof(BulkDeleteSelectionLabel));
         OnPropertyChanged(nameof(BulkPinSelectionLabel));
         OnPropertyChanged(nameof(BulkUnpinSelectionLabel));
         OnPropertyChanged(nameof(BulkAddTagSelectionLabel));
@@ -566,6 +570,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(BulkClearProxySelectionLabel));
         OnPropertyChanged(nameof(MultiSelectionSummary));
         ((RelayCommand)BulkMoveCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkDeleteCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkPinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkUnpinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkAddTagCommand).RaiseCanExecuteChanged();
@@ -630,6 +635,56 @@ public sealed class MainViewModel : ViewModelBase
         Audit("bulk_move", "connection", null, $"Moved {countText} to {destinationName} via bulk action.", newParent?.ToString());
         MirrorDatabase();
         ReportStatus(LogLevel.Success, $"Moved {countText} to {destinationName}.");
+    }
+
+    private void BulkDelete()
+    {
+        var entries = SelectedNodes.OfType<EntryNode>().ToList();
+        if (entries.Count == 0) return;
+
+        var countText = DisplayText.Count(entries.Count, "connection");
+        var preview = FormatBulkDeletePreview(entries);
+        if (!_dialogs.Confirm(
+                Application.Current?.MainWindow,
+                $"Delete {countText}?\n\n{preview}This cannot be undone from TeamStation. Session history and audit events are kept.",
+                "Delete selected connections",
+                "Delete selection",
+                isDestructive: true))
+        {
+            ReportStatus(LogLevel.Warning, "Bulk delete cancelled.");
+            return;
+        }
+
+        foreach (var entryNode in entries)
+            _entries.Delete(entryNode.Id);
+
+        Reload();
+        Audit(
+            "bulk_delete",
+            "connection",
+            null,
+            $"Deleted {countText} via bulk action.",
+            string.Join(", ", entries.Select(entry => entry.Name)));
+        MirrorDatabase();
+        ReportStatus(LogLevel.Warning, $"Deleted {countText}.");
+    }
+
+    private static string FormatBulkDeletePreview(IReadOnlyList<EntryNode> entries)
+    {
+        var names = entries
+            .Select(entry => entry.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Take(5)
+            .ToList();
+
+        if (names.Count == 0)
+            return string.Empty;
+
+        var preview = "Connections:\n" + string.Join('\n', names.Select(name => $"- {name}"));
+        if (entries.Count > names.Count)
+            preview += $"\n- ...and {DisplayText.Count(entries.Count - names.Count, "more connection")}";
+
+        return preview + "\n\n";
     }
 
     private void BulkSetPinned(bool pinned)
