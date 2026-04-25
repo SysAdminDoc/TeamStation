@@ -74,7 +74,8 @@
                         <TextBlock Margin="0,18,0,0" Text="Folder name" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="NameBox"
                                  AutomationProperties.Name="Folder name"
-                                 AutomationProperties.HelpText="Required folder display name." />
+                                 AutomationProperties.HelpText="Required folder display name."
+                                 TextChanged="RequiredField_TextChanged" />
 
                         <TextBlock Margin="0,18,0,0" Text="Accent color" Style="{StaticResource FieldLabelText}" />
                         <Grid>
@@ -255,6 +256,9 @@
                     DockPanel.Dock="Right"
                     Content="Save folder"
                     Style="{StaticResource PrimaryButton}"
+                    IsEnabled="False"
+                    ToolTip="Enter a folder name."
+                    ToolTipService.ShowOnDisabled="True"
                     IsDefault="True"
                     Click="Save_Click" />
         </DockPanel>

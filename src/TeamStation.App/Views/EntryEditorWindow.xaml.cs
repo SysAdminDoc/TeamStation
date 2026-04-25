@@ -56,6 +56,8 @@ public partial class EntryEditorWindow : Window
             ProxyUserBox.Text = proxy.Username ?? string.Empty;
             ProxyPasswordBox.Password = proxy.Password ?? string.Empty;
         }
+
+        UpdateSaveReadiness();
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -198,6 +200,26 @@ public partial class EntryEditorWindow : Window
     {
         ValidationText.Text = string.Empty;
         ValidationBorder.Visibility = Visibility.Collapsed;
+    }
+
+    private void RequiredField_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateSaveReadiness();
+    }
+
+    private void UpdateSaveReadiness()
+    {
+        if (SaveButton is null)
+            return;
+
+        var hasRequiredFields =
+            !string.IsNullOrWhiteSpace(NameBox.Text) &&
+            !string.IsNullOrWhiteSpace(IdBox.Text);
+
+        SaveButton.IsEnabled = hasRequiredFields;
+        SaveButton.ToolTip = hasRequiredFields
+            ? "Save connection"
+            : "Enter a friendly name and TeamViewer ID.";
     }
 
     private static void SelectNullableEnum<T>(ComboBox combo, T? value) where T : struct, Enum

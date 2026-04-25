@@ -83,14 +83,16 @@
                                 <TextBlock Text="Friendly name" Style="{StaticResource FieldLabelText}" />
                                 <TextBox x:Name="NameBox"
                                          AutomationProperties.Name="Friendly name"
-                                         AutomationProperties.HelpText="Required display name for this connection." />
+                                         AutomationProperties.HelpText="Required display name for this connection."
+                                         TextChanged="RequiredField_TextChanged" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="TeamViewer ID" Style="{StaticResource FieldLabelText}" />
                                 <TextBox x:Name="IdBox"
                                          AutomationProperties.Name="TeamViewer ID"
-                                         AutomationProperties.HelpText="Required numeric TeamViewer peer ID, 8 to 12 digits." />
+                                         AutomationProperties.HelpText="Required numeric TeamViewer peer ID, 8 to 12 digits."
+                                         TextChanged="RequiredField_TextChanged" />
                                 <TextBlock Margin="0,6,0,0" Text="Numeric peer ID, 8 to 12 digits." Style="{StaticResource BodyMutedText}" />
                             </StackPanel>
                         </Grid>
@@ -309,6 +311,9 @@
                     Content="Save connection"
                     Style="{StaticResource PrimaryButton}"
                     Click="SaveButton_Click"
+                    IsEnabled="False"
+                    ToolTip="Enter a friendly name and TeamViewer ID."
+                    ToolTipService.ShowOnDisabled="True"
                     IsDefault="True" />
         </DockPanel>
     </Grid>

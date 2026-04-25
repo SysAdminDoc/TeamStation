@@ -47,6 +47,7 @@ public partial class FolderEditorWindow : Window
         PreLaunchScriptBox.Text = _folder.PreLaunchScript ?? string.Empty;
         PostLaunchScriptBox.Text = _folder.PostLaunchScript ?? string.Empty;
         UpdateAccentPreview();
+        UpdateSaveReadiness();
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -154,6 +155,21 @@ public partial class FolderEditorWindow : Window
     {
         ValidationText.Text = string.Empty;
         ValidationBorder.Visibility = Visibility.Collapsed;
+    }
+
+    private void RequiredField_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateSaveReadiness();
+    }
+
+    private void UpdateSaveReadiness()
+    {
+        if (SaveButton is null)
+            return;
+
+        var hasName = !string.IsNullOrWhiteSpace(NameBox.Text);
+        SaveButton.IsEnabled = hasName;
+        SaveButton.ToolTip = hasName ? "Save folder" : "Enter a folder name.";
     }
 
     private static void SelectNullableEnum<T>(ComboBox combo, T? value) where T : struct, Enum

@@ -455,4 +455,34 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("nameof(LaunchSelectedTooltip)", source);
         Assert.Contains("nameof(DeleteSelectionTooltip)", source);
     }
+
+    [Theory]
+    [InlineData("EntryEditorWindow.xaml", "Enter a friendly name and TeamViewer ID.")]
+    [InlineData("FolderEditorWindow.xaml", "Enter a folder name.")]
+    public void Editor_primary_actions_explain_required_fields_when_disabled(string xamlFile, string expectedTooltip)
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", xamlFile);
+        var doc = XDocument.Load(path);
+        var button = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute(Xaml + "Name")) == "SaveButton");
+
+        Assert.NotNull(button);
+        Assert.Equal("False", (string?)button!.Attribute("IsEnabled"));
+        Assert.Equal(expectedTooltip, (string?)button.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)button.Attribute("ToolTipService.ShowOnDisabled"));
+    }
+
+    [Theory]
+    [InlineData("EntryEditorWindow.xaml.cs", "UpdateSaveReadiness()", "NameBox.Text", "IdBox.Text")]
+    [InlineData("FolderEditorWindow.xaml.cs", "UpdateSaveReadiness()", "NameBox.Text", "Enter a folder name.")]
+    public void Editor_code_updates_primary_action_readiness(string sourceFile, string method, string requiredSnippet, string tooltipSnippet)
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", sourceFile);
+        var source = File.ReadAllText(path);
+
+        Assert.Contains(method, source);
+        Assert.Contains(requiredSnippet, source);
+        Assert.Contains(tooltipSnippet, source);
+        Assert.Contains("RequiredField_TextChanged", source);
+    }
 }
