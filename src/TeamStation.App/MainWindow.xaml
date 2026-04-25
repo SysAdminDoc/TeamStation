@@ -675,11 +675,25 @@
             </MenuItem>
 
             <MenuItem Header="_Edit">
-                <MenuItem Header="Edit selection..." Command="{Binding EditCommand}" InputGestureText="F2" />
-                <MenuItem Header="Rename..." Command="{Binding RenameCommand}" />
-                <MenuItem Header="Move..." Command="{Binding MoveCommand}" />
+                <MenuItem Header="Edit selection..."
+                          Command="{Binding EditCommand}"
+                          InputGestureText="F2"
+                          ToolTip="{Binding EditSelectionTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
+                <MenuItem Header="Rename..."
+                          Command="{Binding RenameCommand}"
+                          ToolTip="{Binding EditSelectionTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
+                <MenuItem Header="Move..."
+                          Command="{Binding MoveCommand}"
+                          ToolTip="{Binding MoveSelectionTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
                 <Separator />
-                <MenuItem Header="Delete" Command="{Binding DeleteCommand}" InputGestureText="Del" />
+                <MenuItem Header="Delete"
+                          Command="{Binding DeleteCommand}"
+                          InputGestureText="Del"
+                          ToolTip="{Binding DeleteSelectionTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
             </MenuItem>
 
             <MenuItem Header="_View">
@@ -688,8 +702,16 @@
             </MenuItem>
 
             <MenuItem Header="_Connection">
-                <MenuItem Header="Launch selected" Command="{Binding LaunchCommand}" InputGestureText="Enter" FontWeight="SemiBold" />
-                <MenuItem Header="{Binding SelectedPinText}" Command="{Binding TogglePinCommand}" />
+                <MenuItem Header="Launch selected"
+                          Command="{Binding LaunchCommand}"
+                          InputGestureText="Enter"
+                          FontWeight="SemiBold"
+                          ToolTip="{Binding LaunchSelectedTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
+                <MenuItem Header="{Binding SelectedPinText}"
+                          Command="{Binding TogglePinCommand}"
+                          ToolTip="{Binding PinSelectionTooltip}"
+                          ToolTipService.ShowOnDisabled="True" />
             </MenuItem>
 
             <MenuItem Header="_Tools">
@@ -783,13 +805,19 @@
                 <!--  Toolbar groups (left-aligned, wrap on narrow windows)  -->
                 <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <!--  Group 1: Connection  -->
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding LaunchCommand}" ToolTip="Launch the selected connection">
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding LaunchCommand}"
+                            ToolTip="{Binding LaunchSelectedTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xF5B0;" Foreground="{StaticResource BlueBrush}" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Launch" FontWeight="SemiBold" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding TogglePinCommand}" ToolTip="Toggle pin on the selected connection">
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding TogglePinCommand}"
+                            ToolTip="{Binding PinSelectionTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE718;" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="{Binding SelectedPinText}" />
@@ -811,19 +839,28 @@
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="New folder" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding EditCommand}" ToolTip="Edit selection">
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding EditCommand}"
+                            ToolTip="{Binding EditSelectionTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE70F;" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Edit" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding MoveCommand}" ToolTip="Move to another folder">
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding MoveCommand}"
+                            ToolTip="{Binding MoveSelectionTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE8DE;" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Move" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding DeleteCommand}" ToolTip="Delete selection">
+                    <Button Style="{StaticResource ToolbarButton}"
+                            Command="{Binding DeleteCommand}"
+                            ToolTip="{Binding DeleteSelectionTooltip}"
+                            ToolTipService.ShowOnDisabled="True">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource ToolbarIconText}" Text="&#xE74D;" Foreground="{StaticResource RedBrush}" />
                             <TextBlock Style="{StaticResource ToolbarLabelText}" Text="Delete" Foreground="{StaticResource RedBrush}" />

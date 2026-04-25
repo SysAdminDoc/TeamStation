@@ -266,6 +266,11 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(HasSelection));
                 OnPropertyChanged(nameof(ShowSelectionPlaceholder));
                 OnPropertyChanged(nameof(SelectedPinText));
+                OnPropertyChanged(nameof(LaunchSelectedTooltip));
+                OnPropertyChanged(nameof(EditSelectionTooltip));
+                OnPropertyChanged(nameof(MoveSelectionTooltip));
+                OnPropertyChanged(nameof(DeleteSelectionTooltip));
+                OnPropertyChanged(nameof(PinSelectionTooltip));
             }
         }
     }
@@ -275,6 +280,15 @@ public sealed class MainViewModel : ViewModelBase
     public bool HasSelection => Selected is not null;
     public bool ShowSelectionPlaceholder => Selected is null;
     public string SelectedPinText => Selected is EntryNode { Model.IsPinned: true } ? "Unpin" : "Pin";
+    public string LaunchSelectedTooltip => Selected is EntryNode
+        ? (IsTeamViewerReady ? "Launch the selected connection." : "Install or configure TeamViewer before launching.")
+        : "Select a connection to launch.";
+    public string EditSelectionTooltip => HasSelection ? "Edit the selected item." : "Select an item to edit.";
+    public string MoveSelectionTooltip => HasSelection ? "Move the selected item to another folder." : "Select an item to move.";
+    public string DeleteSelectionTooltip => HasSelection ? "Delete the selected item." : "Select an item to delete.";
+    public string PinSelectionTooltip => Selected is EntryNode
+        ? $"{SelectedPinText} the selected connection."
+        : "Select a connection to pin.";
 
     public string Status { get => _status; private set => SetField(ref _status, value); }
     public string StatusTag { get => _statusTag; private set => SetField(ref _statusTag, value); }
@@ -287,6 +301,7 @@ public sealed class MainViewModel : ViewModelBase
             if (SetField(ref _isTeamViewerReady, value))
             {
                 OnPropertyChanged(nameof(TeamViewerStatusText));
+                OnPropertyChanged(nameof(LaunchSelectedTooltip));
                 ((RelayCommand)LaunchCommand).RaiseCanExecuteChanged();
                 QuickConnect.RaiseCanLaunchChanged();
             }

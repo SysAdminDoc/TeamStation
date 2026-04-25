@@ -423,4 +423,36 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("Existing items with matching IDs will be overwritten. Review the file source before continuing.", source);
         Assert.Contains("isDestructive: true", source);
     }
+
+    [Theory]
+    [InlineData("{Binding LaunchCommand}", "{Binding LaunchSelectedTooltip}")]
+    [InlineData("{Binding EditCommand}", "{Binding EditSelectionTooltip}")]
+    [InlineData("{Binding MoveCommand}", "{Binding MoveSelectionTooltip}")]
+    [InlineData("{Binding DeleteCommand}", "{Binding DeleteSelectionTooltip}")]
+    [InlineData("{Binding TogglePinCommand}", "{Binding PinSelectionTooltip}")]
+    public void Selection_dependent_actions_explain_disabled_state(string command, string tooltip)
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var controls = doc.Descendants()
+            .Where(e => ((string?)e.Attribute("Command")) == command)
+            .ToList();
+
+        Assert.NotEmpty(controls);
+        Assert.Contains(controls, c => (string?)c.Attribute("ToolTip") == tooltip);
+        Assert.Contains(controls, c => (string?)c.Attribute("ToolTipService.ShowOnDisabled") == "True");
+    }
+
+    [Fact]
+    public void Main_view_model_surfaces_selection_action_tooltips()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("public string LaunchSelectedTooltip", source);
+        Assert.Contains("Select a connection to launch.", source);
+        Assert.Contains("Install or configure TeamViewer before launching.", source);
+        Assert.Contains("public string DeleteSelectionTooltip", source);
+        Assert.Contains("nameof(LaunchSelectedTooltip)", source);
+        Assert.Contains("nameof(DeleteSelectionTooltip)", source);
+    }
 }
