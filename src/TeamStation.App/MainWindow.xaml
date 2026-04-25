@@ -837,7 +837,7 @@
                                FontSize="11"
                                VerticalAlignment="Center"
                                Margin="0,0,10,0"
-                               ToolTip="Detected installed TeamViewer client version (registry / FileVersionInfo)." />
+                               ToolTip="{Binding TeamViewerSafetyTooltip}" />
                     <Border CornerRadius="999"
                             Padding="8,2"
                             Margin="0,0,12,0"
@@ -846,7 +846,7 @@
                             BorderThickness="1"
                             VerticalAlignment="Center"
                             Visibility="{Binding TeamViewerNeedsUpdate, Converter={StaticResource BoolToVis}}"
-                            ToolTip="The installed TeamViewer client is below 15.74.5. CVE-2026-23572 (auth-bypass) is fixed in 15.74.5+; updating the installed client is recommended.">
+                            ToolTip="{Binding TeamViewerSafetyTooltip}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
                                        FontSize="10"

@@ -9,30 +9,48 @@ namespace TeamStation.Launcher;
 /// usual <c>WOW6432Node</c> mirror fallback for 32-bit installs on 64-bit
 /// Windows) and falls back to <see cref="FileVersionInfo"/> on the resolved
 /// <c>TeamViewer.exe</c> path. Used by the v0.3.5 status-bar pill that
-/// surfaces "update available" when the detected version is below the
-/// minimum-known-safe baseline (CVE-2026-23572 — TeamViewer 15.74.5+).
+/// surfaces "update available" when the detected version matches an entry in
+/// the bundled offline <see cref="TeamViewerCveRegistry"/>.
 /// </summary>
 /// <remarks>
 /// <para>
 /// TeamStation orchestrates the installed TeamViewer client and does NOT
-/// ship the protocol implementation, so the v0.3.5 surfacing is operator-
-/// remediation guidance only — there is no auto-update path.
+/// ship the protocol implementation, so the surfacing is operator-
+/// remediation guidance only — there is no auto-update path and no network
+/// call.
 /// </para>
 /// <para>
 /// The detector is decoupled from <see cref="Registry"/> via the
 /// <see cref="ITeamViewerVersionSource"/> seam so unit tests can pump fake
-/// versions without touching a real registry hive.
+/// versions without touching a real registry hive. v0.4.0 generalised the
+/// hardcoded <c>15.74.5</c> minimum into a registry-driven evaluation;
+/// <see cref="MinimumSafeVersion"/> now reflects the lowest <c>fixed_in</c>
+/// across every entry in the bundled registry, with a static fallback so
+/// existing call sites continue to work even if the registry fails to load.
 /// </para>
 /// </remarks>
 [SupportedOSPlatform("windows")]
 public static class TeamViewerVersionDetector
 {
     /// <summary>
-    /// Minimum version known to incorporate the CVE-2026-23572 (auth-bypass)
-    /// patch. Below this baseline the status bar surfaces an "update
-    /// available" pill. Per the April 2026 TeamViewer security bulletin.
+    /// Backstop value used when the bundled <see cref="TeamViewerCveRegistry"/>
+    /// fails to load (e.g. the embedded resource was stripped from a custom
+    /// build). Reflects the CVE-2026-23572 baseline at v0.4.0 release time.
+    /// Prefer <see cref="MinimumSafeVersion"/> for runtime decisions —
+    /// it consults the registry first and only falls back to this constant.
     /// </summary>
-    public static readonly Version MinimumSafeVersion = new(15, 74, 5);
+    public static readonly Version FallbackMinimumSafeVersion = new(15, 74, 5);
+
+    /// <summary>
+    /// Highest <c>fixed_in</c> across the bundled CVE registry, or
+    /// <see cref="FallbackMinimumSafeVersion"/> if the registry could not be
+    /// loaded or carries no entries with <c>fixed_in</c> declared. The
+    /// "needs update" decision is registry-driven via
+    /// <see cref="TeamViewerSafetyEvaluator"/>; this property exists so older
+    /// log lines and tooltips can still print a single threshold.
+    /// </summary>
+    public static Version MinimumSafeVersion =>
+        TeamViewerCveRegistry.Default.RecommendedMinimumSafeVersion() ?? FallbackMinimumSafeVersion;
 
     /// <summary>
     /// Detects the installed TeamViewer version against the default sources
@@ -54,13 +72,22 @@ public static class TeamViewerVersionDetector
     }
 
     /// <summary>
-    /// Returns true when <paramref name="version"/> is below
-    /// <see cref="MinimumSafeVersion"/>. <c>null</c> input returns false —
+    /// Returns true when <paramref name="version"/> matches a vulnerable
+    /// range in the bundled CVE registry. <c>null</c> input returns false —
     /// "version unknown" is not the same as "version unsafe", and a missing
     /// TeamViewer install is rendered with its own "not detected" message.
+    /// Backward-compatible shim around <see cref="TeamViewerSafetyEvaluator"/>.
     /// </summary>
     public static bool NeedsUpdate(Version? version) =>
-        version is not null && version < MinimumSafeVersion;
+        TeamViewerSafetyEvaluator.Evaluate(version, TeamViewerCveRegistry.Default).NeedsUpdate;
+
+    /// <summary>
+    /// Full safety status against the bundled registry. Callers that need
+    /// the matched CVEs (status-bar tooltip, Trust Center) should use this
+    /// rather than <see cref="NeedsUpdate"/>.
+    /// </summary>
+    public static TeamViewerSafetyStatus EvaluateSafety(Version? version) =>
+        TeamViewerSafetyEvaluator.Evaluate(version, TeamViewerCveRegistry.Default);
 
     /// <summary>
     /// TeamViewer ships its installed version as a 4-component string

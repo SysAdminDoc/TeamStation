@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "description": "TeamStation static, offline-only registry of publicly disclosed TeamViewer client CVEs that affect operator launch decisions. Advisory only — TeamStation never phones home and never auto-updates the installed TeamViewer client.",
+  "last_updated": "2026-04-25",
+  "source": "Curated by TeamStation maintainers from public TeamViewer security bulletins and MITRE CVE entries. See docs/teamviewer-reference.md for the maintainer update procedure.",
+  "entries": [
+    {
+      "id": "CVE-2026-23572",
+      "title": "TeamViewer Full Client / Host pre-authentication bypass on incoming session prompts",
+      "cvss": 7.2,
+      "severity": "high",
+      "published": "2026-04-08",
+      "summary": "An incoming-session confirmation step in TeamViewer Full Client and Host could be bypassed under specific configurations, allowing a remote attacker who already knows a peer ID to start a session without the prompted user confirmation. Mitigated in 15.74.5 by hardening the confirmation gate so the dialog is required regardless of supplied command-line credentials.",
+      "remediation": "Update the installed TeamViewer Full Client / Host to 15.74.5 or later.",
+      "remediation_url": "https://www.teamviewer.com/en/resources/trust-center/security-bulletins/",
+      "affected": [
+        { "min_inclusive": "15.0.0", "max_exclusive": "15.74.5" }
+      ],
+      "fixed_in": "15.74.5"
+    },
+    {
+      "id": "CVE-2020-13699",
+      "title": "TeamViewer URI handler argument injection via NTLM relay primitive",
+      "cvss": 8.8,
+      "severity": "high",
+      "published": "2020-08-05",
+      "summary": "TeamViewer Desktop did not quote arguments passed to its custom URI scheme handlers, allowing a crafted teamviewer10:// (and sibling tv*1://) URI to inject additional command-line parameters and trigger SMB authentication to attacker-controlled hosts. Mitigated in 15.8.3 by quoting argv. TeamStation additionally blocks --play / --control / --Sendto / UNC shapes inside the validator regardless of the installed client.",
+      "remediation": "Update the installed TeamViewer Desktop / Host to 15.8.3 or later. TeamStation already blocks the known argv-injection shapes at the launcher boundary.",
+      "remediation_url": "https://nvd.nist.gov/vuln/detail/CVE-2020-13699",
+      "affected": [
+        { "min_inclusive": "8.0.0", "max_exclusive": "15.8.3" }
+      ],
+      "fixed_in": "15.8.3"
+    }
+  ]
+}

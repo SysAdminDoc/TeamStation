@@ -28,7 +28,7 @@ TeamViewer's built-in contact list is tied to your account and lives in the main
 
 TeamStation fills that gap. It is not a remote-desktop protocol — it orchestrates the TeamViewer client you already have installed.
 
-> **Prerequisite:** The full TeamViewer client must be installed on the launching machine (`TeamViewer.exe` on the `PATH` or at its default install location). TeamStation does not bundle or replace TeamViewer.
+> **Prerequisite:** The full TeamViewer client must be installed on the launching machine (`TeamViewer.exe` on the `PATH` or at its default install location). TeamStation does not bundle or replace TeamViewer. **TeamViewer 15.74.5 or later is recommended** — earlier 15.x builds match TeamStation's bundled offline CVE registry (CVE-2026-23572 auth-bypass; older 15.x is also affected by CVE-2020-13699). The status-bar version chip surfaces the matched advisories at runtime; see [docs/teamviewer-reference.md](docs/teamviewer-reference.md#teamviewer-cve-registry-v040) for the registry format and maintainer update procedure.
 
 ## Status
 

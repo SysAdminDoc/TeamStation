@@ -148,10 +148,8 @@ public sealed class MainViewModel : ViewModelBase
         LogPanel.Append(LogLevel.Info, tvExePath is null
             ? "TeamViewer.exe not found — launches will be disabled until TeamViewer is installed."
             : $"TeamViewer.exe: {tvExePath}");
-        if (TeamViewerNeedsUpdate)
-            LogPanel.Append(LogLevel.Warning,
-                $"{TeamViewerClientVersion} is below the recommended baseline ({TeamViewerVersionDetector.MinimumSafeVersion}). " +
-                "CVE-2026-23572 (auth-bypass) is fixed in TeamViewer 15.74.5+ — update the installed client when convenient.");
+        AppendTeamViewerSafetyLog();
+        AppendTeamViewerProvenanceLog(tvExePath);
         if (!string.IsNullOrEmpty(_settingsService.LastLoadError))
             LogPanel.Append(LogLevel.Warning, _settingsService.LastLoadError!);
         PruneHistory();
@@ -448,6 +446,7 @@ public sealed class MainViewModel : ViewModelBase
 
     private string _teamViewerClientVersion = "TeamViewer not detected";
     private bool _teamViewerNeedsUpdate;
+    private string _teamViewerSafetyTooltip = "TeamViewer client could not be located. Install TeamViewer or set the path in Settings.";
 
     /// <summary>
     /// Display string for the status-bar TeamViewer chip — "TeamViewer 15.71.5"
@@ -462,10 +461,9 @@ public sealed class MainViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// True when the detected client is below
-    /// <see cref="TeamViewerVersionDetector.MinimumSafeVersion"/>
-    /// (15.74.5 — CVE-2026-23572 baseline). The status bar surfaces an
-    /// "Update available" pill when this is set.
+    /// True when the detected client matches an entry in the bundled
+    /// offline <see cref="TeamViewerCveRegistry"/>. The status bar surfaces
+    /// an "Update available" pill when this is set.
     /// </summary>
     public bool TeamViewerNeedsUpdate
     {
@@ -473,13 +471,67 @@ public sealed class MainViewModel : ViewModelBase
         private set => SetField(ref _teamViewerNeedsUpdate, value);
     }
 
+    /// <summary>
+    /// Operator-facing tooltip that hangs off the version chip and update pill.
+    /// Spells out which CVEs the detected version matches and the remediation
+    /// URL — the entire surface is local, advisory, and never phones home.
+    /// </summary>
+    public string TeamViewerSafetyTooltip
+    {
+        get => _teamViewerSafetyTooltip;
+        private set => SetField(ref _teamViewerSafetyTooltip, value);
+    }
+
     private void RefreshTeamViewerVersion()
     {
         var detected = TeamViewerVersionDetector.Detect();
-        TeamViewerClientVersion = detected is null
-            ? "TeamViewer not detected"
-            : $"TeamViewer {detected}";
-        TeamViewerNeedsUpdate = TeamViewerVersionDetector.NeedsUpdate(detected);
+        var status = TeamViewerVersionDetector.EvaluateSafety(detected);
+        TeamViewerClientVersion = status.ChipText;
+        TeamViewerNeedsUpdate = status.NeedsUpdate;
+        TeamViewerSafetyTooltip = status.TooltipText;
+    }
+
+    private void AppendTeamViewerSafetyLog()
+    {
+        var status = TeamViewerVersionDetector.EvaluateSafety(TeamViewerVersionDetector.Detect());
+        if (status.State != TeamViewerSafetyState.Vulnerable) return;
+
+        var ids = string.Join(", ", status.MatchedCves.Select(c => c.Id));
+        var fixHint = status.RecommendedMinimumSafeVersion is not null
+            ? $" Update the installed client to {status.RecommendedMinimumSafeVersion} or later when convenient."
+            : " Update the installed client when convenient.";
+        LogPanel.Append(LogLevel.Warning,
+            $"TeamViewer {status.Version} matches bundled CVE registry: {ids}.{fixHint} " +
+            "Detail in the version chip tooltip; TeamStation does not auto-update TeamViewer.");
+    }
+
+    private void AppendTeamViewerProvenanceLog(string? tvExePath)
+    {
+        // Skip the probe entirely when TeamViewer wasn't located — the log
+        // already carries the "not found" line and the provenance evaluator
+        // would just repeat it.
+        if (string.IsNullOrWhiteSpace(tvExePath)) return;
+
+        TeamViewerBinaryProvenance provenance;
+        try
+        {
+            provenance = TeamViewerBinaryProvenanceInspector.Inspect(tvExePath);
+        }
+        catch (Exception ex)
+        {
+            LogPanel.Append(LogLevel.Info,
+                $"TeamViewer binary provenance check skipped: {ex.Message}");
+            return;
+        }
+
+        var level = provenance.Health switch
+        {
+            TeamViewerProvenanceHealth.SignedByExpectedPublisher => LogLevel.Info,
+            TeamViewerProvenanceHealth.SignedOutsideExpectedRoot => LogLevel.Info,
+            TeamViewerProvenanceHealth.UnableToVerify => LogLevel.Info,
+            _ => LogLevel.Warning,
+        };
+        LogPanel.Append(level, $"TeamViewer trust signal: {provenance.Advice}");
     }
 
     public System.Windows.Input.ICommand AddEntryCommand { get; }

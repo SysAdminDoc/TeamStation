@@ -9,4 +9,13 @@
     <ProjectReference Include="..\TeamStation.Core\TeamStation.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Static, offline TeamViewer CVE registry embedded in the binary. Loaded
+         by TeamViewerCveRegistry at startup and matched against the detected
+         installed TeamViewer client version. Advisory only — no network. -->
+    <EmbeddedResource Include="assets\cve\teamviewer-known.json">
+      <LogicalName>TeamStation.Launcher.assets.cve.teamviewer-known.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>
