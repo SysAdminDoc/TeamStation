@@ -163,11 +163,14 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("{Binding BulkAddTagCommand}", commands);
         Assert.Contains("{Binding BulkRemoveTagCommand}", commands);
         Assert.Contains("{Binding BulkReplaceTagsCommand}", commands);
+        Assert.Contains("{Binding BulkSetModeCommand}", commands);
+        Assert.Contains("{Binding BulkSetQualityCommand}", commands);
+        Assert.Contains("{Binding BulkSetAccessControlCommand}", commands);
         Assert.Contains("{Binding ClearMultiSelectionCommand}", commands);
     }
 
     [Fact]
-    public void Bulk_tag_actions_are_available_from_the_tree_context_menu()
+    public void Bulk_actions_are_available_from_the_tree_context_menu()
     {
         var doc = XDocument.Load(MainWindowXamlPath);
         var items = doc.Descendants(Wpf + "MenuItem")
@@ -180,10 +183,16 @@ public class MainWindowKeyboardNavTests
             && (string?)mi.Attribute("Header") == "{Binding BulkRemoveTagSelectionLabel}");
         Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkReplaceTagsCommand}"
             && (string?)mi.Attribute("Header") == "{Binding BulkReplaceTagsSelectionLabel}");
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkSetModeCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkSetModeSelectionLabel}");
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkSetQualityCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkSetQualitySelectionLabel}");
+        Assert.Contains(items, mi => (string?)mi.Attribute("Command") == "{Binding BulkSetAccessControlCommand}"
+            && (string?)mi.Attribute("Header") == "{Binding BulkSetAccessControlSelectionLabel}");
     }
 
     [Fact]
-    public void Main_view_model_bulk_tag_commands_normalize_and_audit_tag_updates()
+    public void Main_view_model_bulk_commands_normalize_and_audit_updates()
     {
         var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
         var source = File.ReadAllText(path);
@@ -191,12 +200,23 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("BulkAddTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Add)", source);
         Assert.Contains("BulkRemoveTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Remove)", source);
         Assert.Contains("BulkReplaceTagsCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Replace)", source);
+        Assert.Contains("BulkSetModeCommand = new RelayCommand(BulkSetMode", source);
+        Assert.Contains("BulkSetQualityCommand = new RelayCommand(BulkSetQuality", source);
+        Assert.Contains("BulkSetAccessControlCommand = new RelayCommand(BulkSetAccessControl", source);
         Assert.Contains("ParseBulkTags", source);
+        Assert.Contains("ChoiceDialog.Pick", source);
+        Assert.Contains("TryGetCommonLaunchValue", source);
+        Assert.Contains("CreateModeOptions", source);
+        Assert.Contains("CreateQualityOptions", source);
+        Assert.Contains("CreateAccessControlOptions", source);
         Assert.Contains("Distinct(StringComparer.OrdinalIgnoreCase)", source);
         Assert.Contains("validationMessage: \"Enter at least one tag before applying.\"", source);
         Assert.Contains("bulk_add_tag", source);
         Assert.Contains("bulk_remove_tag", source);
         Assert.Contains("bulk_replace_tags", source);
+        Assert.Contains("bulk_set_mode", source);
+        Assert.Contains("bulk_set_quality", source);
+        Assert.Contains("bulk_set_access_control", source);
     }
 
     [Fact]
@@ -210,8 +230,21 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("ValidationText.Text = _validationMessage;", source);
     }
 
+    [Fact]
+    public void Choice_dialog_requires_an_explicit_value_when_selection_is_mixed()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "ChoiceDialog.xaml.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("bool hasInitialValue", source);
+        Assert.Contains("ChoiceBox.SelectedItem = options.FirstOrDefault", source);
+        Assert.Contains("ApplyButton.IsEnabled = option is not null;", source);
+        Assert.Contains("selectedValue = dlg.SelectedValue is T typedValue ? typedValue : null;", source);
+    }
+
     [Theory]
     [InlineData("InputDialog.xaml", "OkButton")]
+    [InlineData("ChoiceDialog.xaml", "ApplyButton")]
     [InlineData("FolderPickerDialog.xaml", "OkButton")]
     [InlineData("FileSystemFolderDialog.xaml", "OkButton")]
     public void Workflow_dialog_disabled_primary_actions_explain_the_required_next_step(string xamlFile, string buttonName)

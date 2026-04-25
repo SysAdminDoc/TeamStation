@@ -1,0 +1,77 @@
+<Window x:Class="TeamStation.App.Views.ChoiceDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Choose value"
+        Width="500"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BaseBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{StaticResource UiFont}"
+        ShowInTaskbar="False"
+        AutomationProperties.Name="Choice dialog">
+    <Border Margin="16"
+            Background="{DynamicResource MantleBrush}"
+            BorderBrush="{DynamicResource PanelBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="24,22">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0">
+                <TextBlock x:Name="DialogTitleText" Style="{StaticResource HeadlineText}" />
+                <TextBlock x:Name="PromptText"
+                           Margin="0,8,0,0"
+                           Style="{StaticResource SectionSubtitleText}" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Margin="0,18,0,0">
+                <TextBlock Text="Apply value" Style="{StaticResource FieldLabelText}" />
+                <ComboBox x:Name="ChoiceBox"
+                          AutomationProperties.Name="{Binding Text, ElementName=DialogTitleText}"
+                          DisplayMemberPath="Label"
+                          SelectionChanged="ChoiceBox_SelectionChanged" />
+            </StackPanel>
+
+            <Border Grid.Row="2"
+                    Margin="0,14,0,0"
+                    Background="{DynamicResource Surface0Brush}"
+                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="12,10">
+                <TextBlock x:Name="ChoiceDescriptionText"
+                           Foreground="{DynamicResource Subtext1Brush}"
+                           FontSize="12"
+                           LineHeight="18"
+                           TextWrapping="Wrap" />
+            </Border>
+
+            <DockPanel Grid.Row="3" Margin="0,20,0,0" LastChildFill="False">
+                <Button DockPanel.Dock="Right"
+                        Content="Cancel"
+                        Style="{StaticResource GhostButton}"
+                        Margin="8,0,0,0"
+                        AutomationProperties.Name="Cancel"
+                        IsCancel="True"
+                        Click="Cancel_Click" />
+                <Button DockPanel.Dock="Right"
+                        x:Name="ApplyButton"
+                        Content="Apply"
+                        Style="{StaticResource PrimaryButton}"
+                        AutomationProperties.Name="Apply selected value"
+                        ToolTip="Choose a value before applying"
+                        ToolTipService.ShowOnDisabled="True"
+                        IsDefault="True"
+                        Click="Apply_Click" />
+            </DockPanel>
+        </Grid>
+    </Border>
+</Window>

@@ -1173,6 +1173,30 @@
                                         FontSize="12"
                                         ToolTip="Replace the complete tag list on every selected connection."
                                         Command="{Binding BulkReplaceTagsCommand}" />
+                                <Button Content="Mode"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Set the launch mode for every selected connection."
+                                        Command="{Binding BulkSetModeCommand}" />
+                                <Button Content="Quality"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Set the quality preference for every selected connection."
+                                        Command="{Binding BulkSetQualityCommand}" />
+                                <Button Content="Access"
+                                        Style="{StaticResource GhostButton}"
+                                        MinWidth="0"
+                                        Padding="8,4"
+                                        Margin="0,0,6,0"
+                                        FontSize="12"
+                                        ToolTip="Set access control for every selected connection."
+                                        Command="{Binding BulkSetAccessControlCommand}" />
                                 <Button Content="Pin"
                                         Style="{StaticResource GhostButton}"
                                         MinWidth="0"
@@ -1354,6 +1378,15 @@
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <MenuItem Header="{Binding BulkReplaceTagsSelectionLabel}"
                                               Command="{Binding BulkReplaceTagsCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkSetModeSelectionLabel}"
+                                              Command="{Binding BulkSetModeCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkSetQualitySelectionLabel}"
+                                              Command="{Binding BulkSetQualityCommand}"
+                                              Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
+                                    <MenuItem Header="{Binding BulkSetAccessControlSelectionLabel}"
+                                              Command="{Binding BulkSetAccessControlCommand}"
                                               Visibility="{Binding IsBulkSelectionActive, Converter={StaticResource BoolToVis}}" />
                                     <Separator />
                                     <MenuItem Header="New connection" Command="{Binding AddEntryCommand}" />

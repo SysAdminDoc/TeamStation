@@ -116,6 +116,9 @@ public sealed class MainViewModel : ViewModelBase
         BulkAddTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Add), () => SelectedNodes.OfType<EntryNode>().Any());
         BulkRemoveTagCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Remove), () => SelectedNodes.OfType<EntryNode>().Any());
         BulkReplaceTagsCommand = new RelayCommand(() => BulkEditTags(BulkTagOperation.Replace), () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkSetModeCommand = new RelayCommand(BulkSetMode, () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkSetQualityCommand = new RelayCommand(BulkSetQuality, () => SelectedNodes.OfType<EntryNode>().Any());
+        BulkSetAccessControlCommand = new RelayCommand(BulkSetAccessControl, () => SelectedNodes.OfType<EntryNode>().Any());
         ClearMultiSelectionCommand = new RelayCommand(ClearMultiSelection, () => IsBulkSelectionActive);
         OpenSettingsCommand = new RelayCommand(OpenSettings);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
@@ -463,6 +466,9 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand BulkAddTagCommand { get; }
     public System.Windows.Input.ICommand BulkRemoveTagCommand { get; }
     public System.Windows.Input.ICommand BulkReplaceTagsCommand { get; }
+    public System.Windows.Input.ICommand BulkSetModeCommand { get; }
+    public System.Windows.Input.ICommand BulkSetQualityCommand { get; }
+    public System.Windows.Input.ICommand BulkSetAccessControlCommand { get; }
     public System.Windows.Input.ICommand ClearMultiSelectionCommand { get; }
 
     /// <summary>
@@ -498,6 +504,9 @@ public sealed class MainViewModel : ViewModelBase
     public string BulkAddTagSelectionLabel => $"Add tag to selection ({MultiSelectedEntryCount})";
     public string BulkRemoveTagSelectionLabel => $"Remove tag from selection ({MultiSelectedEntryCount})";
     public string BulkReplaceTagsSelectionLabel => $"Replace tags on selection ({MultiSelectedEntryCount})";
+    public string BulkSetModeSelectionLabel => $"Set mode on selection ({MultiSelectedEntryCount})";
+    public string BulkSetQualitySelectionLabel => $"Set quality on selection ({MultiSelectedEntryCount})";
+    public string BulkSetAccessControlSelectionLabel => $"Set access on selection ({MultiSelectedEntryCount})";
     public string MultiSelectionSummary => $"{DisplayText.Count(MultiSelectedEntryCount, "connection")} selected";
 
     /// <summary>
@@ -540,12 +549,18 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(BulkAddTagSelectionLabel));
         OnPropertyChanged(nameof(BulkRemoveTagSelectionLabel));
         OnPropertyChanged(nameof(BulkReplaceTagsSelectionLabel));
+        OnPropertyChanged(nameof(BulkSetModeSelectionLabel));
+        OnPropertyChanged(nameof(BulkSetQualitySelectionLabel));
+        OnPropertyChanged(nameof(BulkSetAccessControlSelectionLabel));
         OnPropertyChanged(nameof(MultiSelectionSummary));
         ((RelayCommand)BulkPinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkUnpinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkAddTagCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkRemoveTagCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkReplaceTagsCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkSetModeCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkSetQualityCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)BulkSetAccessControlCommand).RaiseCanExecuteChanged();
         ((RelayCommand)ClearMultiSelectionCommand).RaiseCanExecuteChanged();
     }
 
@@ -682,6 +697,149 @@ public sealed class MainViewModel : ViewModelBase
 
     private static bool TagsEqual(IReadOnlyList<string> left, IReadOnlyList<string> right) =>
         left.Count == right.Count && left.Zip(right).All(pair => string.Equals(pair.First, pair.Second, StringComparison.OrdinalIgnoreCase));
+
+    private void BulkSetMode() => BulkSetLaunchOption<ConnectionMode>(
+        "Set mode on selection",
+        "Choose the TeamViewer launch mode to apply to every selected connection.",
+        "Selected connections have mixed modes. Choose the value to apply before continuing.",
+        CreateModeOptions(),
+        entry => entry.Model.Mode,
+        (entry, value) => entry.Mode = value,
+        value => DisplayText.ModeLabel(value),
+        "mode",
+        "bulk_set_mode");
+
+    private void BulkSetQuality() => BulkSetLaunchOption<ConnectionQuality>(
+        "Set quality on selection",
+        "Choose the TeamViewer quality preference to apply to every selected connection.",
+        "Selected connections have mixed quality preferences. Choose the value to apply before continuing.",
+        CreateQualityOptions(),
+        entry => entry.Model.Quality,
+        (entry, value) => entry.Quality = value,
+        value => DisplayText.QualityLabel(value),
+        "quality",
+        "bulk_set_quality");
+
+    private void BulkSetAccessControl() => BulkSetLaunchOption<AccessControl>(
+        "Set access on selection",
+        "Choose the access-control behavior to apply to every selected connection.",
+        "Selected connections have mixed access-control settings. Choose the value to apply before continuing.",
+        CreateAccessControlOptions(),
+        entry => entry.Model.AccessControl,
+        (entry, value) => entry.AccessControl = value,
+        value => DisplayText.AccessLabel(value),
+        "access control",
+        "bulk_set_access_control");
+
+    private void BulkSetLaunchOption<T>(
+        string title,
+        string prompt,
+        string noSelectionText,
+        IReadOnlyList<ChoiceDialogOption> options,
+        Func<EntryNode, T?> getValue,
+        Action<ConnectionEntry, T?> setValue,
+        Func<T?, string> labelForValue,
+        string settingName,
+        string auditAction)
+        where T : struct
+    {
+        var entries = SelectedNodes.OfType<EntryNode>().ToList();
+        if (entries.Count == 0) return;
+
+        var hasInitialValue = TryGetCommonLaunchValue(entries, getValue, out var initialValue);
+        if (!ChoiceDialog.Pick(
+                Application.Current?.MainWindow,
+                title,
+                prompt,
+                noSelectionText,
+                options,
+                hasInitialValue,
+                initialValue,
+                out T? selectedValue))
+        {
+            ReportStatus(LogLevel.Warning, $"Bulk {settingName} update cancelled.");
+            return;
+        }
+
+        var changed = 0;
+        foreach (var entryNode in entries)
+        {
+            if (EqualityComparer<T?>.Default.Equals(getValue(entryNode), selectedValue))
+                continue;
+
+            setValue(entryNode.Model, selectedValue);
+            entryNode.Model.ModifiedUtc = DateTimeOffset.UtcNow;
+            _entries.Upsert(entryNode.Model);
+            entryNode.Refresh();
+            changed++;
+        }
+
+        var selectedLabel = labelForValue(selectedValue);
+        if (changed == 0)
+        {
+            ReportStatus(LogLevel.Info, $"Selected connections already use {selectedLabel} for {settingName}.");
+            return;
+        }
+
+        ApplyFilter();
+        NotifySurfacePropertyChanges();
+        Audit(auditAction, "connection", null,
+            $"Set {settingName} to {selectedLabel} on {DisplayText.Count(changed, "connection")} via bulk action.",
+            selectedLabel);
+        MirrorDatabase();
+        ReportStatus(LogLevel.Success,
+            $"Set {settingName} to {selectedLabel} on {DisplayText.Count(changed, "connection")}.");
+    }
+
+    private static bool TryGetCommonLaunchValue<T>(
+        IReadOnlyList<EntryNode> entries,
+        Func<EntryNode, T?> getValue,
+        out T? commonValue)
+        where T : struct
+    {
+        commonValue = default;
+        if (entries.Count == 0) return false;
+
+        commonValue = getValue(entries[0]);
+        for (var i = 1; i < entries.Count; i++)
+        {
+            if (!EqualityComparer<T?>.Default.Equals(commonValue, getValue(entries[i])))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static IReadOnlyList<ChoiceDialogOption> CreateModeOptions() =>
+    [
+        new("Inherit from folder", "Resolve the launch mode from the parent folder at launch time.", null),
+        new("Remote control", "Start a standard remote-control session through TeamViewer.exe.", ConnectionMode.RemoteControl),
+        new("File transfer", "Open TeamViewer directly in file-transfer mode.", ConnectionMode.FileTransfer),
+        new("VPN", "Open TeamViewer in VPN mode when supported by the installed client.", ConnectionMode.Vpn),
+        new("Chat", "Open the TeamViewer chat URI handler for the selected connection.", ConnectionMode.Chat),
+        new("Video call", "Open the TeamViewer video-call URI handler for the selected connection.", ConnectionMode.VideoCall),
+        new("Presentation", "Open the TeamViewer presentation URI handler for the selected connection.", ConnectionMode.Presentation),
+    ];
+
+    private static IReadOnlyList<ChoiceDialogOption> CreateQualityOptions() =>
+    [
+        new("Inherit from folder", "Resolve the quality preference from the parent folder at launch time.", null),
+        new("Auto", "Let TeamViewer choose the best balance for the session.", ConnectionQuality.AutoSelect),
+        new("Optimize quality", "Favor image quality when bandwidth allows it.", ConnectionQuality.OptimizeQuality),
+        new("Optimize speed", "Favor responsiveness on slower or less reliable networks.", ConnectionQuality.OptimizeSpeed),
+        new("Custom", "Use custom TeamViewer quality settings already configured in the client.", ConnectionQuality.CustomSettings),
+        new("Undefined", "Pass TeamViewer's undefined quality value for compatibility with imported data.", ConnectionQuality.Undefined),
+    ];
+
+    private static IReadOnlyList<ChoiceDialogOption> CreateAccessControlOptions() =>
+    [
+        new("Inherit from folder", "Resolve access control from the parent folder at launch time.", null),
+        new("Undefined", "Use TeamViewer's default access-control behavior.", AccessControl.Undefined),
+        new("Full access", "Request full access for the remote session.", AccessControl.FullAccess),
+        new("Confirm all", "Require confirmation for all access requests.", AccessControl.ConfirmAll),
+        new("View and show", "Limit the session to viewing and showing actions.", AccessControl.ViewAndShow),
+        new("Custom settings", "Use the custom access-control settings configured in TeamViewer.", AccessControl.CustomSettings),
+    ];
 
     public System.Windows.Input.ICommand ExportCommand { get; }
     public System.Windows.Input.ICommand ImportCommand { get; }
