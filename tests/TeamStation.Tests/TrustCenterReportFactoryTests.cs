@@ -289,6 +289,20 @@ public class TrustCenterReportFactoryTests
         Assert.DoesNotContain("Bearer", report.WebApi.DetailText);
     }
 
+    // -------- Use policy section --------
+
+    [Fact]
+    public void UsePolicy_section_records_local_transparency_boundaries()
+    {
+        var report = BuildBaseline();
+        Assert.Equal(TrustCenterTone.Healthy, report.UsePolicy.Tone);
+        Assert.Contains("local-use", report.UsePolicy.Headline);
+        Assert.Contains("official TeamViewer client", report.UsePolicy.DetailText);
+        Assert.Contains("does not hide sessions", report.UsePolicy.DetailText);
+        Assert.Contains(report.UsePolicy.SafeguardList, item => item.Contains("recorded", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(report.UsePolicy.SafeguardList, item => item.Contains("allowlisting", StringComparison.OrdinalIgnoreCase));
+    }
+
     // -------- Formatters --------
 
     [Theory]

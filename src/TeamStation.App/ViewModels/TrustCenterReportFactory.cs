@@ -52,7 +52,8 @@ public static class TrustCenterReportFactory
             Database: BuildDatabase(databasePath, databaseSizeBytes, databaseLastWrite, portableMode, now),
             Mirror: BuildMirror(cloudSyncFolder, mirrorFile, mirrorLastWrite, now),
             Registry: BuildRegistry(registry),
-            WebApi: BuildWebApi(webApiTokenConfigured));
+            WebApi: BuildWebApi(webApiTokenConfigured),
+            UsePolicy: BuildUsePolicy());
     }
 
     // -------- Safety --------
@@ -220,6 +221,21 @@ public static class TrustCenterReportFactory
             TokenConfigured: true,
             Headline: "TeamViewer Web API token configured",
             DetailText: "Read-only group/device sync runs when invoked. Token value is not displayed here.",
+            Tone: TrustCenterTone.Healthy);
+    }
+
+    // -------- Use policy --------
+
+    private static TrustCenterUsePolicySection BuildUsePolicy()
+    {
+        return new TrustCenterUsePolicySection(
+            Headline: "Transparent local-use posture",
+            DetailText: "TeamStation orchestrates the official TeamViewer client and keeps review evidence local. It does not hide sessions, run a relay, or implement the TeamViewer protocol.",
+            Safeguards: ImmutableArray.Create(
+                "Launch and workflow actions are recorded in the local activity and audit surfaces.",
+                "TeamViewer.exe provenance is advisory and visible; failed provenance never becomes a hidden launch blocker.",
+                "Credentials and tokens are redacted in status surfaces and documentation examples.",
+                "Enterprise allowlisting should key on the TeamViewer publisher/path and the TeamStation release artifact path."),
             Tone: TrustCenterTone.Healthy);
     }
 

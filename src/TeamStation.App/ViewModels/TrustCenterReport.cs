@@ -23,7 +23,8 @@ public sealed record TrustCenterReport(
     TrustCenterDatabaseSection Database,
     TrustCenterMirrorSection Mirror,
     TrustCenterRegistrySection Registry,
-    TrustCenterWebApiSection WebApi);
+    TrustCenterWebApiSection WebApi,
+    TrustCenterUsePolicySection UsePolicy);
 
 /// <summary>
 /// TeamViewer client + bundled CVE registry verdict. Wraps the existing
@@ -120,6 +121,21 @@ public sealed record TrustCenterWebApiSection(
     string Headline,
     string DetailText,
     TrustCenterTone Tone);
+
+/// <summary>
+/// Local operating posture for abuse-resistance and enterprise review. The
+/// section records TeamStation's boundaries rather than probing the host.
+/// Keeping it in the report makes the same trust summary available to the
+/// dialog and future Evidence Pack exports.
+/// </summary>
+public sealed record TrustCenterUsePolicySection(
+    string Headline,
+    string DetailText,
+    ImmutableArray<string> Safeguards,
+    TrustCenterTone Tone)
+{
+    public IReadOnlyList<string> SafeguardList => Safeguards;
+}
 
 /// <summary>
 /// Visual tone used by the dialog to colour each section's status pill.

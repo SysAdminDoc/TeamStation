@@ -2,6 +2,8 @@
 
 Implementation reference for the TeamStation launcher. Distilled from the official CLI docs, KB 34447, the REACH API guide, the `webapi.teamviewer.com/api/v1` schema, and the CVE-2020-13699 advisory. Cross-checked against local TV 15 install behavior.
 
+For product-level proof status across CLI, URI, Web Client, Web API, deployment, and rejected surfaces, see [`teamviewer-capability-matrix.md`](teamviewer-capability-matrix.md). For future setup-time assignment command builders, see [`teamviewer-deployment-helper.md`](teamviewer-deployment-helper.md).
+
 ---
 
 ## CLI parameters — `TeamViewer.exe`
@@ -27,6 +29,8 @@ Implementation reference for the TeamStation launcher. Distilled from the offici
 ### `assign` sub-parameters
 
 `--api-token`, `--group`, `--group-id`, `--alias`, `--grant-easy-access`, `--reassign`, `--wait`, `--proxy`, `--proxy-user`, `--proxy-pw`, `--proxy-pwbase64`, `--retries`, `--timeout`, `--verbose` (macOS only).
+
+TeamStation does not yet execute assignment commands. Future guarded builders must follow the redaction, dry-run, and lab-proof requirements in [`teamviewer-deployment-helper.md`](teamviewer-deployment-helper.md).
 
 ---
 
@@ -210,7 +214,7 @@ TeamStation **never blocks launch** on a failed provenance check. The activity l
 
 ## Trust Center dashboard (v0.4.0)
 
-`Tools -> Trust Center...` opens a read-only health snapshot composed of six panels. Every value is local: nothing is uploaded, nothing is fetched. The dialog uses calm sysadmin tone (4 status pills — `OK` / `CHECK` / `ACTION` / `INFO`) and never blocks launch.
+`Tools -> Trust Center...` opens a read-only health snapshot composed of seven panels. Every value is local: nothing is uploaded, nothing is fetched. The dialog uses calm sysadmin tone (4 status pills — `OK` / `CHECK` / `ACTION` / `INFO`) and never blocks launch.
 
 | Panel | Source | Action tone |
 | --- | --- | --- |
@@ -220,5 +224,6 @@ TeamStation **never blocks launch** on a failed provenance check. The activity l
 | Encrypted mirror | Mirror file `LastWriteTime` against a 7-day stale threshold | `Info` when not configured, `Caution` when stale, `Healthy` when fresh |
 | CVE registry | `TeamViewerCveRegistry.Default` entry count + diagnostics | `Caution` when diagnostics present, `Healthy` for clean load |
 | TeamViewer Web API | Token presence (never the value) | `Info` when not configured, `Healthy` when set |
+| Use and audit posture | Static local-use boundaries plus redaction / audit / allowlisting reminders | `Healthy` because it records built-in posture, not host health |
 
 Pure logic lives in `TrustCenterReportFactory.Build` so unit tests can pump synthetic probes through without spinning up Win32; `TrustCenterViewModel` owns the IO at runtime and exposes a `RefreshCommand` so the operator can re-probe without closing the dialog.

@@ -91,6 +91,7 @@ capture guide in that folder for the required set; re-capture on any UI change.
 - A cloud mirror folder can receive an encrypted copy of the SQLite database after changes. It is a mirror/backup mechanism, not a multi-writer merge engine.
 - **Known residual risk:** launching a session normally passes `--PasswordB64` on the TeamViewer command line. That value is visible to any process on the machine that can read the command line of another user-owned process during the brief launch window. Toggle **Settings → Launch without password on the command line** to stage the password on the clipboard instead — TeamStation clears the clipboard 30s after launch.
 - TeamStation never phones home. There is no telemetry, no update ping, no cloud account.
+- **Trust posture:** TeamStation launches the official TeamViewer client, records local launch/audit events, never hides sessions, and keeps TeamViewer control-surface proof status explicit in [`docs/teamviewer-capability-matrix.md`](docs/teamviewer-capability-matrix.md). Future setup-time assignment helpers are specified in [`docs/teamviewer-deployment-helper.md`](docs/teamviewer-deployment-helper.md) with redacted dry-runs before any executable workflow lands.
 
 ## Download
 
