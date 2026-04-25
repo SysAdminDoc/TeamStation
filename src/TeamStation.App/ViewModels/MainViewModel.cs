@@ -37,6 +37,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly string? _startupDbPath;
     private readonly object _rootsLock = new();
     private bool _isTeamViewerReady;
+    private bool _isCloudSyncing;
     private Brush _statusBrush = Brushes.Transparent;
     private string _statusTag = "Ready";
     private int _folderCount;
@@ -105,9 +106,10 @@ public sealed class MainViewModel : ViewModelBase
         TogglePinCommand = new RelayCommand(TogglePin, () => Selected is EntryNode);
         BulkPinCommand = new RelayCommand(() => BulkSetPinned(true), () => SelectedNodes.OfType<EntryNode>().Any());
         BulkUnpinCommand = new RelayCommand(() => BulkSetPinned(false), () => SelectedNodes.OfType<EntryNode>().Any());
+        ClearMultiSelectionCommand = new RelayCommand(ClearMultiSelection, () => IsBulkSelectionActive);
         OpenSettingsCommand = new RelayCommand(OpenSettings);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
-        SyncTeamViewerCloudCommand = new RelayCommand(() => _ = SyncTeamViewerCloudAsync());
+        SyncTeamViewerCloudCommand = new RelayCommand(() => _ = SyncTeamViewerCloudAsync(), () => CanSyncTeamViewerCloud);
         ExportSessionsCommand = new RelayCommand(ExportSessions);
         RunExternalToolCommand = new RelayCommand(RunExternalTool,
             parameter => Selected is EntryNode && parameter is ExternalToolDefinition);
@@ -271,6 +273,34 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
     public string TeamViewerStatusText => _isTeamViewerReady ? "TeamViewer ready" : "Install TeamViewer";
+    public bool IsCloudSyncing
+    {
+        get => _isCloudSyncing;
+        private set
+        {
+            if (SetField(ref _isCloudSyncing, value))
+            {
+                OnPropertyChanged(nameof(CanSyncTeamViewerCloud));
+                OnPropertyChanged(nameof(CloudSyncStatusText));
+                OnPropertyChanged(nameof(CloudSyncButtonText));
+                OnPropertyChanged(nameof(CloudSyncToneBrush));
+                ((RelayCommand)SyncTeamViewerCloudCommand).RaiseCanExecuteChanged();
+            }
+        }
+    }
+    public bool HasTeamViewerApiToken => !string.IsNullOrWhiteSpace(_settings.TeamViewerApiToken);
+    public bool CanSyncTeamViewerCloud => HasTeamViewerApiToken && !IsCloudSyncing;
+    public string CloudSyncButtonText => IsCloudSyncing ? "Syncing" : "Sync cloud";
+    public string CloudSyncStatusText => IsCloudSyncing
+        ? "Cloud sync in progress"
+        : HasTeamViewerApiToken
+            ? "Cloud sync ready"
+            : "Cloud sync not configured";
+    public Brush CloudSyncToneBrush => IsCloudSyncing
+        ? TryBrush("BlueBrush", Brushes.LightSkyBlue)
+        : HasTeamViewerApiToken
+            ? TryBrush("GreenBrush", Brushes.LightGreen)
+            : TryBrush("Overlay0Brush", Brushes.Gray);
     public string DatabasePathDisplay => _startupDbPath ?? "Database path unavailable";
     public string DatabaseLocationDisplay => _startupDbPath is null
         ? "Portable mode"
@@ -381,6 +411,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand LaunchCommand { get; }
     public System.Windows.Input.ICommand BulkPinCommand { get; }
     public System.Windows.Input.ICommand BulkUnpinCommand { get; }
+    public System.Windows.Input.ICommand ClearMultiSelectionCommand { get; }
 
     /// <summary>
     /// v0.3.5: nodes with <see cref="TreeNode.IsMultiSelected"/> set,
@@ -412,6 +443,7 @@ public sealed class MainViewModel : ViewModelBase
     public bool IsBulkSelectionActive => MultiSelectedEntryCount >= 2;
     public string BulkPinSelectionLabel => $"Pin selection ({MultiSelectedEntryCount})";
     public string BulkUnpinSelectionLabel => $"Unpin selection ({MultiSelectedEntryCount})";
+    public string MultiSelectionSummary => $"{DisplayText.Count(MultiSelectedEntryCount, "connection")} selected";
 
     /// <summary>
     /// Toggles <see cref="TreeNode.IsMultiSelected"/> on <paramref name="node"/>.
@@ -450,8 +482,10 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsBulkSelectionActive));
         OnPropertyChanged(nameof(BulkPinSelectionLabel));
         OnPropertyChanged(nameof(BulkUnpinSelectionLabel));
+        OnPropertyChanged(nameof(MultiSelectionSummary));
         ((RelayCommand)BulkPinCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BulkUnpinCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)ClearMultiSelectionCommand).RaiseCanExecuteChanged();
     }
 
     private void BulkSetPinned(bool pinned)
@@ -872,6 +906,12 @@ public sealed class MainViewModel : ViewModelBase
         RefreshTeamViewerVersion();
         OnPropertyChanged(nameof(ExternalTools));
         OnPropertyChanged(nameof(HasExternalTools));
+        OnPropertyChanged(nameof(HasTeamViewerApiToken));
+        OnPropertyChanged(nameof(CanSyncTeamViewerCloud));
+        OnPropertyChanged(nameof(CloudSyncStatusText));
+        OnPropertyChanged(nameof(CloudSyncButtonText));
+        OnPropertyChanged(nameof(CloudSyncToneBrush));
+        ((RelayCommand)SyncTeamViewerCloudCommand).RaiseCanExecuteChanged();
         Search.RaiseSavedSearchesChanged();
         OnPropertyChanged(nameof(SavedSearches));
         OnPropertyChanged(nameof(HasSavedSearches));
@@ -900,6 +940,17 @@ public sealed class MainViewModel : ViewModelBase
 
     private async Task SyncTeamViewerCloudAsync()
     {
+        if (!HasTeamViewerApiToken)
+        {
+            ReportStatus(LogLevel.Warning, "Add a TeamViewer Web API token in Settings before syncing cloud devices.");
+            return;
+        }
+
+        if (IsCloudSyncing)
+            return;
+
+        IsCloudSyncing = true;
+        ReportStatus(LogLevel.Info, "Syncing TeamViewer cloud devices...");
         try
         {
             var result = await _cloudSync.PullAsync(_settings.TeamViewerApiToken ?? string.Empty);
@@ -934,6 +985,10 @@ public sealed class MainViewModel : ViewModelBase
         {
             ReportStatus(LogLevel.Error, $"TeamViewer cloud sync failed: {ex.Message}");
             _dialogs.ShowError(Application.Current?.MainWindow, "TeamViewer cloud sync failed", ex.Message);
+        }
+        finally
+        {
+            IsCloudSyncing = false;
         }
     }
 

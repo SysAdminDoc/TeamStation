@@ -17,7 +17,7 @@
             <Setter Property="Background" Value="{StaticResource MantleBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="22,20" />
         </Style>
     </Window.Resources>

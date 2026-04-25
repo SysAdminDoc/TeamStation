@@ -119,4 +119,35 @@ public class MainWindowKeyboardNavTests
         var tab = (string?)tree.Attribute("KeyboardNavigation.TabNavigation");
         Assert.Equal("Once", tab);
     }
+
+    [Fact]
+    public void Disabled_cloud_sync_button_still_explains_why_it_is_unavailable()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var button = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute("Command")) == "{Binding SyncTeamViewerCloudCommand}");
+
+        Assert.NotNull(button);
+        Assert.Equal("{Binding CloudSyncStatusText}", (string?)button!.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)button.Attribute("ToolTipService.ShowOnDisabled"));
+    }
+
+    [Fact]
+    public void Bulk_selection_surface_exposes_inline_actions()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var summary = doc.Descendants(Wpf + "TextBlock")
+            .FirstOrDefault(tb => ((string?)tb.Attribute("Text")) == "{Binding MultiSelectionSummary}");
+
+        Assert.NotNull(summary);
+
+        var commands = doc.Descendants(Wpf + "Button")
+            .Select(b => (string?)b.Attribute("Command"))
+            .Where(command => !string.IsNullOrWhiteSpace(command))
+            .ToHashSet();
+
+        Assert.Contains("{Binding BulkPinCommand}", commands);
+        Assert.Contains("{Binding BulkUnpinCommand}", commands);
+        Assert.Contains("{Binding ClearMultiSelectionCommand}", commands);
+    }
 }

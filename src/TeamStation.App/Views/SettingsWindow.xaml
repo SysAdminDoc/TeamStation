@@ -16,8 +16,16 @@
             <Setter Property="Background" Value="{StaticResource MantleBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="22,20" />
+        </Style>
+        <Style x:Key="TrustSignal" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,8,8" />
         </Style>
     </Window.Resources>
 
@@ -47,8 +55,46 @@
         <ScrollViewer Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
             <StackPanel>
 
-                <!--  Appearance  -->
+                <!--  Trust posture  -->
                 <Border Style="{StaticResource SectionCard}">
+                    <StackPanel>
+                        <TextBlock Text="Security posture" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="TeamStation keeps launches fast while making credential and sync behavior explicit."
+                                   Style="{StaticResource SectionSubtitleText}" />
+                        <WrapPanel Margin="0,16,0,0">
+                            <Border Style="{StaticResource TrustSignal}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                                               Text="&#xE72E;"
+                                               Foreground="{StaticResource GreenBrush}"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                    <StackPanel>
+                                        <TextBlock Text="Encrypted local vault" FontWeight="SemiBold" FontSize="12" />
+                                        <TextBlock Text="Passwords and tokens stay protected at rest." Style="{StaticResource BodyMutedText}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource TrustSignal}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                                               Text="&#xE895;"
+                                               Foreground="{StaticResource BlueBrush}"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                    <StackPanel>
+                                        <TextBlock Text="Opt-in cloud sync" FontWeight="SemiBold" FontSize="12" />
+                                        <TextBlock Text="No Web API token means no cloud requests." Style="{StaticResource BodyMutedText}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <!--  Appearance  -->
+                <Border Style="{StaticResource SectionCard}" Margin="0,14,0,0">
                     <StackPanel>
                         <TextBlock Text="Appearance" Style="{StaticResource SectionTitleText}" />
                         <TextBlock Margin="0,6,0,0"
