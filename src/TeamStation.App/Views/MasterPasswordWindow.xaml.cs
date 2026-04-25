@@ -17,7 +17,11 @@ public partial class MasterPasswordWindow : Window
             ? "Portable mode stores the database next to the app. A master password is required so the database can move between machines without relying on Windows DPAPI."
             : "Enter the master password for this portable database.";
         ConfirmPanel.Visibility = createNew ? Visibility.Visible : Visibility.Collapsed;
-        Loaded += (_, _) => PasswordBox.Focus();
+        Loaded += (_, _) =>
+        {
+            UpdateReadiness();
+            PasswordBox.Focus();
+        };
     }
 
     public string Password { get; private set; } = string.Empty;
@@ -52,5 +56,38 @@ public partial class MasterPasswordWindow : Window
     {
         ValidationText.Text = message;
         ValidationBorder.Visibility = Visibility.Visible;
+    }
+
+    private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        UpdateReadiness();
+    }
+
+    private void UpdateReadiness()
+    {
+        var password = PasswordBox.Password;
+        var hasLength = password.Length >= 10;
+        var matches = !_createNew || password == ConfirmBox.Password;
+
+        ContinueButton.IsEnabled = hasLength && matches;
+        if (!hasLength)
+        {
+            ContinueButton.ToolTip = "Enter a master password with at least 10 characters.";
+            PasswordHelpText.Text = "Use at least 10 characters.";
+            return;
+        }
+
+        if (!matches)
+        {
+            ContinueButton.ToolTip = "Confirm the same master password to continue.";
+            PasswordHelpText.Text = "Passwords must match before portable mode can be created.";
+            return;
+        }
+
+        ContinueButton.ToolTip = "Continue";
+        PasswordHelpText.Text = _createNew
+            ? "Password length and confirmation are ready."
+            : "Password length is ready.";
+        ValidationBorder.Visibility = Visibility.Collapsed;
     }
 }

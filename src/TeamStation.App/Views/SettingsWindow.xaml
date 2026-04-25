@@ -103,6 +103,8 @@
 
                         <TextBlock Margin="0,18,0,0" Text="Theme" Style="{StaticResource FieldLabelText}" />
                         <ComboBox x:Name="ThemeBox"
+                                  AutomationProperties.Name="Theme"
+                                  AutomationProperties.HelpText="Choose the TeamStation color theme."
                                   DisplayMemberPath="Name"
                                   SelectedValuePath="Id" />
                         <TextBlock Margin="0,6,0,0" Text="System follows Windows app mode; Dark, Graphite, Light, and High contrast are available for fixed environments." Style="{StaticResource BodyMutedText}" />
@@ -124,13 +126,21 @@
                                 <ColumnDefinition Width="10" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="TeamViewerPathBox" />
-                            <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="Browse" Click="Browse_Click" />
+                            <TextBox x:Name="TeamViewerPathBox"
+                                     AutomationProperties.Name="TeamViewer executable"
+                                     AutomationProperties.HelpText="Optional full path to TeamViewer.exe. Leave blank to use automatic discovery." />
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource GhostButton}"
+                                    Content="Browse"
+                                    AutomationProperties.Name="Browse for TeamViewer executable"
+                                    Click="Browse_Click" />
                         </Grid>
                         <TextBlock Margin="0,6,0,0" Text="Leave blank to use registry and standard install-path discovery." Style="{StaticResource BodyMutedText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="Web API token" Style="{StaticResource FieldLabelText}" />
-                        <PasswordBox x:Name="ApiTokenBox" />
+                        <PasswordBox x:Name="ApiTokenBox"
+                                     AutomationProperties.Name="TeamViewer Web API token"
+                                     AutomationProperties.HelpText="Optional read-only script token for TeamViewer cloud sync." />
                         <TextBlock Margin="0,6,0,0" Text="Read-only script token used for group / device sync and online-state checks." Style="{StaticResource BodyMutedText}" />
                     </StackPanel>
                 </Border>
@@ -144,10 +154,12 @@
                                    Style="{StaticResource SectionSubtitleText}" />
 
                         <CheckBox x:Name="WakeBox"
+                                  AutomationProperties.Name="Send Wake-on-LAN before launch"
                                   Content="Send Wake-on-LAN before launch when a connection has a MAC address"
                                   Margin="0,18,0,12" />
 
                         <CheckBox x:Name="ClipboardPasswordBox"
+                                  AutomationProperties.Name="Stage password on clipboard"
                                   Content="Stage password on the clipboard instead of the command line (auto-clears in 30 s)"
                                   Margin="0,0,0,4" />
                         <TextBlock Margin="0,0,0,0"
@@ -171,13 +183,21 @@
                                 <ColumnDefinition Width="10" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="CloudFolderBox" />
-                            <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="Browse" Click="BrowseCloud_Click" />
+                            <TextBox x:Name="CloudFolderBox"
+                                     AutomationProperties.Name="Cloud sync folder"
+                                     AutomationProperties.HelpText="Optional existing folder where TeamStation writes an encrypted backup mirror." />
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource GhostButton}"
+                                    Content="Browse"
+                                    AutomationProperties.Name="Browse for cloud sync folder"
+                                    Click="BrowseCloud_Click" />
                         </Grid>
                         <TextBlock Margin="0,6,0,0" Text="Optional backup mirror folder. TeamStation writes an encrypted DB copy after changes." Style="{StaticResource BodyMutedText}" />
 
                         <TextBlock Margin="0,18,0,0" Text="Saved searches" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="SavedSearchesBox"
+                                 AutomationProperties.Name="Saved searches"
+                                 AutomationProperties.HelpText="One named search per line."
                                  AcceptsReturn="True"
                                  Height="90"
                                  VerticalContentAlignment="Top"
@@ -196,6 +216,8 @@
 
                         <TextBox x:Name="ExternalToolsBox"
                                  Margin="0,18,0,0"
+                                 AutomationProperties.Name="External tool definitions"
+                                 AutomationProperties.HelpText="One tool per line using Name, command, and optional arguments separated by vertical bars."
                                  AcceptsReturn="True"
                                  Height="130"
                                  FontFamily="{StaticResource MonoFont}"
@@ -208,18 +230,35 @@
             </StackPanel>
         </ScrollViewer>
 
-        <DockPanel Grid.Row="2" Margin="0,18,0,0" LastChildFill="False">
-            <Button DockPanel.Dock="Right"
-                    Content="Cancel"
-                    Style="{StaticResource GhostButton}"
-                    Margin="8,0,0,0"
-                    Click="Cancel_Click"
-                    IsCancel="True" />
-            <Button DockPanel.Dock="Right"
-                    Content="Save settings"
-                    Style="{StaticResource PrimaryButton}"
-                    Click="Save_Click"
-                    IsDefault="True" />
-        </DockPanel>
+        <StackPanel Grid.Row="2" Margin="0,18,0,0">
+            <Border x:Name="ValidationBorder"
+                    Margin="0,0,0,12"
+                    Style="{StaticResource ValidationBanner}"
+                    Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                               FontSize="13"
+                               Text="&#xE814;"
+                               Foreground="{StaticResource RedBrush}"
+                               VerticalAlignment="Top"
+                               Margin="0,1,10,0" />
+                    <TextBlock x:Name="ValidationText" Foreground="{StaticResource RedBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <DockPanel LastChildFill="False">
+                <Button DockPanel.Dock="Right"
+                        Content="Cancel"
+                        Style="{StaticResource GhostButton}"
+                        Margin="8,0,0,0"
+                        Click="Cancel_Click"
+                        IsCancel="True" />
+                <Button DockPanel.Dock="Right"
+                        Content="Save settings"
+                        Style="{StaticResource PrimaryButton}"
+                        Click="Save_Click"
+                        IsDefault="True" />
+            </DockPanel>
+        </StackPanel>
     </Grid>
 </Window>

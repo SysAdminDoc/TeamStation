@@ -223,4 +223,52 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("File.Exists(defaultPath)", source);
         Assert.Contains("Default TeamViewer.exe path does not exist.", source);
     }
+
+    [Theory]
+    [InlineData("ThemeBox", "Theme")]
+    [InlineData("TeamViewerPathBox", "TeamViewer executable")]
+    [InlineData("ApiTokenBox", "TeamViewer Web API token")]
+    [InlineData("CloudFolderBox", "Cloud sync folder")]
+    [InlineData("SavedSearchesBox", "Saved searches")]
+    [InlineData("ExternalToolsBox", "External tool definitions")]
+    public void Settings_fields_expose_accessible_names(string controlName, string expectedName)
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "SettingsWindow.xaml");
+        var doc = XDocument.Load(path);
+        var control = doc.Descendants()
+            .FirstOrDefault(e => ((string?)e.Attribute(Xaml + "Name")) == controlName);
+
+        Assert.NotNull(control);
+        Assert.Equal(expectedName, (string?)control!.Attribute("AutomationProperties.Name"));
+    }
+
+    [Fact]
+    public void Settings_save_validates_paths_and_external_tool_lines()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "SettingsWindow.xaml.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("File.Exists(teamViewerPath)", source);
+        Assert.Contains("Directory.Exists(cloudFolder)", source);
+        Assert.Contains("FindInvalidExternalToolLine", source);
+        Assert.Contains("External tool line", source);
+    }
+
+    [Fact]
+    public void Master_password_dialog_disables_continue_until_ready()
+    {
+        var path = Path.Combine(RepoRoot, "src", "TeamStation.App", "Views", "MasterPasswordWindow.xaml");
+        var doc = XDocument.Load(path);
+        var button = doc.Descendants(Wpf + "Button")
+            .FirstOrDefault(b => ((string?)b.Attribute(Xaml + "Name")) == "ContinueButton");
+
+        Assert.NotNull(button);
+        Assert.Equal("False", (string?)button!.Attribute("IsEnabled"));
+        Assert.Equal("True", (string?)button.Attribute("ToolTipService.ShowOnDisabled"));
+
+        var password = doc.Descendants(Wpf + "PasswordBox")
+            .FirstOrDefault(pb => ((string?)pb.Attribute(Xaml + "Name")) == "PasswordBox");
+        Assert.NotNull(password);
+        Assert.Equal("Master password", (string?)password!.Attribute("AutomationProperties.Name"));
+    }
 }

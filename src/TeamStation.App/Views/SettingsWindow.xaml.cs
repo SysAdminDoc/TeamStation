@@ -1,4 +1,5 @@
 using System.Windows;
+using System.IO;
 using Microsoft.Win32;
 using TeamStation.App.Services;
 using TeamStation.Core.Models;
@@ -47,6 +48,9 @@ public partial class SettingsWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
+        if (!ValidateBeforeSave())
+            return;
+
         _settings.TeamViewerPathOverride = BlankToNull(TeamViewerPathBox.Text);
         _settings.Theme = ThemeBox.SelectedValue as string ?? "Dark";
         _settings.TeamViewerApiToken = BlankToNull(ApiTokenBox.Password);
@@ -66,6 +70,60 @@ public partial class SettingsWindow : Window
     {
         DialogResult = false;
         Close();
+    }
+
+    private bool ValidateBeforeSave()
+    {
+        var teamViewerPath = BlankToNull(TeamViewerPathBox.Text);
+        if (teamViewerPath is not null && !File.Exists(teamViewerPath))
+        {
+            ShowValidation("TeamViewer executable path does not exist.");
+            TeamViewerPathBox.Focus();
+            return false;
+        }
+
+        var cloudFolder = BlankToNull(CloudFolderBox.Text);
+        if (cloudFolder is not null && !Directory.Exists(cloudFolder))
+        {
+            ShowValidation("Cloud sync folder does not exist.");
+            CloudFolderBox.Focus();
+            return false;
+        }
+
+        var invalidToolLine = FindInvalidExternalToolLine(ExternalToolsBox.Text);
+        if (invalidToolLine is not null)
+        {
+            ShowValidation($"External tool line {invalidToolLine.Value} must use Name|Command with an optional |Arguments segment.");
+            ExternalToolsBox.Focus();
+            return false;
+        }
+
+        ValidationBorder.Visibility = Visibility.Collapsed;
+        return true;
+    }
+
+    private void ShowValidation(string message)
+    {
+        ValidationText.Text = message;
+        ValidationBorder.Visibility = Visibility.Visible;
+    }
+
+    private static int? FindInvalidExternalToolLine(string text)
+    {
+        var lineNumber = 0;
+        foreach (var rawLine in text.Split(["\r\n", "\n"], StringSplitOptions.None))
+        {
+            lineNumber++;
+            var line = rawLine.Trim();
+            if (line.Length == 0)
+                continue;
+
+            var parts = line.Split('|', 3, StringSplitOptions.TrimEntries);
+            if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
+                return lineNumber;
+        }
+
+        return null;
     }
 
     private static List<ExternalToolDefinition> ParseTools(string text)
