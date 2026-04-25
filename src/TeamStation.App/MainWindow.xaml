@@ -785,6 +785,10 @@
                           ToolTip="{Binding ClearSearchTooltip}"
                           ToolTipService.ShowOnDisabled="True" />
                 <Separator />
+                <MenuItem Header="Trust Center..."
+                          Command="{Binding OpenTrustCenterCommand}"
+                          ToolTip="Local-only health snapshot: TeamViewer client safety, binary provenance, database, mirror, CVE registry, Web API."
+                          ToolTipService.ShowOnDisabled="True" />
                 <MenuItem Header="Settings..." Command="{Binding OpenSettingsCommand}" />
             </MenuItem>
         </Menu>

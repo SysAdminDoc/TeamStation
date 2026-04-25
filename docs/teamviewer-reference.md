@@ -204,4 +204,21 @@ The result is collapsed to a `TeamViewerProvenanceHealth` enum surfaced in the a
 
 **This is not anti-malware.** A determined attacker who can drop a signed binary on the same machine still passes. The check exists to catch the much more common "operator pointed Settings at the wrong path" and "renamed stub launcher from a different vendor" scenarios.
 
-TeamStation **never blocks launch** on a failed provenance check. The activity log carries the verdict, and a future Trust Center surface (v0.4.0 backlog) will display the result alongside the CVE state.
+TeamStation **never blocks launch** on a failed provenance check. The activity log carries the verdict, and the Trust Center dialog (`Tools -> Trust Center...`) renders the result alongside the CVE state.
+
+---
+
+## Trust Center dashboard (v0.4.0)
+
+`Tools -> Trust Center...` opens a read-only health snapshot composed of six panels. Every value is local: nothing is uploaded, nothing is fetched. The dialog uses calm sysadmin tone (4 status pills — `OK` / `CHECK` / `ACTION` / `INFO`) and never blocks launch.
+
+| Panel | Source | Action tone |
+| --- | --- | --- |
+| TeamViewer client safety | `TeamViewerSafetyEvaluator.Evaluate` against the bundled CVE registry | `Action` for vulnerable / not-detected, `Healthy` for safe, `Info` for unknown |
+| TeamViewer.exe provenance | `TeamViewerBinaryProvenanceInspector.Inspect` (Authenticode + publisher + install root) | Maps from `TeamViewerProvenanceHealth` |
+| Local database | File metadata + `StoragePaths.IsPortable` | `Info` when no DB yet, `Healthy` otherwise |
+| Encrypted mirror | Mirror file `LastWriteTime` against a 7-day stale threshold | `Info` when not configured, `Caution` when stale, `Healthy` when fresh |
+| CVE registry | `TeamViewerCveRegistry.Default` entry count + diagnostics | `Caution` when diagnostics present, `Healthy` for clean load |
+| TeamViewer Web API | Token presence (never the value) | `Info` when not configured, `Healthy` when set |
+
+Pure logic lives in `TrustCenterReportFactory.Build` so unit tests can pump synthetic probes through without spinning up Win32; `TrustCenterViewModel` owns the IO at runtime and exposes a `RefreshCommand` so the operator can re-probe without closing the dialog.

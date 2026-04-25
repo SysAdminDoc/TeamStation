@@ -131,6 +131,7 @@ public sealed class MainViewModel : ViewModelBase
         BulkClearProxyCommand = new RelayCommand(BulkClearProxy, () => SelectedNodes.OfType<EntryNode>().Any());
         ClearMultiSelectionCommand = new RelayCommand(ClearMultiSelection, () => IsBulkSelectionActive);
         OpenSettingsCommand = new RelayCommand(OpenSettings);
+        OpenTrustCenterCommand = new RelayCommand(OpenTrustCenter);
         OpenDatabaseFolderCommand = new RelayCommand(OpenDatabaseFolder, () => CanOpenDatabaseFolder);
         ImportTeamViewerHistoryCommand = new RelayCommand(ImportTeamViewerHistory);
         SyncTeamViewerCloudCommand = new RelayCommand(() => _ = SyncTeamViewerCloudAsync(), () => CanSyncTeamViewerCloud);
@@ -1292,6 +1293,7 @@ public sealed class MainViewModel : ViewModelBase
     public System.Windows.Input.ICommand ImportCsvCommand { get; }
     public System.Windows.Input.ICommand TogglePinCommand { get; }
     public System.Windows.Input.ICommand OpenSettingsCommand { get; }
+    public System.Windows.Input.ICommand OpenTrustCenterCommand { get; }
     public System.Windows.Input.ICommand OpenDatabaseFolderCommand { get; }
     public System.Windows.Input.ICommand ImportTeamViewerHistoryCommand { get; }
     public System.Windows.Input.ICommand SyncTeamViewerCloudCommand { get; }
@@ -1770,6 +1772,14 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasSavedSearches));
         Audit("settings", "application", null, "Updated settings.");
         ReportStatus(LogLevel.Success, "Settings saved.");
+    }
+
+    private void OpenTrustCenter()
+    {
+        var databasePath = _startupDbPath ?? StoragePaths.ResolveDatabasePath();
+        var vm = new TrustCenterViewModel(_settings, databasePath);
+        var dialog = new TrustCenterDialog(vm) { Owner = Application.Current?.MainWindow };
+        dialog.ShowDialog();
     }
 
     private void ImportTeamViewerHistory()
