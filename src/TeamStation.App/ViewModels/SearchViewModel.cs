@@ -21,7 +21,7 @@ public sealed class SearchViewModel : ViewModelBase
         _settingsService = settingsService;
         SaveCommand = new RelayCommand(SaveCurrent, () => CanSaveCurrent);
         ApplyCommand = new RelayCommand(ApplySaved, parameter => parameter is string { Length: > 0 });
-        ClearCommand = new RelayCommand(() => SearchText = string.Empty);
+        ClearCommand = new RelayCommand(() => SearchText = string.Empty, () => HasText);
     }
 
     public event EventHandler? SearchTextChanged;
@@ -39,7 +39,9 @@ public sealed class SearchViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsCurrentSearchSaved));
                 OnPropertyChanged(nameof(CanSaveCurrent));
                 OnPropertyChanged(nameof(SaveTooltip));
+                OnPropertyChanged(nameof(ClearTooltip));
                 SaveCommand.RaiseCanExecuteChanged();
+                ClearCommand.RaiseCanExecuteChanged();
                 SearchTextChanged?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -60,6 +62,9 @@ public sealed class SearchViewModel : ViewModelBase
                 : "Save the current search for quick reuse.";
         }
     }
+    public string ClearTooltip => HasText
+        ? "Clear the current search filter."
+        : "No search filter to clear.";
 
     public IReadOnlyList<string> SavedSearches => _settings.SavedSearches;
 

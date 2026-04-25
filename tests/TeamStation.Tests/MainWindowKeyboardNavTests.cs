@@ -394,6 +394,18 @@ public class MainWindowKeyboardNavTests
     }
 
     [Fact]
+    public void Clear_search_menu_explains_disabled_state()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var item = doc.Descendants(Wpf + "MenuItem")
+            .FirstOrDefault(mi => ((string?)mi.Attribute("Command")) == "{Binding ClearSearchCommand}");
+
+        Assert.NotNull(item);
+        Assert.Equal("{Binding ClearSearchTooltip}", (string?)item!.Attribute("ToolTip"));
+        Assert.Equal("True", (string?)item.Attribute("ToolTipService.ShowOnDisabled"));
+    }
+
+    [Fact]
     public void Search_view_model_prevents_duplicate_saved_search_feedback()
     {
         var searchPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "SearchViewModel.cs");
@@ -408,6 +420,22 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("return;", searchSource);
         Assert.Contains("public string SaveSearchTooltip => Search.SaveTooltip;", mainSource);
         Assert.Contains("nameof(SearchViewModel.SaveTooltip)", mainSource);
+    }
+
+    [Fact]
+    public void Search_view_model_disables_clear_when_filter_is_empty()
+    {
+        var searchPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "SearchViewModel.cs");
+        var mainPath = Path.Combine(RepoRoot, "src", "TeamStation.App", "ViewModels", "MainViewModel.cs");
+        var searchSource = File.ReadAllText(searchPath);
+        var mainSource = File.ReadAllText(mainPath);
+
+        Assert.Contains("ClearCommand = new RelayCommand(() => SearchText = string.Empty, () => HasText)", searchSource);
+        Assert.Contains("public string ClearTooltip", searchSource);
+        Assert.Contains("No search filter to clear.", searchSource);
+        Assert.Contains("ClearCommand.RaiseCanExecuteChanged()", searchSource);
+        Assert.Contains("public string ClearSearchTooltip => Search.ClearTooltip;", mainSource);
+        Assert.Contains("nameof(SearchViewModel.ClearTooltip)", mainSource);
     }
 
     [Fact]

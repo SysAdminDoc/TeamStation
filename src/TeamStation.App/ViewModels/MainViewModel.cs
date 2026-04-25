@@ -187,6 +187,7 @@ public sealed class MainViewModel : ViewModelBase
     public string SearchText { get => Search.SearchText; set => Search.SearchText = value; }
     public bool HasSearchText => Search.HasText;
     public string SaveSearchTooltip => Search.SaveTooltip;
+    public string ClearSearchTooltip => Search.ClearTooltip;
     public bool CanSaveCurrentSearch => Search.CanSaveCurrent;
     public IReadOnlyList<string> SavedSearches => Search.SavedSearches;
     public bool HasSavedSearches => Search.HasSavedSearches;
@@ -236,6 +237,9 @@ public sealed class MainViewModel : ViewModelBase
                 break;
             case nameof(SearchViewModel.SaveTooltip):
                 OnPropertyChanged(nameof(SaveSearchTooltip));
+                break;
+            case nameof(SearchViewModel.ClearTooltip):
+                OnPropertyChanged(nameof(ClearSearchTooltip));
                 break;
             case nameof(SearchViewModel.CanSaveCurrent):
                 OnPropertyChanged(nameof(CanSaveCurrentSearch));
