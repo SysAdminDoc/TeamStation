@@ -4,6 +4,26 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-04-25
+
+Three-task patch on top of v0.3.4: completes the byte[] launch-path wiring v0.3.4 introduced, ships TeamViewer client-version detection + an "Update available" pill in the status bar (operator remediation guidance for CVE-2026-23572), and lays down bulk multi-select infrastructure on the connection tree with Bulk Pin / Bulk Unpin as the first commands.
+
+### Security
+
+- **`MainViewModel.LaunchEntry` is plumbed to the byte[] launcher overload** that v0.3.4 introduced. `EntryRepository.LoadEntryPasswordBytes(source.Id)` and `LoadEntryProxyPasswordBytes(source.Id)` are loaded immediately before `_launcher.Launch(launchTarget, pwBytes, proxyPwBytes, options)` runs; the launcher zeros the buffers via `try/finally + CryptographicOperations.ZeroMemory` after argv has been handed to `Process.Start`. Clipboard-password mode (`ShouldUseClipboardPasswordMode`) bypasses the byte path entirely — clipboard staging and argv-password are mutually exclusive by design. Folder-default-inheritance launches (`source.Password` is null but `effective.Password` came from a folder default) fall back to the legacy string path automatically. Closes the v0.3.4 deferred follow-up.
+
+### Added
+
+- **TeamViewer client-version detection + "Update available" status pill.** New `TeamStation.Launcher.TeamViewerVersionDetector` reads the version from `HKLM\SOFTWARE\TeamViewer\Version` (with `WOW6432Node` mirror and `HKCU` fallback), then falls back to `System.Diagnostics.FileVersionInfo` on the resolved `TeamViewer.exe`. The status bar shows the parsed version (`TeamViewer 15.71.5`) as a small monospace chip; below 15.74.5 a yellow "Update available" pill appears with a tooltip explaining CVE-2026-23572 (TeamViewer auth-bypass, CVSS 7.2, fixed in 15.74.5+). Refreshed at startup and after Settings save. Decoupled from the registry via `ITeamViewerVersionSource` so unit tests can pump fakes. Iter-2 P2 closed.
+- **Bulk multi-select infrastructure on the connection tree.** WPF TreeView has no native multi-select; v0.3.5 ships the foundation. `TreeNode.IsMultiSelected` flag with `INotifyPropertyChanged`. `MainWindow.xaml.cs` `Tree_PreviewMouseLeftButtonDown` accumulator: plain click clears the multi-selection and lets the WPF default selection take over (single-select / double-click-launch / arrow-key-nav unchanged); Ctrl+left-click toggles `IsMultiSelected` on the clicked node. `MainViewModel.SelectedNodes` flattens the tree and returns the multi-selected nodes; `MultiSelectedEntryCount` and `IsBulkSelectionActive` drive context-menu visibility. `Bulk Pin (N)` and `Bulk Unpin (N)` context-menu items operate on the selection (only the `EntryNode` subset; folders multi-select for visual feedback but bulk-pin filters via `OfType<EntryNode>`). Multi-select state is cleared on `Reload()` so node-identity churn cannot leak references to nodes no longer in the tree. Visual highlight: multi-selected rows use the same `BlueSoftBrush` background and `BlueBrush` border as `IsSelected`. Sets the pattern for `BulkSetTag` / `BulkSetProxy` / `BulkSetMode` in v0.3.6. P1, top r/sysadmin migration friction point per iter-1 research.
+
+### Tests
+
+- **`TeamViewerVersionDetectorTests` (12 cases — `[Theory]` + `[Fact]` parameter expansion).** Pins the parser + threshold: `TryParseVersion` accepts well-formed TeamViewer version strings (3-component and 4-component) including surrounding whitespace, rejects null / empty / "v"-prefixed / non-version inputs, `Detect` returns null when the source returns null and otherwise returns the parsed `Version`, `NeedsUpdate` correctly thresholds 15.74.4 as needing update / 15.74.5 as safe / 16.0.0 as safe / null as not-needing-update (so the pill never lights when TeamViewer isn't detected — the chip's "TeamViewer not detected" message handles that). `MinimumSafeVersion` constant pinned to `Version(15, 74, 5)` — any future shift surfaces deliberately.
+- **`BulkMultiSelectTests` (5 cases).** Pins the testable surface of the bulk-select infrastructure: `TreeNode.IsMultiSelected` defaults to false; setter raises `INotifyPropertyChanged.PropertyChanged` for the `IsMultiSelected` name; idempotent assignment does NOT raise (consumers of `INotifyPropertyChanged` won't see spurious notifications); `IsMultiSelected` is independent of `IsSelected` (single-select can coexist with multi-select); the flatten-walk that `MainViewModel.SelectedNodes` uses correctly collects only multi-selected nodes across nested folders; folder multi-select is allowed (the visual highlight applies; bulk-pin filters via `OfType<EntryNode>` so folders are no-ops for that command, which is the contract).
+
+Test count: 398 → 422.
+
 ## [0.3.4] - 2026-04-25
 
 Credential-handling patch closing the two related items that v0.3.3 deferred. Both extend the v0.3.3 DPAPI entropy story: the API-token surface gets the same per-database salt the DEK already uses, and the launch hot path moves to a byte[] credential-read API so the password lives in a zeroable buffer instead of a CLR-interned string.

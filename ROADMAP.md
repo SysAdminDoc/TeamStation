@@ -10,9 +10,9 @@ Prioritization:
 
 ---
 
-## Current main progress through v0.3.4
+## Current main progress through v0.3.5
 
-v0.3.0 → v0.3.4 ships the largest adoption blockers from P1/P2 plus a sustained security + UX hardening cadence:
+v0.3.0 → v0.3.5 ships the largest adoption blockers from P1/P2 plus a sustained security + UX hardening cadence:
 
 - App settings, first-run trust notice, portable-mode master password (Argon2id), and configurable TeamViewer.exe path.
 - Quick connect, saved searches, per-entry profile names, pinned entries, and pinned/recent tray launch menu.
@@ -25,6 +25,9 @@ v0.3.0 → v0.3.4 ships the largest adoption blockers from P1/P2 plus a sustaine
 - A11y baseline on the connection tree: Enter / F2 / Delete single-key actions, `KeyboardNavigation.TabNavigation="Once"` to avoid the tab-trap, `AutomationProperties.Name` on the tree and search box (v0.3.3).
 - AppSettings token DPAPI entropy via lazy Unprotect (v0.3.4) — closes the architectural blocker from v0.3.3 where `SettingsService.Load` ran before the `Database` was opened.
 - byte[] credential-read API on the launch hot path (v0.3.4) — `CryptoService.DecryptToBytes`, `EntryRepository.LoadEntryPasswordBytes`, `TeamViewerLauncher.Launch(entry, byte[]?, byte[]?, options)` zeros input buffers via `CryptographicOperations.ZeroMemory` immediately after argv compose. Closes the v0.3.0 postflight `System.String credential leak` finding for the launch path.
+- `MainViewModel.LaunchEntry` plumbed through to the byte[] launcher overload (v0.3.5) — completes the v0.3.4 deliverable. Clipboard mode + folder-inheritance fall back to the legacy string path.
+- TeamViewer client version detection + status-bar update-available pill (v0.3.5) — surfaces CVE-2026-23572 baseline (15.74.5) without an auto-update path.
+- Bulk multi-select infrastructure on the connection tree + Bulk Pin/Unpin (v0.3.5) — Ctrl-click accumulator, `TreeNode.IsMultiSelected`, `MainViewModel.SelectedNodes`, foundation for `BulkSetTag` / `BulkSetProxy` / `BulkSetMode` in v0.3.6.
 
 Still open before a formal 1.0 release: real-peer TeamViewer launch validation, Web API pagination/rate-limit hardening, online-state polling, conflict-aware cloud sync, installer packaging, and UX testing on real support workflows.
 
@@ -203,14 +206,31 @@ One-time scan of the three most-cited OSS / freemium alternatives sysadmins comp
 - [x] **P1 — `AppSettings.TeamViewerApiToken` DPAPI entropy hardening.** Closed in v0.3.4 via lazy `UnprotectApiToken` — `SettingsService.Load` no longer eagerly Unprotects; the host pushes the salt in via `SettingsService.Entropy` after `Database` opens, then calls `UnprotectApiToken(settings)`. Existing v0.3.3-and-earlier null-entropy wraps fall back transparently and re-wrap under the salt on next `Save`. Pinned by `AppSettingsEntropyTests` (6 cases).
 - [x] **P1 — byte[] credential-read API on the launch hot path.** `CryptoService.EncryptBytes` / `DecryptToBytes`, `EntryRepository.LoadEntryPasswordBytes` / `LoadEntryProxyPasswordBytes`, `CliArgvBuilder.Build` overload taking byte[] passwords, `TeamViewerLauncher.Launch` overload that zeros buffers via `try/finally + CryptographicOperations.ZeroMemory` after argv compose. Pinned by `CredentialByteApiTests` (10) + `TeamViewerLauncherZeroingTests` (4).
 
-## v0.3.5 backlog (next patch — iter-2 research follow-ups)
+## v0.3.5 — launch-path completion + bulk-ops infrastructure + TV version pill (shipped 2026-04-25)
+
+- [x] **P1 — Wire MainViewModel.LaunchEntry through to byte[] launcher overload.** `EntryRepository.LoadEntryPasswordBytes(source.Id)` + `LoadEntryProxyPasswordBytes(source.Id)` feed `TeamViewerLauncher.Launch(target, byte[]?, byte[]?, options)` which zeros buffers via `try/finally + CryptographicOperations.ZeroMemory` after argv compose. Clipboard-password mode and folder-default-inheritance flows fall back to the legacy string path. Completes the v0.3.4 deferred follow-up.
+- [x] **P2 — TeamViewer client version detection + status-bar update-available pill.** Closes iter-2 P2. New `TeamViewerVersionDetector` (registry → FileVersionInfo). Status bar shows `TeamViewer 15.71.5` chip + a yellow "Update available" pill when below 15.74.5 (CVE-2026-23572 baseline). Operator-side remediation; no auto-update. `TeamViewerVersionDetectorTests` (12 cases via `[Theory]`).
+- [x] **P1 — Bulk multi-select infrastructure on the connection tree + Bulk Pin/Unpin.** `TreeNode.IsMultiSelected` flag; Ctrl-click accumulator on the tree (plain click clears multi-selection, single-select semantics preserved); `MainViewModel.SelectedNodes` flattens RootNodes; `BulkPin` / `BulkUnpin` commands operate on `OfType<EntryNode>` of the selection. Context menu shows `Pin selection (N)` / `Unpin selection (N)` only when 2+ entries are multi-selected. Multi-select state cleared on `Reload()`. Visual highlight via the existing `BlueSoftBrush` background + `BlueBrush` border. `BulkMultiSelectTests` (5 cases).
+
+## v0.3.6 backlog (bulk-ops expansion + iter-2 research follow-ups)
+
+### Bulk operations expansion (using v0.3.5 multi-select infrastructure)
+
+- [ ] **P1 — Bulk Set Tag / Add Tag / Remove Tag.** Multi-select entries → context menu → "Set tag…" dialog with add/remove/replace semantics. The most-requested r/sysadmin migration friction operation per iter-1 research (mRemoteNG ships this).
+- [ ] **P2 — Bulk Set Proxy.** Multi-select entries → "Set proxy…" dialog → applies (or clears) the proxy on every selected entry. Operator-fleet bulk reconfiguration.
+- [ ] **P2 — Bulk Set Mode / Quality / Access Control.** Same shape as Bulk Set Proxy — pick the value, apply across selection.
+- [ ] **P3 — Shift-range-select on the tree.** Currently only Ctrl-click accumulates. Range-select needs walk-from-anchor semantics (first / last + everything in between in display order). Out of v0.3.5 scope per the rubric.
+
+### Iter-2 landscape research follow-ups
+
+
 
 ### Iter-2 landscape research findings (delta scan, 2026-04-24)
 
 A 24-source delta scan over the iter-1 baseline surfaced the following items that were not present at v0.3.2 cut. See `docs/research/iter-2-sources.md` for the full source inventory.
 
-- [ ] **P0 — Operator note: CVE-2026-23572 (TeamViewer auth bypass, CVSS 7.2).** Affects TeamViewer Full / Host below 15.74.5 — bypasses "Allow after confirmation" access controls. TeamStation orchestrates the installed client and does not ship the protocol implementation, so the patch lives upstream. Update README "Prerequisite" block to recommend ≥ 15.74.5 explicitly. Documented in CHANGELOG v0.3.3 release notes; expand in the README on the next docs pass.
-- [ ] **P2 — Surface installed TeamViewer version + CVE-state in the status bar.** Read the version out of `HKLM\SOFTWARE\TeamViewer\Version` (or the Wow6432 mirror) and surface a "TeamViewer 15.71.5 — update available" pill when the detected version is below the latest known-vulnerable build. Operator-side remediation guide; no auto-update.
+- [ ] **P0 — Operator note: CVE-2026-23572 (TeamViewer auth bypass, CVSS 7.2).** Affects TeamViewer Full / Host below 15.74.5 — bypasses "Allow after confirmation" access controls. TeamStation orchestrates the installed client and does not ship the protocol implementation, so the patch lives upstream. Update README "Prerequisite" block to recommend ≥ 15.74.5 explicitly. Documented in CHANGELOG v0.3.3 release notes; v0.3.5 surfaces the version + update-available pill in the status bar; still want the README "Prerequisite" line updated explicitly on the next docs pass.
+- [x] **P2 — Surface installed TeamViewer version + CVE-state in the status bar.** Closed in v0.3.5 — see "v0.3.5" section above.
 - [ ] **P2 — `.NET 10.0.7` OOB CVE chain (CVE-2026-26130 / 26127 / 40372).** When TeamStation moves off `.NET 9` (currently TFM `net9.0-windows10.0.19041.0`) the migration target is a patched `.NET 10.0.7+` runtime, not stock `.NET 10.0.6`. Track the upgrade path in the `.NET 10` migration ticket when it lands.
 - [ ] **P2 — Native AOT compatibility audit.** UWP `.NET 9` Native AOT shipped in March 2026; investigate whether any DPAPI / SQLite / fo-dicom paths break under AOT. WPF itself is AOT-incompatible today, but smaller binaries + faster startup is worth a feasibility scan when WPF lifts the restriction.
 - [ ] **P3 — RustDesk + Windows App federation feasibility note.** Microsoft's "Remote Desktop client EOL → Windows App" move (Sep 2026) creates migration friction for many sysadmins who currently use the legacy client alongside TeamViewer. Adding a non-default RustDesk launcher backend would let TeamStation be a single pane of glass for the migration period — but it violates the "TeamViewer-only" charter. Tagged CHARTER-REVIEW; do NOT silently drop. User decision.
