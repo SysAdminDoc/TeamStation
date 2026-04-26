@@ -10,10 +10,11 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 - **Settings exposes database maintenance opt-out.** The Settings dialog now includes a default-on "Optimize SQLite planner statistics when database connections close" checkbox for operators diagnosing database issues.
 - **Startup database integrity warning.** Startup now runs `PRAGMA integrity_check` after the SQLite database opens and logs the result before normal interaction begins. A clean vault records an info entry; failed or incomplete checks record a warning with the first reported SQLite messages.
 - **Activity log structured export.** The activity dock now has a disabled-aware `Export` action that writes the visible transient log buffer as newline-delimited JSON (`teamstation.activity.v1`) for ELK / Splunk / Loki-style ingestion. This remains separate from the tamper-evident audit log.
+- **Launch-latency histogram.** Successful launches now feed a rolling 50-sample latency view in the activity dock: bucketed time-to-`Process.Start`, p50 / p95, and the last credential-read and session-history write timings.
 
 ### Tests
 
-- Added focused coverage for the new settings default / persistence, SQLite integrity report API, startup wiring, structured activity-log export, and a SQLite smoke that disposes an optimized connection, reopens the vault, and verifies `PRAGMA integrity_check` returns `ok`.
+- Added focused coverage for the new settings default / persistence, SQLite integrity report API, startup wiring, structured activity-log export, launch-latency rollups, and a SQLite smoke that disposes an optimized connection, reopens the vault, and verifies `PRAGMA integrity_check` returns `ok`.
 
 ## [0.3.5] - 2026-04-25
 

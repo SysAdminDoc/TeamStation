@@ -633,6 +633,25 @@ public class MainWindowKeyboardNavTests
         Assert.Equal("True", (string?)clearButton.Attribute("ToolTipService.ShowOnDisabled"));
     }
 
+    [Fact]
+    public void Activity_log_exposes_launch_latency_histogram()
+    {
+        var doc = XDocument.Load(MainWindowXamlPath);
+        var histogram = doc.Descendants(Wpf + "StackPanel")
+            .FirstOrDefault(sp => ((string?)sp.Attribute("AutomationProperties.Name")) == "Launch latency histogram");
+
+        Assert.NotNull(histogram);
+        Assert.Equal("{Binding HasLaunchLatency, Converter={StaticResource BoolToVis}}", (string?)histogram!.Attribute("Visibility"));
+
+        var textBindings = histogram.Descendants(Wpf + "TextBlock")
+            .Select(tb => (string?)tb.Attribute("Text"))
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .ToList();
+
+        Assert.Contains("{Binding LaunchLatencySummary}", textBindings);
+        Assert.Contains("{Binding LaunchLatencyHistogram}", textBindings);
+    }
+
     [Theory]
     [InlineData("{Binding ClearLogCommand}", "{Binding LogClearTooltip}")]
     [InlineData("{Binding SyncTeamViewerCloudCommand}", "{Binding CloudSyncStatusText}")]
@@ -685,8 +704,14 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("public bool HasEntries => Entries.Count > 0;", logPanelSource);
         Assert.Contains("public string ClearTooltip", logPanelSource);
         Assert.Contains("OnPropertyChanged(nameof(HasEntries))", logPanelSource);
+        Assert.Contains("public bool HasLaunchLatency", logPanelSource);
+        Assert.Contains("public string LaunchLatencyHistogram", logPanelSource);
         Assert.Contains("public bool ShowLogEmptyState => !LogHasEntries;", mainViewModelSource);
+        Assert.Contains("public bool HasLaunchLatency => LogPanel.HasLaunchLatency;", mainViewModelSource);
+        Assert.Contains("public string LaunchLatencySummary => LogPanel.LaunchLatencySummary;", mainViewModelSource);
+        Assert.Contains("public string LaunchLatencyHistogram => LogPanel.LaunchLatencyHistogram;", mainViewModelSource);
         Assert.Contains("nameof(LogPanelViewModel.HasEntries)", mainViewModelSource);
+        Assert.Contains("nameof(LogPanelViewModel.LaunchLatencyHistogram)", mainViewModelSource);
     }
 
     [Fact]

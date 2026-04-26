@@ -212,6 +212,9 @@ public sealed class MainViewModel : ViewModelBase
     public bool ShowLogEmptyState => !LogHasEntries;
     public string LogClearTooltip => LogPanel.ClearTooltip;
     public string LogExportTooltip => LogPanel.ExportTooltip;
+    public bool HasLaunchLatency => LogPanel.HasLaunchLatency;
+    public string LaunchLatencySummary => LogPanel.LaunchLatencySummary;
+    public string LaunchLatencyHistogram => LogPanel.LaunchLatencyHistogram;
     public System.Windows.Input.ICommand ClearLogCommand => LogPanel.ClearCommand;
     public System.Windows.Input.ICommand ToggleLogCommand => LogPanel.ToggleCommand;
 
@@ -250,6 +253,9 @@ public sealed class MainViewModel : ViewModelBase
                 break;
             case nameof(LogPanelViewModel.ClearTooltip): OnPropertyChanged(nameof(LogClearTooltip)); break;
             case nameof(LogPanelViewModel.ExportTooltip): OnPropertyChanged(nameof(LogExportTooltip)); break;
+            case nameof(LogPanelViewModel.HasLaunchLatency): OnPropertyChanged(nameof(HasLaunchLatency)); break;
+            case nameof(LogPanelViewModel.LaunchLatencySummary): OnPropertyChanged(nameof(LaunchLatencySummary)); break;
+            case nameof(LogPanelViewModel.LaunchLatencyHistogram): OnPropertyChanged(nameof(LaunchLatencyHistogram)); break;
         }
     }
 
@@ -2339,6 +2345,10 @@ public sealed class MainViewModel : ViewModelBase
 
     private void LaunchEntry(ConnectionEntry source, bool persistLastConnected, LaunchOptions? forcedOptions = null)
     {
+        var launchStopwatch = Stopwatch.StartNew();
+        var credentialReadElapsed = TimeSpan.Zero;
+        var historyWriteElapsed = TimeSpan.Zero;
+
         var effective = InheritanceResolver.Resolve(source, _foldersById);
         if (_settings.WakeOnLanBeforeLaunch && !string.IsNullOrWhiteSpace(effective.WakeMacAddress))
         {
@@ -2390,10 +2400,12 @@ public sealed class MainViewModel : ViewModelBase
             byte[]? proxyPwBytes = null;
             if (clipboardStagedPassword is null)
             {
+                var credentialStopwatch = Stopwatch.StartNew();
                 if (!string.IsNullOrEmpty(source.Password))
                     pwBytes = _entries.LoadEntryPasswordBytes(source.Id);
                 if (!string.IsNullOrEmpty(source.Proxy?.Password))
                     proxyPwBytes = _entries.LoadEntryProxyPasswordBytes(source.Id);
+                credentialReadElapsed = credentialStopwatch.Elapsed;
             }
 
             outcome = pwBytes is not null || proxyPwBytes is not null
@@ -2412,6 +2424,7 @@ public sealed class MainViewModel : ViewModelBase
 
         if (outcome.Success)
         {
+            var toProcessStartElapsed = launchStopwatch.Elapsed;
             var started = DateTimeOffset.UtcNow;
             var session = new SessionRecord
             {
@@ -2425,6 +2438,8 @@ public sealed class MainViewModel : ViewModelBase
                 StartedUtc = started,
                 Outcome = "Started",
             };
+
+            var historyStopwatch = Stopwatch.StartNew();
             _sessions.Upsert(session);
 
             if (persistLastConnected)
@@ -2437,6 +2452,7 @@ public sealed class MainViewModel : ViewModelBase
                 }
                 NotifyRecentsChanged();
             }
+            historyWriteElapsed = historyStopwatch.Elapsed;
 
             Audit("launch", "connection", persistLastConnected ? source.Id : null, $"Launched \"{source.Name}\".");
             TrackSessionExit(session, effective);
@@ -2445,6 +2461,11 @@ public sealed class MainViewModel : ViewModelBase
             if (clipboardStagedPassword is not null)
                 _ = ScheduleClipboardClearAsync(clipboardStagedPassword);
             MirrorDatabase();
+            LogPanel.RecordLaunchLatency(new LaunchLatencySample(
+                DateTimeOffset.UtcNow,
+                toProcessStartElapsed,
+                credentialReadElapsed,
+                historyWriteElapsed));
             ReportStatus(LogLevel.Success, outcome.Uri is not null
                 ? $"Launched \"{source.Name}\" via URI handler."
                 : $"Launched \"{source.Name}\" (pid {outcome.ProcessId?.ToString() ?? "?"}).");

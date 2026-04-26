@@ -1675,15 +1675,30 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
-                                       FontSize="14"
-                                       Text="&#xE7C4;"
-                                       Foreground="{StaticResource Subtext1Brush}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0" />
-                            <TextBlock Text="Activity" Style="{StaticResource SectionTitleText}" VerticalAlignment="Center" />
-                            <TextBlock Margin="14,0,0,0" Text="{Binding LogSummary}" Style="{StaticResource BodyMutedText}" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                                           FontSize="14"
+                                           Text="&#xE7C4;"
+                                           Foreground="{StaticResource Subtext1Brush}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <TextBlock Text="Activity" Style="{StaticResource SectionTitleText}" VerticalAlignment="Center" />
+                                <TextBlock Margin="14,0,0,0" Text="{Binding LogSummary}" Style="{StaticResource BodyMutedText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Margin="22,8,0,0"
+                                        Visibility="{Binding HasLaunchLatency, Converter={StaticResource BoolToVis}}"
+                                        AutomationProperties.Name="Launch latency histogram">
+                                <TextBlock Text="{Binding LaunchLatencySummary}"
+                                           Style="{StaticResource BodyMutedText}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Margin="0,3,0,0"
+                                           Text="{Binding LaunchLatencyHistogram}"
+                                           FontFamily="{StaticResource MonoFont}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource Subtext0Brush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
