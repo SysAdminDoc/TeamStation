@@ -15,7 +15,7 @@ namespace TeamStation.Data.Storage;
 [SupportedOSPlatform("windows")]
 public sealed class Database : ISecretStore
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
 
     public string Path { get; }
     public bool OptimizeOnConnectionClose { get; set; } = true;
@@ -188,7 +188,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
     target_type   TEXT NOT NULL,
     target_id     TEXT,
     summary       TEXT NOT NULL,
-    detail        TEXT
+    detail        TEXT,
+    prev_hash     BLOB,
+    row_hash      BLOB
 );
 CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
 ";
@@ -315,6 +317,19 @@ CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
             }
 
             WriteSchemaVersion(c, tx, 3);
+            tx.Commit();
+        }
+
+        if (version < 4)
+        {
+            using var tx = c.BeginTransaction();
+            // Add HMAC-chain columns to audit_log. Both are nullable BLOB
+            // so AddColumnIfMissing is sufficient — no table rebuild needed.
+            // Rows written before this migration retain NULL in both columns
+            // and are treated as "legacy" rows by VerifyChain().
+            AddColumnIfMissing(c, tx, "audit_log", "prev_hash", "BLOB");
+            AddColumnIfMissing(c, tx, "audit_log", "row_hash", "BLOB");
+            WriteSchemaVersion(c, tx, 4);
             tx.Commit();
         }
     }

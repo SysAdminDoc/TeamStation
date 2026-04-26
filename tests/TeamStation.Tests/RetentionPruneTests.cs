@@ -20,9 +20,9 @@ public class RetentionPruneTests : IDisposable
     {
         _dbPath = Path.Combine(Path.GetTempPath(), $"ts-prune-{Guid.NewGuid():N}.db");
         _db = new Database(_dbPath);
-        _ = CryptoService.CreateOrLoad(_db);
+        var crypto = CryptoService.CreateOrLoad(_db);
         _sessions = new SessionRepository(_db);
-        _audit = new AuditLogRepository(_db);
+        _audit = new AuditLogRepository(_db, crypto);
     }
 
     public void Dispose()

@@ -63,13 +63,13 @@ VALUES
         // MigrateIfNeeded. Must not throw.
         var db = new Database(_dbPath);
 
-        // Schema version must now be 3.
+        // Schema version must now be 4 (v3 → v4 migration adds HMAC columns).
         using (var c = db.OpenConnection())
         {
             using var cmd = c.CreateCommand();
             cmd.CommandText = "SELECT value FROM _meta WHERE key = 'schema_version';";
             var raw = (byte[])cmd.ExecuteScalar()!;
-            Assert.Equal(3, BitConverter.ToInt32(raw, 0));
+            Assert.Equal(4, BitConverter.ToInt32(raw, 0));
         }
 
         // Every row survives. Repo materialises them — the adversarial

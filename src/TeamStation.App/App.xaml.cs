@@ -1,5 +1,6 @@
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using Microsoft.Win32;
@@ -27,6 +28,15 @@ public partial class App : Application
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
+        // CLI sub-command: TeamStation.exe --verify-audit-chain
+        // Must be checked before the mutex and before any UI is created so the
+        // process can be driven from PowerShell or cmd without showing a window.
+        if (Array.IndexOf(e.Args, "--verify-audit-chain") >= 0)
+        {
+            RunAuditChainVerificationCli();
+            return; // Shutdown called inside; WPF message loop never starts.
+        }
+
         // Global unhandled-exception nets. We try to surface these in-app
         // instead of silently dropping into Windows Error Reporting,
         // which for a single-file self-contained WPF app looks like a vanish.
@@ -106,7 +116,7 @@ public partial class App : Application
             var entries = new EntryRepository(db, crypto);
             var folders = new FolderRepository(db, crypto);
             var sessions = new SessionRepository(db);
-            var audit = new AuditLogRepository(db);
+            var audit = new AuditLogRepository(db, crypto);
             var launcher = new TeamViewerLauncher(() => ResolveTeamViewerPath(settings));
             var tvExePath = ResolveTeamViewerPath(settings);
             var version = Assembly.GetExecutingAssembly()
@@ -267,8 +277,50 @@ public partial class App : Application
         return CryptoService.CreateOrLoad(db, CryptoUnlockOptions.WithMasterPassword(dialog.Password));
     }
 
-    protected override void OnExit(ExitEventArgs e)
+    // -------------------------------------------------------------------------
+    // CLI: --verify-audit-chain
+    // -------------------------------------------------------------------------
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AttachConsole(int dwProcessId);
+
+    /// <summary>
+    /// Headless path for <c>TeamStation.exe --verify-audit-chain</c>.
+    /// Attaches to the parent process's console so output appears inline in
+    /// PowerShell/cmd, initializes the DB + crypto, runs
+    /// <see cref="AuditLogRepository.VerifyChain"/>, prints a one-line result,
+    /// then exits with code 0 (PASS) or 1 (FAIL).
+    /// </summary>
+    private void RunAuditChainVerificationCli()
     {
+        const int attachParentProcess = -1;
+        AttachConsole(attachParentProcess);
+
+        // WinExe severs the standard streams on start-up; reattach them so
+        // Console.WriteLine actually reaches the parent terminal.
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+        Console.SetError(new StreamWriter(Console.OpenStandardError()) { AutoFlush = true });
+        Console.WriteLine(); // separate our output from any parent shell prompt
+
+        try
+        {
+            var dbPath = StoragePaths.ResolveDatabasePath();
+            var db = new Database(dbPath);
+            var crypto = CreateCrypto(db);
+            var audit = new AuditLogRepository(db, crypto);
+            var result = audit.VerifyChain();
+            Console.WriteLine(result.Summary);
+            Shutdown(result.IsValid ? 0 : 1);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Verification error: {ex.GetType().Name}: {ex.Message}");
+            Shutdown(2);
+        }
+    }
+
+    protected override void OnExit(ExitEventArgs e)    {
         try { _tray?.Dispose(); } catch { /* swallow during exit */ }
         if (_ownsSingleInstanceMutex)
         {

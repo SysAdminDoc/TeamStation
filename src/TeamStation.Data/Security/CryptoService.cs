@@ -710,6 +710,22 @@ public sealed class CryptoService : IDisposable
         CryptographicOperations.ZeroMemory(_dek);
         _disposed = true;
     }
+
+    /// <summary>
+    /// Returns HMAC-SHA256 of <paramref name="message"/> keyed with the DEK.
+    /// Used by the audit-log HMAC chain to detect retroactive tampering
+    /// without introducing new key material — the same 256-bit DEK that
+    /// protects field ciphertext is reused as the HMAC key, which is safe
+    /// because the two usages are domain-separated (AES-GCM vs. HMAC-SHA256).
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown after <see cref="Dispose"/> has been called.
+    /// </exception>
+    public byte[] ComputeHmac(ReadOnlySpan<byte> message)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return HMACSHA256.HashData(_dek, message);
+    }
 }
 
 /// <summary>

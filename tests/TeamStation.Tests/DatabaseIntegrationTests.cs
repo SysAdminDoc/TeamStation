@@ -26,7 +26,7 @@ public class DatabaseIntegrationTests : IDisposable
         _entries = new EntryRepository(_db, _crypto);
         _folders = new FolderRepository(_db, _crypto);
         _sessions = new SessionRepository(_db);
-        _audit = new AuditLogRepository(_db);
+        _audit = new AuditLogRepository(_db, _crypto);
     }
 
     public void Dispose()

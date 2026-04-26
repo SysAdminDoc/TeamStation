@@ -296,7 +296,8 @@ Intent: make TeamStation feel like a first-class TeamViewer operations workbench
 
 ### Audit-trail integrity (Phase 1: HMAC chain) (P1, [5/4/3/4/4/4 → 4.00])
 
-- [ ] **Append-only HMAC chain on `audit_log` rows.** Each row carries `prev_hash` + `row_hash = HMAC-SHA256(key=DEK, msg=prev_hash || row_data)` so a verifier can detect retroactive tampering. The DEK already exists; no new key material. Integrity check tool ships as a CLI: `TeamStation.exe --verify-audit-chain`.
+- [x] **Append-only HMAC chain on `audit_log` rows.** Each row carries `prev_hash` + `row_hash = HMAC-SHA256(key=DEK, msg=prev_hash || row_data)` so a verifier can detect retroactive tampering. The DEK already exists; no new key material. Integrity check tool ships as a CLI: `TeamStation.exe --verify-audit-chain`.
+  - **Implementation note (schema v4).** `CryptoService.ComputeHmac(ReadOnlySpan<byte>)` added (DEK reused as HMAC key). Schema v4 adds nullable `prev_hash BLOB` + `row_hash BLOB` columns via `AddColumnIfMissing`; existing rows keep NULL (treated as legacy skips by the verifier). Canonical message: `prev_hash (32 B) || TLV(id, occurred_utc, action, target_type, target_id?, summary, detail?)` where NULL fields use sentinel length 0xFFFFFFFF. `AuditLogRepository` accepts `CryptoService? crypto = null`; legacy callers unaffected. New `AuditChainVerificationResult` record in `TeamStation.Core.Models`. CLI uses `AttachConsole(-1)` P/Invoke so output appears inline in any parent console. 8 new tests in `AuditChainTests.cs`.
 - [ ] **CSV / NDJSON export of the verified audit log** for SIEM ingestion (Splunk, Elastic). iter-3 source A.10 (compliance pain), A.18 (RDM / BeyondTrust paywall the equivalent feature).
 - **Justification:** Iter-3 finds compliance + audit trails are the most-paywalled commercial-competitor feature. TeamStation can ship the OSS equivalent within charter (local-first, no cloud upload of the logs). Differentiator.
 
