@@ -10,12 +10,26 @@ namespace TeamStation.Data.Storage;
 public sealed class EntryRepository
 {
     private readonly Database _db;
-    private readonly CryptoService _crypto;
+    private CryptoService _crypto;
 
     public EntryRepository(Database db, CryptoService crypto)
     {
         _db = db;
         _crypto = crypto;
+    }
+
+    /// <summary>
+    /// Replaces the active <see cref="CryptoService"/> after a successful DEK
+    /// rotation. Called once by the rotation coordinator immediately after the
+    /// migrator commits the re-encrypted rows and before the new DEK is promoted
+    /// in the key store. The old service is already disposed by
+    /// <see cref="CryptoService.RotateDek"/>; subsequent reads and writes use
+    /// the new service automatically.
+    /// </summary>
+    public void UpdateCrypto(CryptoService newCrypto)
+    {
+        ArgumentNullException.ThrowIfNull(newCrypto);
+        _crypto = newCrypto;
     }
 
     public IReadOnlyList<ConnectionEntry> GetAll()

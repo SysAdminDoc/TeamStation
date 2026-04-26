@@ -277,7 +277,7 @@ Intent: make TeamStation feel like a first-class TeamViewer operations workbench
 
 ### Surface RotateDek in Settings UI (P1 from iter-1, deferred since v0.3.1, [5/4/4/4/5/4 → 4.33])
 
-- [ ] **Wire a "Rotate encryption key" button** in `SettingsWindow` → opens a two-step dialog: (1) confirm + status-bar progress, (2) on success display "Rotated N entries / M folders" toast. Runs the migrator across `folders` + `entries` inside a single `BEGIN IMMEDIATE` transaction. Rollback on any failure; relies on the v0.3.1 two-phase-commit primitive that's already shipped. iter-1 source #157 (ROADMAP P1 internal flag).
+- [x] **Wire a "Rotate encryption key" button** in `SettingsWindow` → opens a two-step dialog: (1) confirm + status-bar progress, (2) on success display "Rotated N entries / M folders" toast. Runs the migrator across `folders` + `entries` inside a single `BEGIN IMMEDIATE` transaction. Rollback on any failure; relies on the v0.3.1 two-phase-commit primitive that's already shipped. iter-1 source #157 (ROADMAP P1 internal flag). Implemented: `EntryRepository.UpdateCrypto` / `FolderRepository.UpdateCrypto` plumbed through `MainViewModel` → `SettingsWindow`; rotation delegate created in `App.OnStartup` (DPAPI mode only; portable mode disables the button with explanatory hint).
 - **Justification:** The crypto primitive is shipped (v0.3.1); the missing piece is operator UX. Low-risk wire-up with strong security narrative.
 
 ### Microsoft.Data.Sqlite 9.x → 10.0.6 (P1, [5/3/5/4/5/3 → 4.17])

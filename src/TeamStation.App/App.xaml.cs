@@ -6,6 +6,7 @@ using Microsoft.Win32;
 using TeamStation.App.Services;
 using TeamStation.App.ViewModels;
 using TeamStation.App.Views;
+using TeamStation.Core.Models;
 using TeamStation.Data.Security;
 using TeamStation.Data.Storage;
 using TeamStation.Launcher;
@@ -112,6 +113,91 @@ public partial class App : Application
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                 ?? "dev";
 
+            // DEK rotation delegate — available in DPAPI (standard) mode only.
+            // Portable mode uses a master-password-wrapped DEK; that path needs
+            // a separate re-prompt flow that is not yet implemented.
+            Func<(int entries, int folders)>? rotateDek = null;
+            if (!StoragePaths.IsPortable(out _))
+            {
+                rotateDek = () =>
+                {
+                    var (entryCount, folderCount) = (0, 0);
+                    var newSvc = CryptoService.RotateDek(db, (oldSvc, newSvc) =>
+                    {
+                        using var c = db.OpenConnection();
+                        using var tx = c.BeginTransaction();
+
+                        // Re-read and re-encrypt all entry password fields.
+                        var entryRows = new List<(string id, byte[]? pw, byte[]? proxyPw)>();
+                        using (var cmd = c.CreateCommand())
+                        {
+                            cmd.Transaction = tx;
+                            cmd.CommandText = "SELECT id, password_enc, proxy_pass_enc FROM entries;";
+                            using var reader = cmd.ExecuteReader();
+                            while (reader.Read())
+                            {
+                                var id = reader.GetString(0);
+                                var pw = reader.IsDBNull(1) ? null : (byte[])reader[1];
+                                var proxyPw = reader.IsDBNull(2) ? null : (byte[])reader[2];
+                                entryRows.Add((id, pw, proxyPw));
+                            }
+                        }
+
+                        foreach (var (id, pw, proxyPw) in entryRows)
+                        {
+                            var newPw = pw is null ? null : newSvc.EncryptBytes(oldSvc.DecryptToBytes(pw));
+                            var newProxyPw = proxyPw is null ? null : newSvc.EncryptBytes(oldSvc.DecryptToBytes(proxyPw));
+                            using var cmd = c.CreateCommand();
+                            cmd.Transaction = tx;
+                            cmd.CommandText = "UPDATE entries SET password_enc=$pw, proxy_pass_enc=$proxy WHERE id=$id;";
+                            cmd.Parameters.AddWithValue("$pw", (object?)newPw ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("$proxy", (object?)newProxyPw ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("$id", id);
+                            cmd.ExecuteNonQuery();
+                            if (pw is not null || proxyPw is not null) entryCount++;
+                        }
+
+                        // Re-read and re-encrypt all folder default password fields.
+                        var folderRows = new List<(string id, byte[] pw)>();
+                        using (var cmd2 = c.CreateCommand())
+                        {
+                            cmd2.Transaction = tx;
+                            cmd2.CommandText = "SELECT id, default_password_enc FROM folders WHERE default_password_enc IS NOT NULL;";
+                            using var reader = cmd2.ExecuteReader();
+                            while (reader.Read())
+                                folderRows.Add((reader.GetString(0), (byte[])reader[1]));
+                        }
+
+                        foreach (var (id, pw) in folderRows)
+                        {
+                            var newPw = newSvc.EncryptBytes(oldSvc.DecryptToBytes(pw))!;
+                            using var cmd = c.CreateCommand();
+                            cmd.Transaction = tx;
+                            cmd.CommandText = "UPDATE folders SET default_password_enc=$pw WHERE id=$id;";
+                            cmd.Parameters.AddWithValue("$pw", newPw);
+                            cmd.Parameters.AddWithValue("$id", id);
+                            cmd.ExecuteNonQuery();
+                            folderCount++;
+                        }
+
+                        tx.Commit();
+                    });
+
+                    entries.UpdateCrypto(newSvc);
+                    folders.UpdateCrypto(newSvc);
+                    _crypto = newSvc;
+
+                    audit.Append(new AuditEvent
+                    {
+                        Action = "rotate-dek",
+                        TargetType = "vault",
+                        Summary = $"Encryption key rotated. Re-encrypted {entryCount} connection(s) and {folderCount} folder default(s).",
+                    });
+
+                    return (entryCount, folderCount);
+                };
+            }
+
             var vm = new MainViewModel(
                 entries: entries,
                 folders: folders,
@@ -125,7 +211,8 @@ public partial class App : Application
                 tvExePath: tvExePath,
                 startupVersion: version,
                 startupDbPath: dbPath,
-                startupIntegrityReport: startupIntegrity);
+                startupIntegrityReport: startupIntegrity,
+                rotateDek: rotateDek);
 
             var window = new MainWindow(vm);
             MainWindow = window;

@@ -281,6 +281,35 @@
                     </StackPanel>
                 </Border>
 
+                <!--  Vault security  -->
+                <Border Style="{StaticResource SectionCard}" Margin="0,14,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Vault security" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="Re-encrypt all stored passwords under a fresh 256-bit AES-GCM key. Uses the v0.3.1 two-phase-commit primitive — atomic and rollback-safe."
+                                   Style="{StaticResource SectionSubtitleText}" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+                            <Button x:Name="RotateDekButton"
+                                    Content="Rotate encryption key"
+                                    AutomationProperties.Name="Rotate encryption key"
+                                    AutomationProperties.HelpText="Generates a new data-encryption key and re-encrypts all stored passwords under it."
+                                    Style="{StaticResource GhostButton}"
+                                    Click="RotateDek_Click" />
+                        </StackPanel>
+                        <TextBlock x:Name="RotateDekHint"
+                                   Margin="0,6,0,0"
+                                   Text="Available in standard (DPAPI) mode only. Generates a fresh random key, migrates all entries and folder defaults in a single transaction, then atomically promotes the new key."
+                                   Style="{StaticResource BodyMutedText}" />
+                        <TextBlock x:Name="RotateDekStatus"
+                                   Margin="0,8,0,0"
+                                   Visibility="Collapsed"
+                                   FontWeight="SemiBold"
+                                   FontSize="12"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
 

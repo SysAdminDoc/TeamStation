@@ -4,6 +4,10 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+### Security
+
+- **"Rotate encryption key" action in Settings.** The Settings dialog now exposes a "Vault security" section with a **Rotate encryption key** button. Clicking it generates a fresh 256-bit AES-GCM data-encryption key via the v0.3.1 two-phase-commit primitive, re-encrypts every `password_enc` / `proxy_pass_enc` / `default_password_enc` column in a single SQLite transaction, atomically promotes the new wrapped DEK, and writes an audit event recording the counts. The button is available in standard (DPAPI) mode only; portable (master-password) mode disables it with an explanatory hint. On success the section shows "Re-encrypted N connection password(s) and M folder default(s) under a fresh key"; on failure it shows the error inline without closing the dialog.
+
 ### Changed
 
 - **SQLite maintenance upgrade.** `TeamStation.Data` now references `Microsoft.Data.Sqlite` 10.0.6. `Database.OpenConnection()` returns a small optimizing connection that runs best-effort `PRAGMA optimize` during `Close` / `Dispose`, keeping the existing raw-SQL repository shape while picking up SQLite's lightweight planner-statistics maintenance.

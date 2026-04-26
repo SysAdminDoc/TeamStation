@@ -9,12 +9,22 @@ namespace TeamStation.Data.Storage;
 public sealed class FolderRepository
 {
     private readonly Database _db;
-    private readonly CryptoService _crypto;
+    private CryptoService _crypto;
 
     public FolderRepository(Database db, CryptoService crypto)
     {
         _db = db;
         _crypto = crypto;
+    }
+
+    /// <summary>
+    /// Replaces the active <see cref="CryptoService"/> after a successful DEK
+    /// rotation. Symmetric with <see cref="EntryRepository.UpdateCrypto"/>.
+    /// </summary>
+    public void UpdateCrypto(CryptoService newCrypto)
+    {
+        ArgumentNullException.ThrowIfNull(newCrypto);
+        _crypto = newCrypto;
     }
 
     public IReadOnlyList<Folder> GetAll()

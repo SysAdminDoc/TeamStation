@@ -36,6 +36,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly SettingsService _settingsService;
     private readonly TeamViewerCloudSyncService _cloudSync = new();
     private readonly IDialogService _dialogs;
+    private readonly Func<(int entries, int folders)>? _rotateDek;
 
     private TreeNode? _selected;
     private string _status = string.Empty;
@@ -67,7 +68,8 @@ public sealed class MainViewModel : ViewModelBase
         string? tvExePath,
         string? startupVersion = null,
         string? startupDbPath = null,
-        DatabaseIntegrityReport? startupIntegrityReport = null)
+        DatabaseIntegrityReport? startupIntegrityReport = null,
+        Func<(int entries, int folders)>? rotateDek = null)
     {
         _entries = entries;
         _folders = folders;
@@ -78,6 +80,7 @@ public sealed class MainViewModel : ViewModelBase
         _settings = settings;
         _settingsService = settingsService;
         _dialogs = dialogs;
+        _rotateDek = rotateDek;
         _isTeamViewerReady = !string.IsNullOrWhiteSpace(tvExePath);
         _tvExePath = tvExePath ?? "TeamViewer.exe not found — install TeamViewer before launching";
         _startupVersion = startupVersion ?? "dev";
@@ -1830,7 +1833,7 @@ public sealed class MainViewModel : ViewModelBase
 
     private void OpenSettings()
     {
-        var dialog = new SettingsWindow(_settings) { Owner = Application.Current?.MainWindow };
+        var dialog = new SettingsWindow(_settings, _rotateDek) { Owner = Application.Current?.MainWindow };
         if (dialog.ShowDialog() != true)
             return;
 

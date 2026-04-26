@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Media;
 using System.IO;
 using Microsoft.Win32;
 using TeamStation.App.Services;
@@ -9,12 +10,14 @@ namespace TeamStation.App.Views;
 public partial class SettingsWindow : Window
 {
     private readonly AppSettings _settings;
+    private readonly Func<(int entries, int folders)>? _rotateDek;
 
-    public SettingsWindow(AppSettings settings)
+    public SettingsWindow(AppSettings settings, Func<(int entries, int folders)>? rotateDek = null)
     {
         InitializeComponent();
         ThemeManager.ConfigureWindow(this);
         _settings = settings;
+        _rotateDek = rotateDek;
         ThemeBox.ItemsSource = ThemeManager.Themes;
         ThemeBox.SelectedValue = ThemeManager.Normalize(settings.Theme);
         TeamViewerPathBox.Text = settings.TeamViewerPathOverride ?? string.Empty;
@@ -29,6 +32,46 @@ public partial class SettingsWindow : Window
         SavedSearchesBox.Text = string.Join(Environment.NewLine, settings.SavedSearches);
         ExternalToolsBox.Text = string.Join(Environment.NewLine,
             settings.ExternalTools.Select(t => $"{t.Name}|{t.Command}|{t.Arguments}"));
+
+        RotateDekButton.IsEnabled = rotateDek is not null;
+        if (rotateDek is null)
+            RotateDekHint.Text = "Key rotation is not available in portable (master-password) mode.";
+    }
+
+    private void RotateDek_Click(object sender, RoutedEventArgs e)
+    {
+        if (_rotateDek is null) return;
+
+        var confirmed = ThemedMessageDialog.Confirm(
+            this,
+            "Rotate encryption key",
+            "This generates a new 256-bit AES-GCM key and re-encrypts every stored password under it. " +
+            "The operation is atomic — if anything fails, your existing passwords are unaffected.\n\nContinue?",
+            ThemedMessageKind.Warning,
+            "Rotate");
+        if (!confirmed) return;
+
+        RotateDekButton.IsEnabled = false;
+        RotateDekStatus.Visibility = Visibility.Collapsed;
+
+        try
+        {
+            var (entries, folders) = _rotateDek();
+            var parts = new List<string>();
+            if (entries > 0) parts.Add($"{entries} connection password{(entries == 1 ? "" : "s")}");
+            if (folders > 0) parts.Add($"{folders} folder default{(folders == 1 ? "" : "s")}");
+            var what = parts.Count > 0 ? string.Join(" and ", parts) : "0 passwords";
+            RotateDekStatus.Text = $"Done. Re-encrypted {what} under a fresh key.";
+            RotateDekStatus.Foreground = (Brush)FindResource("GreenBrush");
+            RotateDekStatus.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            RotateDekStatus.Text = $"Rotation failed: {ex.Message}";
+            RotateDekStatus.Foreground = (Brush)FindResource("RedBrush");
+            RotateDekStatus.Visibility = Visibility.Visible;
+            RotateDekButton.IsEnabled = true;
+        }
     }
 
     private void Browse_Click(object sender, RoutedEventArgs e)
