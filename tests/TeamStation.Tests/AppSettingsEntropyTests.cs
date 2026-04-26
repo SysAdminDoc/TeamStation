@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using TeamStation.App.Services;
+using TeamStation.Data.Security;
 
 namespace TeamStation.Tests;
 
@@ -68,13 +69,17 @@ public class AppSettingsEntropyTests : IDisposable
         loadSvc.UnprotectApiToken(loadSettings);
         Assert.Equal("tv_fresh_token", loadSettings.TeamViewerApiToken);
 
-        // The underlying ProtectedData wrap must in fact be entropy-bound:
+        // The underlying ProtectedData wrap must be purpose-entropy-bound:
         // unwrapping with null entropy raises CryptographicException.
         var rawWrap = Convert.FromBase64String(loadSettings.TeamViewerApiTokenProtected!);
         Assert.ThrowsAny<CryptographicException>(() =>
             ProtectedData.Unprotect(rawWrap, optionalEntropy: null, DataProtectionScope.CurrentUser));
-        // And succeeds with the salt:
-        var unwrapped = ProtectedData.Unprotect(rawWrap, entropy, DataProtectionScope.CurrentUser);
+        // Base entropy (without purpose derivation) must also fail.
+        Assert.ThrowsAny<CryptographicException>(() =>
+            ProtectedData.Unprotect(rawWrap, entropy, DataProtectionScope.CurrentUser));
+        // Succeeds with the purpose-derived entropy:
+        var purposeEntropy = DpapiPurposeEntropy.Derive(entropy, DpapiPurposeEntropy.Settings);
+        var unwrapped = ProtectedData.Unprotect(rawWrap, purposeEntropy, DataProtectionScope.CurrentUser);
         Assert.Equal("tv_fresh_token", Encoding.UTF8.GetString(unwrapped));
     }
 
@@ -119,13 +124,17 @@ public class AppSettingsEntropyTests : IDisposable
         settings.Theme = "System";
         svc.Save(settings);
 
-        // Verify the wrap on disk is now entropy-bound: null-entropy unwrap
-        // fails, salt unwrap succeeds.
+        // Verify the wrap on disk is now purpose-entropy-bound.
         var settings2 = svc.Load();
         var rawWrap = Convert.FromBase64String(settings2.TeamViewerApiTokenProtected!);
         Assert.ThrowsAny<CryptographicException>(() =>
             ProtectedData.Unprotect(rawWrap, optionalEntropy: null, DataProtectionScope.CurrentUser));
-        var unwrapped = ProtectedData.Unprotect(rawWrap, entropy, DataProtectionScope.CurrentUser);
+        // Base entropy (no purpose derivation) must also fail.
+        Assert.ThrowsAny<CryptographicException>(() =>
+            ProtectedData.Unprotect(rawWrap, entropy, DataProtectionScope.CurrentUser));
+        // Purpose-derived entropy succeeds.
+        var purposeEntropy = DpapiPurposeEntropy.Derive(entropy, DpapiPurposeEntropy.Settings);
+        var unwrapped = ProtectedData.Unprotect(rawWrap, purposeEntropy, DataProtectionScope.CurrentUser);
         Assert.Equal("legacy_token", Encoding.UTF8.GetString(unwrapped));
     }
 

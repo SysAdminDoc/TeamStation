@@ -79,8 +79,9 @@ public class CryptoEntropyTests
         var wrap = store.LoadValue(DekKey)!;
         var salt = store.LoadValue(EntropyKey)!;
 
-        // Round-trip with the correct salt — must succeed.
-        var ok = ProtectedData.Unprotect(wrap, salt, DataProtectionScope.CurrentUser);
+        // Round-trip with the purpose-derived entropy — must succeed.
+        var purposeEntropy = DpapiPurposeEntropy.Derive(salt, DpapiPurposeEntropy.CredentialStore);
+        var ok = ProtectedData.Unprotect(wrap, purposeEntropy, DataProtectionScope.CurrentUser);
         Assert.Equal(32, ok.Length);
 
         // Wrong entropy bytes — must fail.
@@ -90,10 +91,13 @@ public class CryptoEntropyTests
         Assert.ThrowsAny<CryptographicException>(() =>
             ProtectedData.Unprotect(wrap, wrong, DataProtectionScope.CurrentUser));
 
-        // Null entropy — must fail (proves the wrap is in fact entropy-bound,
-        // not a coincidence).
+        // Null entropy — must fail (proves the wrap is purpose-entropy-bound).
         Assert.ThrowsAny<CryptographicException>(() =>
             ProtectedData.Unprotect(wrap, null, DataProtectionScope.CurrentUser));
+
+        // Base entropy without purpose derivation — must also fail.
+        Assert.ThrowsAny<CryptographicException>(() =>
+            ProtectedData.Unprotect(wrap, salt, DataProtectionScope.CurrentUser));
     }
 
     [Fact]
@@ -112,16 +116,19 @@ public class CryptoEntropyTests
         var ct = svc.EncryptString("after-upgrade");
         Assert.Equal("after-upgrade", svc.DecryptString(ct));
 
-        // Salt now exists; the wrap row has been replaced by an entropy-bound wrap.
+        // Salt now exists; the wrap row has been replaced by a purpose-entropy-bound wrap.
         var salt = store.LoadValue(EntropyKey);
         Assert.NotNull(salt);
         Assert.Equal(32, salt!.Length);
         var newWrap = store.LoadValue(DekKey)!;
         Assert.NotEqual(Convert.ToBase64String(legacyWrap), Convert.ToBase64String(newWrap));
 
-        // The new wrap unwraps with the salt and FAILS without it.
-        var roundTrippedDek = ProtectedData.Unprotect(newWrap, salt, DataProtectionScope.CurrentUser);
+        // The new wrap unwraps with purpose-derived entropy and FAILS with base entropy or null.
+        var purposeEntropy = DpapiPurposeEntropy.Derive(salt, DpapiPurposeEntropy.CredentialStore);
+        var roundTrippedDek = ProtectedData.Unprotect(newWrap, purposeEntropy, DataProtectionScope.CurrentUser);
         Assert.Equal(dek, roundTrippedDek);
+        Assert.ThrowsAny<CryptographicException>(() =>
+            ProtectedData.Unprotect(newWrap, salt, DataProtectionScope.CurrentUser));
         Assert.ThrowsAny<CryptographicException>(() =>
             ProtectedData.Unprotect(newWrap, null, DataProtectionScope.CurrentUser));
     }
@@ -170,9 +177,10 @@ public class CryptoEntropyTests
         var saltAfterRotation = store.LoadValue(EntropyKey)!;
         Assert.Equal(saltBeforeRotation, saltAfterRotation);
 
-        // New wrap is entropy-bound under the SAME salt.
+        // New wrap is purpose-entropy-bound under the same base salt.
         var wrap = store.LoadValue(DekKey)!;
-        var dek = ProtectedData.Unprotect(wrap, saltAfterRotation, DataProtectionScope.CurrentUser);
+        var derivedEntropy = DpapiPurposeEntropy.Derive(saltAfterRotation, DpapiPurposeEntropy.CredentialStore);
+        var dek = ProtectedData.Unprotect(wrap, derivedEntropy, DataProtectionScope.CurrentUser);
         Assert.Equal(32, dek.Length);
         Assert.ThrowsAny<CryptographicException>(() =>
             ProtectedData.Unprotect(wrap, null, DataProtectionScope.CurrentUser));
@@ -198,9 +206,10 @@ public class CryptoEntropyTests
         Assert.NotNull(salt);
         Assert.Equal(32, salt!.Length);
 
-        // New wrap unwraps under the new salt, fails under null.
+        // New wrap unwraps under purpose-derived entropy, fails under null or base salt.
         var wrap = store.LoadValue(DekKey)!;
-        Assert.NotNull(ProtectedData.Unprotect(wrap, salt, DataProtectionScope.CurrentUser));
+        var purposeEntropy = DpapiPurposeEntropy.Derive(salt, DpapiPurposeEntropy.CredentialStore);
+        Assert.NotNull(ProtectedData.Unprotect(wrap, purposeEntropy, DataProtectionScope.CurrentUser));
         Assert.ThrowsAny<CryptographicException>(() =>
             ProtectedData.Unprotect(wrap, null, DataProtectionScope.CurrentUser));
 

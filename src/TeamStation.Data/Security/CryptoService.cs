@@ -122,7 +122,10 @@ public sealed class CryptoService : IDisposable
         if (wrapped is null)
         {
             dek = RandomNumberGenerator.GetBytes(KeySize);
-            var protectedDek = ProtectedData.Protect(dek, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
+            var purposeEntropy = entropy is not null
+                ? DpapiPurposeEntropy.Derive(entropy, DpapiPurposeEntropy.CredentialStore)
+                : null;
+            var protectedDek = ProtectedData.Protect(dek, optionalEntropy: purposeEntropy, scope: DataProtectionScope.CurrentUser);
             keyStore.Save(protectedDek);
         }
         else
@@ -161,12 +164,14 @@ public sealed class CryptoService : IDisposable
     }
 
     /// <summary>
-    /// Unwraps a stored DEK with the per-database entropy salt and falls back
-    /// to <c>optionalEntropy: null</c> on <see cref="CryptographicException"/>
-    /// so legacy v0.3.2 (and earlier) installs that wrapped under null
-    /// entropy keep working. On a successful legacy unwrap the DEK is
-    /// silently re-wrapped under the new entropy and the wrap row is
-    /// updated so the next load takes the fast path.
+    /// Unwraps a stored DEK using a 3-tier fallback chain:
+    /// <list type="number">
+    ///   <item>Purpose-derived entropy (v0.4.x+, new wraps)</item>
+    ///   <item>Base entropy (v0.3.3–v0.4.0 era)</item>
+    ///   <item>Null entropy (pre-v0.3.3)</item>
+    /// </list>
+    /// A successful legacy read (tiers 2 or 3) triggers a silent re-wrap under
+    /// purpose-derived entropy so subsequent loads take the fast path.
     /// </summary>
     private static byte[] UnprotectDekWithLegacyFallback(byte[] wrapped, byte[]? entropy, IKeyStore keyStore)
     {
@@ -176,29 +181,40 @@ public sealed class CryptoService : IDisposable
             return ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
         }
 
+        var purposeEntropy = DpapiPurposeEntropy.Derive(entropy, DpapiPurposeEntropy.CredentialStore);
+
+        // Tier 1: purpose-derived entropy (v0.4.x+ wraps)
         try
         {
-            return ProtectedData.Unprotect(wrapped, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
+            return ProtectedData.Unprotect(wrapped, optionalEntropy: purposeEntropy, scope: DataProtectionScope.CurrentUser);
+        }
+        catch (CryptographicException) { }
+
+        // Tier 2 and 3: legacy wraps (base entropy or null entropy). Either
+        // way, re-wrap under purpose-entropy so the next load takes tier 1.
+        byte[] dek;
+        try
+        {
+            // Tier 2: base entropy (v0.3.3–v0.4.0)
+            dek = ProtectedData.Unprotect(wrapped, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
         }
         catch (CryptographicException)
         {
-            // Legacy null-entropy wrap. Unwrap with the original entropy,
-            // then re-wrap under the new entropy and persist so we don't
-            // hit the catch path again on the next load.
-            var dek = ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
-            try
-            {
-                var rewrapped = ProtectedData.Protect(dek, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
-                keyStore.Save(rewrapped);
-            }
-            catch
-            {
-                // Re-wrap is best-effort. If the persist fails we still hand
-                // back a working DEK; the next load will hit the same legacy
-                // path and try again.
-            }
-            return dek;
+            // Tier 3: null entropy (pre-v0.3.3)
+            dek = ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
         }
+
+        try
+        {
+            var rewrapped = ProtectedData.Protect(dek, optionalEntropy: purposeEntropy, scope: DataProtectionScope.CurrentUser);
+            keyStore.Save(rewrapped);
+        }
+        catch
+        {
+            // Re-wrap is best-effort. If the persist fails we still return a
+            // working DEK; the next load will retry the legacy fallback chain.
+        }
+        return dek;
     }
 
     public static bool HasMasterPassword(ISecretStore keyStore)
@@ -541,7 +557,10 @@ public sealed class CryptoService : IDisposable
             throw new CryptographicException("Stored DEK has unexpected length.");
 
         var newDekUnpinned = RandomNumberGenerator.GetBytes(KeySize);
-        var newWrapped = ProtectedData.Protect(newDekUnpinned, optionalEntropy: entropy, scope: DataProtectionScope.CurrentUser);
+        var purposeEntropy = entropy is not null
+            ? DpapiPurposeEntropy.Derive(entropy, DpapiPurposeEntropy.CredentialStore)
+            : null;
+        var newWrapped = ProtectedData.Protect(newDekUnpinned, optionalEntropy: purposeEntropy, scope: DataProtectionScope.CurrentUser);
 
         // Hand the pinned buffers to the services so the caller sees the
         // same memory-hygiene guarantees on temporary rotation services as

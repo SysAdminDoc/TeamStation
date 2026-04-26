@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Collections.Frozen;
 using TeamStation.Core.Models;
 
 namespace TeamStation.Launcher.Validation;
@@ -13,16 +15,15 @@ public static partial class LaunchInputValidator
     public const int MaxPasswordLength = 256;
     public const int MaxProxyUserLength = 128;
 
-    private static readonly char[] ForbiddenInPassword =
-    [
-        '\\', '/', ':', '\0', '\r', '\n', '\t', ' ', '"', '\''
-    ];
+    private static readonly SearchValues<char> ForbiddenInPassword =
+        SearchValues.Create(['\\', '/', ':', '\0', '\r', '\n', '\t', ' ', '"', '\'']);
 
-    private static readonly string[] ForbiddenSubstringsInAny =
-    [
-        "--play", "--control", "--Sendto", "--id", "--api-token",
-        "\\\\", "..\\", "../"
-    ];
+    private static readonly FrozenSet<string> ForbiddenSubstringsInAny =
+        new string[]
+        {
+            "--play", "--control", "--Sendto", "--id", "--api-token",
+            "\\\\", "..\\", "../"
+        }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     public static void ValidateTeamViewerId(string id)
     {
@@ -44,7 +45,7 @@ public static partial class LaunchInputValidator
             throw new LaunchValidationException($"Password exceeds {MaxPasswordLength} characters.");
         if (password.StartsWith('-'))
             throw new LaunchValidationException("Password must not start with '-'.");
-        if (password.IndexOfAny(ForbiddenInPassword) >= 0)
+        if (password.AsSpan().IndexOfAny(ForbiddenInPassword) >= 0)
             throw new LaunchValidationException("Password contains a forbidden character.");
         foreach (var bad in ForbiddenSubstringsInAny)
         {

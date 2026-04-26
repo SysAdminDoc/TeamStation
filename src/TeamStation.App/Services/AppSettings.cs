@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using TeamStation.Core.Io;
 using TeamStation.Core.Models;
+using TeamStation.Data.Security;
 
 namespace TeamStation.App.Services;
 
@@ -148,7 +149,12 @@ public sealed class SettingsService
         var bytes = Encoding.UTF8.GetBytes(value);
         try
         {
-            var protectedBytes = ProtectedData.Protect(bytes, entropy, scope: DataProtectionScope.CurrentUser);
+            // Use purpose-derived entropy so this wrap cannot be replayed
+            // against the credential-store DEK unprotect path.
+            var effectiveEntropy = entropy is not null
+                ? DpapiPurposeEntropy.Derive(entropy, DpapiPurposeEntropy.Settings)
+                : null;
+            var protectedBytes = ProtectedData.Protect(bytes, effectiveEntropy, scope: DataProtectionScope.CurrentUser);
             return Convert.ToBase64String(protectedBytes);
         }
         finally
@@ -171,18 +177,7 @@ public sealed class SettingsService
 
         try
         {
-            byte[] unprotected;
-            try
-            {
-                unprotected = ProtectedData.Unprotect(wrapped, entropy, scope: DataProtectionScope.CurrentUser);
-            }
-            catch (CryptographicException) when (entropy is not null)
-            {
-                // Legacy v0.3.3-and-earlier wrap (made under null entropy).
-                // Falling back lets the existing user keep their saved token
-                // across the upgrade; the next Save re-wraps under entropy.
-                unprotected = ProtectedData.Unprotect(wrapped, optionalEntropy: null, scope: DataProtectionScope.CurrentUser);
-            }
+            var unprotected = TryUnprotectSettingsBlob(wrapped, entropy);
             try
             {
                 return Encoding.UTF8.GetString(unprotected);
@@ -194,8 +189,37 @@ public sealed class SettingsService
         }
         catch
         {
-            // Token was encrypted under a different user/machine — expected on a portable DB move.
+            // Token was encrypted under a different user/machine or an
+            // unrecognised entropy scheme — expected on a portable DB move.
             return null;
         }
+    }
+
+    /// <summary>
+    /// 3-tier DPAPI fallback for the API-token blob:
+    /// <list type="number">
+    ///   <item>Purpose-derived entropy (v0.4.x+)</item>
+    ///   <item>Base entropy (v0.3.4 era — same salt, no purpose derivation)</item>
+    ///   <item>Null entropy (pre-v0.3.4)</item>
+    /// </list>
+    /// Throws <see cref="CryptographicException"/> if all tiers fail.
+    /// </summary>
+    private static byte[] TryUnprotectSettingsBlob(byte[] wrapped, byte[]? entropy)
+    {
+        if (entropy is not null)
+        {
+            var purposeEntropy = DpapiPurposeEntropy.Derive(entropy, DpapiPurposeEntropy.Settings);
+
+            // Tier 1: purpose-derived entropy (v0.4.x+ wraps)
+            try { return ProtectedData.Unprotect(wrapped, purposeEntropy, DataProtectionScope.CurrentUser); }
+            catch (CryptographicException) { }
+
+            // Tier 2: base entropy (v0.3.4 era)
+            try { return ProtectedData.Unprotect(wrapped, entropy, DataProtectionScope.CurrentUser); }
+            catch (CryptographicException) { }
+        }
+
+        // Tier 3: null entropy (pre-v0.3.4)
+        return ProtectedData.Unprotect(wrapped, optionalEntropy: null, DataProtectionScope.CurrentUser);
     }
 }

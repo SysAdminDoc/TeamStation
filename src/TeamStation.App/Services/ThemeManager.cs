@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -29,7 +30,7 @@ public static class ThemeManager
         new("HighContrast", "High contrast"),
     ];
 
-    private static readonly Dictionary<string, Palette> Palettes = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly FrozenDictionary<string, Palette> Palettes = new Dictionary<string, Palette>(StringComparer.OrdinalIgnoreCase)
     {
         ["Dark"] = new(
             Base: Color.FromRgb(0x10, 0x10, 0x10),
@@ -123,7 +124,7 @@ public static class ThemeManager
             PanelBorder: Color.FromArgb(0x75, 0xFF, 0xFF, 0xFF),
             InputBorder: Color.FromArgb(0xAA, 0xFF, 0xFF, 0xFF),
             DangerBorder: Color.FromArgb(0xAA, 0xFF, 0x5C, 0x7A)),
-    };
+    }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     public static string Normalize(string? themeId)
     {
