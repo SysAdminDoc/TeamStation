@@ -4,6 +4,10 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-25
+
+Minor release rolling up the audit-log SIEM export CLI, schema-v4 HMAC-SHA256 audit-chain integrity, Microsoft.Data.Sqlite 10.0.6 maintenance bump with `PRAGMA optimize` on close, startup `PRAGMA integrity_check` warning, structured activity-log NDJSON export, and a 50-sample launch-latency rollup in the activity dock. 45+ commits since v0.3.5.
+
 ### Added
 
 - **`--export-audit-log` CLI** — Headless export of the entire audit log for SIEM ingestion (Splunk, Elastic/OpenSearch, Datadog, Loki). Supports `--format=ndjson` (default, `teamstation.audit.v1` schema, UTF-8, no BOM) and `--format=csv` (RFC 4180, UTF-8 BOM for Excel compatibility). Output goes to `--output=<path>` or stdout when the flag is omitted. Unless `--skip-verify` is given, the HMAC chain is verified before export and the process exits 2 if the chain is invalid; exit 0 on success. `AuditLogRepository.GetAll()` added (ascending order, no row cap). New `AuditLogExporter` static class in `TeamStation.Data.Storage`. 13 new tests in `AuditLogExporterTests.cs`.
