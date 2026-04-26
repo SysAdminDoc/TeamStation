@@ -15,8 +15,11 @@ public static partial class LaunchInputValidator
     public const int MaxPasswordLength = 256;
     public const int MaxProxyUserLength = 128;
 
+    private static readonly char[] ForbiddenInPasswordChars =
+        { '\\', '/', ':', '\0', '\r', '\n', '\t', ' ', '"', '\'' };
+
     private static readonly SearchValues<char> ForbiddenInPassword =
-        SearchValues.Create(['\\', '/', ':', '\0', '\r', '\n', '\t', ' ', '"', '\'']);
+        SearchValues.Create(ForbiddenInPasswordChars);
 
     private static readonly FrozenSet<string> ForbiddenSubstringsInAny =
         new string[]
@@ -102,7 +105,7 @@ public static partial class LaunchInputValidator
         // allow; every other char in ForbiddenInPassword is still banned.
         if (host.StartsWith('-'))
             throw new LaunchValidationException("Proxy host must not start with '-'.");
-        foreach (var ch in ForbiddenInPassword)
+        foreach (var ch in ForbiddenInPasswordChars)
         {
             if (ch == ':' && isBracketedIpv6) continue;
             if (host.IndexOf(ch) >= 0)
@@ -122,7 +125,7 @@ public static partial class LaunchInputValidator
             throw new LaunchValidationException($"Proxy username exceeds {MaxProxyUserLength} characters.");
         if (username.StartsWith('-'))
             throw new LaunchValidationException("Proxy username must not start with '-'.");
-        if (username.IndexOfAny(ForbiddenInPassword) >= 0)
+        if (username.AsSpan().IndexOfAny(ForbiddenInPassword) >= 0)
             throw new LaunchValidationException("Proxy username contains a forbidden character.");
     }
 }
