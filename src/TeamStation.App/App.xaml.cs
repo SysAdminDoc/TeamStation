@@ -28,13 +28,17 @@ public partial class App : Application
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
-        // CLI sub-command: TeamStation.exe --verify-audit-chain
-        // Must be checked before the mutex and before any UI is created so the
-        // process can be driven from PowerShell or cmd without showing a window.
+        // CLI sub-commands — must be checked before the mutex and before any UI is
+        // created so the process can be driven from PowerShell or cmd headlessly.
         if (Array.IndexOf(e.Args, "--verify-audit-chain") >= 0)
         {
             RunAuditChainVerificationCli();
-            return; // Shutdown called inside; WPF message loop never starts.
+            return;
+        }
+        if (Array.IndexOf(e.Args, "--export-audit-log") >= 0)
+        {
+            RunAuditExportCli(e.Args);
+            return;
         }
 
         // Global unhandled-exception nets. We try to surface these in-app
@@ -318,6 +322,93 @@ public partial class App : Application
             Console.Error.WriteLine($"Verification error: {ex.GetType().Name}: {ex.Message}");
             Shutdown(2);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // CLI: --export-audit-log
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Headless path for <c>TeamStation.exe --export-audit-log</c>.
+    /// <para>
+    /// Flags (all optional):
+    /// <list type="bullet">
+    ///   <item><c>--format=ndjson</c> (default) or <c>--format=csv</c></item>
+    ///   <item><c>--output=&lt;path&gt;</c> — file to write; omit to write to stdout</item>
+    ///   <item><c>--skip-verify</c> — skip HMAC chain verification before export</item>
+    /// </list>
+    /// Exit codes: 0 = success, 1 = chain verification failed, 2 = error.
+    /// </para>
+    /// </summary>
+    private void RunAuditExportCli(string[] args)
+    {
+        const int attachParentProcess = -1;
+        AttachConsole(attachParentProcess);
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+        Console.SetError(new StreamWriter(Console.OpenStandardError()) { AutoFlush = true });
+        Console.WriteLine();
+
+        try
+        {
+            var format = GetArgValue(args, "--format=") ?? "ndjson";
+            var outputPath = GetArgValue(args, "--output=");
+            var skipVerify = Array.IndexOf(args, "--skip-verify") >= 0;
+
+            var dbPath = StoragePaths.ResolveDatabasePath();
+            var db = new Database(dbPath);
+            var crypto = CreateCrypto(db);
+            var audit = new AuditLogRepository(db, crypto);
+
+            if (!skipVerify)
+            {
+                var chainResult = audit.VerifyChain();
+                Console.Error.WriteLine($"Chain: {chainResult.Summary}");
+                if (!chainResult.IsValid)
+                {
+                    Shutdown(1);
+                    return;
+                }
+            }
+
+            var events = audit.GetAll();
+
+            TextWriter? fileWriter = null;
+            try
+            {
+                var writer = outputPath is not null
+                    ? fileWriter = new StreamWriter(outputPath, append: false, System.Text.Encoding.UTF8)
+                    : Console.Out;
+
+                if (format.Equals("csv", StringComparison.OrdinalIgnoreCase))
+                    TeamStation.Data.Storage.AuditLogExporter.WriteCsv(events, writer);
+                else
+                    TeamStation.Data.Storage.AuditLogExporter.WriteNdjson(events, writer);
+
+                writer.Flush();
+            }
+            finally
+            {
+                fileWriter?.Dispose();
+            }
+
+            if (outputPath is not null)
+                Console.Error.WriteLine($"Exported {events.Count} row(s) [{format}] → {outputPath}");
+
+            Shutdown(0);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Export error: {ex.GetType().Name}: {ex.Message}");
+            Shutdown(2);
+        }
+    }
+
+    private static string? GetArgValue(string[] args, string prefix)
+    {
+        foreach (var a in args)
+            if (a.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return a[prefix.Length..];
+        return null;
     }
 
     protected override void OnExit(ExitEventArgs e)    {

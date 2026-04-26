@@ -4,6 +4,10 @@ All notable changes to TeamStation are documented here. Format loosely follows [
 
 ## [Unreleased]
 
+### Added
+
+- **`--export-audit-log` CLI** — Headless export of the entire audit log for SIEM ingestion (Splunk, Elastic/OpenSearch, Datadog, Loki). Supports `--format=ndjson` (default, `teamstation.audit.v1` schema, UTF-8, no BOM) and `--format=csv` (RFC 4180, UTF-8 BOM for Excel compatibility). Output goes to `--output=<path>` or stdout when the flag is omitted. Unless `--skip-verify` is given, the HMAC chain is verified before export and the process exits 2 if the chain is invalid; exit 0 on success. `AuditLogRepository.GetAll()` added (ascending order, no row cap). New `AuditLogExporter` static class in `TeamStation.Data.Storage`. 13 new tests in `AuditLogExporterTests.cs`.
+
 ### Security
 
 - **HMAC-SHA256 integrity chain on `audit_log` rows.** Schema v4 adds `prev_hash BLOB` and `row_hash BLOB` to `audit_log`. Every new row carries `row_hash = HMAC-SHA256(key=DEK, prev_hash ‖ row_data)` so a verifier can detect retroactive insertion, deletion, or modification without additional key material — the existing 256-bit AES-GCM DEK doubles as the HMAC key. The chain is verified via `TeamStation.exe --verify-audit-chain` (attaches to the parent console, exits 0/1, prints a one-line summary). Rows written before the schema-v4 migration carry NULL hashes and are counted as skipped legacy rows; they do not invalidate newer rows. `CryptoService.ComputeHmac(ReadOnlySpan<byte>)` added. `AuditLogRepository` accepts an optional `CryptoService?`; legacy callers continue to work with `crypto = null`. New `AuditChainVerificationResult` record in `TeamStation.Core.Models`.

@@ -77,8 +77,37 @@ VALUES
         tx.Commit();
     }
 
-    public IReadOnlyList<AuditEvent> GetRecent(int limit = 250)
+    /// <summary>
+    /// Returns every row in the audit log in chronological order (oldest first).
+    /// Unlike <see cref="GetRecent"/> this has no row cap; use for export paths.
+    /// </summary>
+    public IReadOnlyList<AuditEvent> GetAll()
     {
+        using var c = _db.OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = @"
+SELECT id, occurred_utc, action, target_type, target_id, summary, detail
+FROM audit_log
+ORDER BY occurred_utc ASC, id ASC;";
+        using var reader = cmd.ExecuteReader();
+        var events = new List<AuditEvent>();
+        while (reader.Read())
+        {
+            events.Add(new AuditEvent
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                OccurredUtc = DateTimeOffset.Parse(reader.GetString(1), CultureInfo.InvariantCulture),
+                Action = reader.GetString(2),
+                TargetType = reader.GetString(3),
+                TargetId = reader.IsDBNull(4) ? null : Guid.Parse(reader.GetString(4)),
+                Summary = reader.GetString(5),
+                Detail = reader.IsDBNull(6) ? null : reader.GetString(6),
+            });
+        }
+        return events;
+    }
+
+    public IReadOnlyList<AuditEvent> GetRecent(int limit = 250)    {
         using var c = _db.OpenConnection();
         using var cmd = c.CreateCommand();
         // Secondary sort on id so events that share a millisecond (common in
