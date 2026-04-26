@@ -74,6 +74,40 @@ public class DatabaseIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void Slow_query_event_fires_when_command_reaches_threshold()
+    {
+        _db.SlowQueryThreshold = TimeSpan.Zero;
+        var events = new List<DatabaseSlowQueryEventArgs>();
+        _db.SlowQueryLogged += (_, evt) => events.Add(evt);
+
+        using var c = _db.OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT 42;";
+
+        Assert.Equal(42, Convert.ToInt32(cmd.ExecuteScalar()));
+        var slowQuery = Assert.Single(
+            events,
+            evt => evt.CommandText.Contains("SELECT 42;", StringComparison.Ordinal));
+        Assert.True(slowQuery.Elapsed >= TimeSpan.Zero);
+        Assert.True(slowQuery.OccurredAt <= DateTimeOffset.Now);
+    }
+
+    [Fact]
+    public void Slow_query_event_respects_threshold()
+    {
+        _db.SlowQueryThreshold = TimeSpan.FromDays(1);
+        var count = 0;
+        _db.SlowQueryLogged += (_, _) => count++;
+
+        using var c = _db.OpenConnection();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT 42;";
+        cmd.ExecuteScalar();
+
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
     public void CheckIntegrity_reports_ok_for_fresh_database()
     {
         var report = _db.CheckIntegrity();

@@ -58,7 +58,7 @@ TeamStation fills that gap. It is not a remote-desktop protocol — it orchestra
 - Per-connection profile names, pinned entries, TeamViewer.exe overrides, Wake-on-LAN, and launch scripts
 - CVE-2020-13699-hardened launcher — numeric-ID regex, password denylist, argv-array `Process.Start` only
 - DPAPI-wrapped AES-256-GCM credential storage in local SQLite (WAL, FKs); portable mode uses a master-password-wrapped DEK
-- Default-on SQLite planner maintenance via `PRAGMA optimize` when database connections close, with a Settings opt-out for diagnostics
+- Default-on SQLite planner maintenance via `PRAGMA optimize` when database connections close, plus configurable slow-query activity warnings
 - Debounced multi-field search; folders with matching descendants stay visible and auto-expand
 - Saved searches, quick connect, and pinned/recent tray launching
 - Flexible **CSV import** (TeamViewer Management Console, Remote Desktop Manager, mRemoteNG, ad-hoc spreadsheets) with column aliases that tolerate spaces / underscores / hyphens / case
@@ -102,7 +102,7 @@ System requirements:
 - Windows 10 1809+ or Windows 11 (x64)
 - TeamViewer 15 Classic or TeamViewer Remote (the full client; **QuickSupport is not enough** — TeamStation needs `TeamViewer.exe` on the `PATH` or at its default install location)
 
-First run creates `%LocalAppData%\TeamStation\teamstation.db` with WAL mode, foreign keys, startup `PRAGMA integrity_check`, and default-on `PRAGMA optimize` maintenance when database connections close. Passwords are encrypted at rest with AES-256-GCM under a key wrapped by Windows DPAPI (user-scoped). No network traffic, no telemetry, no update pings.
+First run creates `%LocalAppData%\TeamStation\teamstation.db` with WAL mode, foreign keys, startup `PRAGMA integrity_check`, default-on `PRAGMA optimize` maintenance when database connections close, and a 100 ms slow-query warning threshold surfaced in the activity panel. Passwords are encrypted at rest with AES-256-GCM under a key wrapped by Windows DPAPI (user-scoped). No network traffic, no telemetry, no update pings.
 
 ## Build from source
 

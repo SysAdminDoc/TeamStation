@@ -1,3 +1,5 @@
+using System.Data;
+using System.Diagnostics;
 using System.Runtime.Versioning;
 using Microsoft.Data.Sqlite;
 using TeamStation.Data.Security;
@@ -17,6 +19,8 @@ public sealed class Database : ISecretStore
 
     public string Path { get; }
     public bool OptimizeOnConnectionClose { get; set; } = true;
+    public TimeSpan SlowQueryThreshold { get; set; } = TimeSpan.FromMilliseconds(100);
+    public event EventHandler<DatabaseSlowQueryEventArgs>? SlowQueryLogged;
 
     public Database(string path)
     {
@@ -26,7 +30,10 @@ public sealed class Database : ISecretStore
 
     public SqliteConnection OpenConnection()
     {
-        var c = new OptimizingSqliteConnection($"Data Source={Path};Cache=Shared", () => OptimizeOnConnectionClose);
+        var c = new ObservedSqliteConnection(
+            $"Data Source={Path};Cache=Shared",
+            () => OptimizeOnConnectionClose,
+            ReportSlowQuery);
         c.Open();
         using var pragma = c.CreateCommand();
         pragma.CommandText = "PRAGMA foreign_keys = ON;";
@@ -378,15 +385,50 @@ CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
         cmd.ExecuteNonQuery();
     }
 
-    private sealed class OptimizingSqliteConnection : SqliteConnection
+    private void ReportSlowQuery(string commandText, TimeSpan elapsed)
+    {
+        var threshold = SlowQueryThreshold;
+        if (threshold < TimeSpan.Zero || elapsed < threshold)
+            return;
+
+        try
+        {
+            SlowQueryLogged?.Invoke(
+                this,
+                new DatabaseSlowQueryEventArgs(
+                    DateTimeOffset.Now,
+                    elapsed,
+                    commandText));
+        }
+        catch
+        {
+            // Diagnostics should never break the underlying database operation.
+        }
+    }
+
+    private sealed class ObservedSqliteConnection : SqliteConnection
     {
         private readonly Func<bool> _shouldOptimize;
+        private readonly Action<string, TimeSpan> _reportSlowQuery;
         private bool _hasOptimized;
 
-        public OptimizingSqliteConnection(string connectionString, Func<bool> shouldOptimize)
+        public ObservedSqliteConnection(
+            string connectionString,
+            Func<bool> shouldOptimize,
+            Action<string, TimeSpan> reportSlowQuery)
             : base(connectionString)
         {
             _shouldOptimize = shouldOptimize;
+            _reportSlowQuery = reportSlowQuery;
+        }
+
+        public override SqliteCommand CreateCommand()
+        {
+            return new ObservedSqliteCommand(this, _reportSlowQuery)
+            {
+                Transaction = Transaction,
+                CommandTimeout = DefaultTimeout,
+            };
         }
 
         public override void Close()
@@ -429,7 +471,95 @@ CREATE INDEX IF NOT EXISTS ix_audit_log_occurred ON audit_log(occurred_utc);
             }
         }
     }
+
+    private sealed class ObservedSqliteCommand : SqliteCommand
+    {
+        private readonly Action<string, TimeSpan> _reportSlowQuery;
+        private int _measureDepth;
+
+        public ObservedSqliteCommand(SqliteConnection connection, Action<string, TimeSpan> reportSlowQuery)
+        {
+            Connection = connection;
+            _reportSlowQuery = reportSlowQuery;
+        }
+
+        public override int ExecuteNonQuery() => Measure(base.ExecuteNonQuery);
+
+        public override object? ExecuteScalar() => Measure(base.ExecuteScalar);
+
+        public override SqliteDataReader ExecuteReader() => Measure(base.ExecuteReader);
+
+        public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) =>
+            MeasureAsync(() => base.ExecuteNonQueryAsync(cancellationToken));
+
+        public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken) =>
+            MeasureAsync(() => base.ExecuteScalarAsync(cancellationToken));
+
+        public override SqliteDataReader ExecuteReader(CommandBehavior behavior) =>
+            Measure(() => base.ExecuteReader(behavior));
+
+        public override Task<SqliteDataReader> ExecuteReaderAsync() =>
+            MeasureAsync(base.ExecuteReaderAsync);
+
+        public override Task<SqliteDataReader> ExecuteReaderAsync(CancellationToken cancellationToken) =>
+            MeasureAsync(() => base.ExecuteReaderAsync(cancellationToken));
+
+        public override Task<SqliteDataReader> ExecuteReaderAsync(CommandBehavior behavior) =>
+            MeasureAsync(() => base.ExecuteReaderAsync(behavior));
+
+        public override Task<SqliteDataReader> ExecuteReaderAsync(
+            CommandBehavior behavior,
+            CancellationToken cancellationToken) =>
+            MeasureAsync(() => base.ExecuteReaderAsync(behavior, cancellationToken));
+
+        private async Task<T> MeasureAsync<T>(Func<Task<T>> execute)
+        {
+            if (_measureDepth > 0)
+                return await execute().ConfigureAwait(false);
+
+            _measureDepth++;
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return await execute().ConfigureAwait(false);
+            }
+            finally
+            {
+                Report(stopwatch);
+                _measureDepth--;
+            }
+        }
+
+        private T Measure<T>(Func<T> execute)
+        {
+            if (_measureDepth > 0)
+                return execute();
+
+            _measureDepth++;
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return execute();
+            }
+            finally
+            {
+                Report(stopwatch);
+                _measureDepth--;
+            }
+        }
+
+        private void Report(Stopwatch stopwatch)
+        {
+            stopwatch.Stop();
+            _reportSlowQuery(CommandText, stopwatch.Elapsed);
+        }
+    }
 }
+
+public sealed record DatabaseSlowQueryEventArgs(
+    DateTimeOffset OccurredAt,
+    TimeSpan Elapsed,
+    string CommandText);
 
 public sealed record DatabaseIntegrityReport(
     bool IsOk,

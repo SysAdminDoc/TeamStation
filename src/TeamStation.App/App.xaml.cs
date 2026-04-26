@@ -86,6 +86,8 @@ public partial class App : Application
             var db = new Database(dbPath)
             {
                 OptimizeOnConnectionClose = settings.OptimizeDatabaseOnClose,
+                SlowQueryThreshold = TimeSpan.FromMilliseconds(
+                    AppSettings.NormalizeSlowQueryThresholdMs(settings.SlowQueryThresholdMs)),
             };
             var startupIntegrity = db.CheckIntegrity();
             _crypto = CreateCrypto(db);

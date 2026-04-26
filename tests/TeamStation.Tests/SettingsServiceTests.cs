@@ -28,6 +28,7 @@ public class SettingsServiceTests : IDisposable
         Assert.Null(svc.LastLoadError);
         Assert.Equal(90, loaded.HistoryRetentionDays);
         Assert.True(loaded.OptimizeDatabaseOnClose);
+        Assert.Equal(100, loaded.SlowQueryThresholdMs);
         Assert.False(loaded.HasAcceptedLaunchNotice);
     }
 
@@ -42,6 +43,7 @@ public class SettingsServiceTests : IDisposable
             PreferProtocolLaunch = true,
             PreferClipboardPasswordLaunch = true,
             OptimizeDatabaseOnClose = false,
+            SlowQueryThresholdMs = 250,
             HistoryRetentionDays = 14,
             Theme = "Light",
         };
@@ -54,6 +56,7 @@ public class SettingsServiceTests : IDisposable
         Assert.True(loaded.PreferProtocolLaunch);
         Assert.True(loaded.PreferClipboardPasswordLaunch);
         Assert.False(loaded.OptimizeDatabaseOnClose);
+        Assert.Equal(250, loaded.SlowQueryThresholdMs);
         Assert.Equal(14, loaded.HistoryRetentionDays);
         Assert.Equal("Light", loaded.Theme);
         Assert.Null(svc.LastLoadError);

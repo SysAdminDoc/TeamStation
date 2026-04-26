@@ -25,6 +25,7 @@ public partial class SettingsWindow : Window
         CloudFolderBox.Text = settings.CloudSyncFolder ?? string.Empty;
         RetentionDaysBox.Text = settings.HistoryRetentionDays.ToString();
         OptimizeDatabaseBox.IsChecked = settings.OptimizeDatabaseOnClose;
+        SlowQueryThresholdBox.Text = AppSettings.NormalizeSlowQueryThresholdMs(settings.SlowQueryThresholdMs).ToString();
         SavedSearchesBox.Text = string.Join(Environment.NewLine, settings.SavedSearches);
         ExternalToolsBox.Text = string.Join(Environment.NewLine,
             settings.ExternalTools.Select(t => $"{t.Name}|{t.Command}|{t.Arguments}"));
@@ -63,6 +64,7 @@ public partial class SettingsWindow : Window
         _settings.CloudSyncFolder = BlankToNull(CloudFolderBox.Text);
         _settings.HistoryRetentionDays = int.Parse(RetentionDaysBox.Text.Trim());
         _settings.OptimizeDatabaseOnClose = OptimizeDatabaseBox.IsChecked == true;
+        _settings.SlowQueryThresholdMs = AppSettings.NormalizeSlowQueryThresholdMs(int.Parse(SlowQueryThresholdBox.Text.Trim()));
         _settings.SavedSearches = SavedSearchesBox.Text
             .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -101,6 +103,14 @@ public partial class SettingsWindow : Window
         {
             ShowValidation("History retention must be a whole number from 0 to 3650 days.");
             RetentionDaysBox.Focus();
+            return false;
+        }
+
+        if (!int.TryParse(SlowQueryThresholdBox.Text.Trim(), out var slowQueryThresholdMs) ||
+            slowQueryThresholdMs is < AppSettings.MinSlowQueryThresholdMs or > AppSettings.MaxSlowQueryThresholdMs)
+        {
+            ShowValidation($"Slow query threshold must be a whole number from {AppSettings.MinSlowQueryThresholdMs} to {AppSettings.MaxSlowQueryThresholdMs} ms.");
+            SlowQueryThresholdBox.Focus();
             return false;
         }
 

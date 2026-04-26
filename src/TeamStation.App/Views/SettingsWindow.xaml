@@ -229,6 +229,25 @@
                                    Text="Keeps larger vaults responsive with SQLite's lightweight PRAGMA optimize maintenance. Disable only while diagnosing database issues."
                                    Style="{StaticResource BodyMutedText}" />
 
+                        <TextBlock Margin="0,18,0,0" Text="Slow query threshold" Style="{StaticResource FieldLabelText}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="SlowQueryThresholdBox"
+                                     AutomationProperties.Name="Slow SQLite query threshold"
+                                     AutomationProperties.HelpText="Milliseconds before a SQLite command is logged as a slow query in the activity panel." />
+                            <TextBlock Grid.Column="2"
+                                       Text="ms"
+                                       Style="{StaticResource BodyMutedText}"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="SQLite commands at or above this duration appear as activity warnings with elapsed time and SQL text. Default is 100 ms."
+                                   Style="{StaticResource BodyMutedText}" />
+
                         <TextBlock Margin="0,18,0,0" Text="Saved searches" Style="{StaticResource FieldLabelText}" />
                         <TextBox x:Name="SavedSearchesBox"
                                  AutomationProperties.Name="Saved searches"

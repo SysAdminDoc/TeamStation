@@ -85,6 +85,7 @@ public sealed class MainViewModel : ViewModelBase
 
         LogPanel = new LogPanelViewModel();
         LogPanel.PropertyChanged += OnLogPanelPropertyChanged;
+        _database.SlowQueryLogged += OnSlowQueryLogged;
         QuickConnect = new QuickConnectViewModel(
             (entry, save) => QuickLaunch(entry, save),
             () => IsTeamViewerReady);
@@ -169,6 +170,36 @@ public sealed class MainViewModel : ViewModelBase
 
         var level = report.IsOk ? LogLevel.Info : LogLevel.Warning;
         LogPanel.Append(level, report.Summary);
+    }
+
+    private void OnSlowQueryLogged(object? sender, DatabaseSlowQueryEventArgs e)
+    {
+        var elapsedMs = Math.Max(0, (long)Math.Round(e.Elapsed.TotalMilliseconds));
+        var thresholdMs = Math.Max(0, (long)Math.Round(_database.SlowQueryThreshold.TotalMilliseconds));
+        var message = $"Slow SQLite query ({elapsedMs} ms, threshold {thresholdMs} ms): {FormatSqlForActivity(e.CommandText)}";
+
+        void Append() => LogPanel.Append(LogLevel.Warning, message);
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            Append();
+        else
+            dispatcher.BeginInvoke((Action)Append);
+    }
+
+    private static string FormatSqlForActivity(string commandText)
+    {
+        const int maxLength = 260;
+        var normalized = string.Join(
+            ' ',
+            commandText.Split([' ', '\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries));
+
+        if (normalized.Length == 0)
+            return "(empty command)";
+
+        return normalized.Length <= maxLength
+            ? normalized
+            : normalized[..(maxLength - 3)] + "...";
     }
 
     private void PruneHistory()
@@ -1805,6 +1836,8 @@ public sealed class MainViewModel : ViewModelBase
 
         _settingsService.Save(_settings);
         _database.OptimizeOnConnectionClose = _settings.OptimizeDatabaseOnClose;
+        _database.SlowQueryThreshold = TimeSpan.FromMilliseconds(
+            AppSettings.NormalizeSlowQueryThresholdMs(_settings.SlowQueryThresholdMs));
         ThemeManager.Apply(_settings.Theme);
         TvExePath = !string.IsNullOrWhiteSpace(_settings.TeamViewerPathOverride)
             ? _settings.TeamViewerPathOverride

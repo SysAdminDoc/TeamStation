@@ -498,6 +498,7 @@ public class MainWindowKeyboardNavTests
     [InlineData("CloudFolderBox", "Cloud sync folder")]
     [InlineData("RetentionDaysBox", "History retention days")]
     [InlineData("OptimizeDatabaseBox", "Optimize SQLite on connection close")]
+    [InlineData("SlowQueryThresholdBox", "Slow SQLite query threshold")]
     [InlineData("SavedSearchesBox", "Saved searches")]
     [InlineData("ExternalToolsBox", "External tool definitions")]
     public void Settings_fields_expose_accessible_names(string controlName, string expectedName)
@@ -535,10 +536,16 @@ public class MainWindowKeyboardNavTests
         Assert.Contains("Use 0 to keep history indefinitely.", xaml);
         Assert.Contains("RetentionDaysBox.Text = settings.HistoryRetentionDays.ToString()", source);
         Assert.Contains("OptimizeDatabaseBox.IsChecked = settings.OptimizeDatabaseOnClose", source);
+        Assert.Contains("SlowQueryThresholdBox.Text = AppSettings.NormalizeSlowQueryThresholdMs(settings.SlowQueryThresholdMs).ToString()", source);
         Assert.Contains("_settings.HistoryRetentionDays = int.Parse(RetentionDaysBox.Text.Trim())", source);
         Assert.Contains("_settings.OptimizeDatabaseOnClose = OptimizeDatabaseBox.IsChecked == true", source);
+        Assert.Contains("_settings.SlowQueryThresholdMs = AppSettings.NormalizeSlowQueryThresholdMs(int.Parse(SlowQueryThresholdBox.Text.Trim()))", source);
         Assert.Contains("retentionDays is < 0 or > 3650", source);
         Assert.Contains("History retention must be a whole number from 0 to 3650 days.", source);
+        Assert.Contains("Slow query threshold", xaml);
+        Assert.Contains("SQLite commands at or above this duration appear as activity warnings", xaml);
+        Assert.Contains("slowQueryThresholdMs is < AppSettings.MinSlowQueryThresholdMs or > AppSettings.MaxSlowQueryThresholdMs", source);
+        Assert.Contains("Slow query threshold must be a whole number", source);
     }
 
     [Fact]
@@ -550,9 +557,12 @@ public class MainWindowKeyboardNavTests
         var vmSource = File.ReadAllText(vmPath);
 
         Assert.Contains("var startupIntegrity = db.CheckIntegrity()", appSource);
+        Assert.Contains("SlowQueryThreshold = TimeSpan.FromMilliseconds(", appSource);
         Assert.Contains("startupIntegrityReport: startupIntegrity", appSource);
         Assert.Contains("AppendDatabaseIntegrityLog(startupIntegrityReport)", vmSource);
         Assert.Contains("report.IsOk ? LogLevel.Info : LogLevel.Warning", vmSource);
+        Assert.Contains("_database.SlowQueryLogged += OnSlowQueryLogged", vmSource);
+        Assert.Contains("Slow SQLite query (", vmSource);
     }
 
     [Fact]

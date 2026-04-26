@@ -11,6 +11,10 @@ namespace TeamStation.App.Services;
 
 public sealed class AppSettings
 {
+    public const int DefaultSlowQueryThresholdMs = 100;
+    public const int MinSlowQueryThresholdMs = 1;
+    public const int MaxSlowQueryThresholdMs = 60_000;
+
     public string? TeamViewerPathOverride { get; set; }
     [JsonIgnore]
     public string? TeamViewerApiToken { get; set; }
@@ -21,6 +25,7 @@ public sealed class AppSettings
     public bool PreferProtocolLaunch { get; set; }
     public bool PreferClipboardPasswordLaunch { get; set; }
     public bool OptimizeDatabaseOnClose { get; set; } = true;
+    public int SlowQueryThresholdMs { get; set; } = DefaultSlowQueryThresholdMs;
     public int HistoryRetentionDays { get; set; } = 90;
     public string? CloudSyncFolder { get; set; }
     public List<string> SavedSearches { get; set; } = new();
@@ -29,6 +34,9 @@ public sealed class AppSettings
         new ExternalToolDefinition { Name = "Ping", Command = "ping", Arguments = "%ID%" },
         new ExternalToolDefinition { Name = "Remote Desktop", Command = "mstsc", Arguments = "/v:%TAG:host%" },
     ];
+
+    public static int NormalizeSlowQueryThresholdMs(int value) =>
+        Math.Clamp(value, MinSlowQueryThresholdMs, MaxSlowQueryThresholdMs);
 }
 
 /// <summary>
